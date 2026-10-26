@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07090a">
+  <title>Mercado Negro</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎰</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="mode-banner" class="banner" hidden></div>
+
+  <header class="top">
+    <div class="brand">
+      <span class="logo">🎰</span>
+      <div>
+        <h1>Mercado Negro</h1>
+        <small>Casino clandestino · Nochevieja 2026</small>
+      </div>
+    </div>
+    <div class="countdown" id="countdown"></div>
+  </header>
+
+  <main>
+    <div id="loading" class="loading">🃏 Barajando cartas…</div>
+
+    <!-- ============ RANKING ============ -->
+    <section id="view-ranking" class="view" hidden>
+      <div id="limit-info" class="limit-info"></div>
+      <div id="final-banner"></div>
+      <ol id="ranking-list" class="ranking"></ol>
+      <div id="ranking-stats" class="stats"></div>
+    </section>
+
+    <!-- ============ DUELO ============ -->
+    <section id="view-duelo" class="view" hidden>
+      <div id="my-challenges-wrap">
+        <h2 class="section-title">🎯 Tus retos</h2>
+        <ul id="my-challenges" class="challenges"></ul>
+      </div>
+
+      <h2 class="section-title">⚔️ Retar a alguien</h2>
+      <div id="challenge-noreg" class="empty" hidden>
+        Para retar a alguien tienes que sentarte a la mesa.<br><br>
+        <button type="button" id="c-register" class="btn primary">Quiero jugar</button>
+      </div>
+      <form id="challenge-form" class="card" autocomplete="off">
+        <label>Rival<select id="c-rival"></select></label>
+        <label>Minijuego<select id="c-game"></select></label>
+        <input id="c-game-other" placeholder="¿Qué minijuego?" maxlength="60" hidden>
+        <label>Apuesta</label>
+        <div class="bet">
+          <input type="range" id="c-bet-range" min="1" value="1">
+          <input type="number" id="c-bet" min="1" inputmode="numeric">
+        </div>
+        <p id="c-max" class="hint"></p>
+        <button id="c-submit" class="btn primary" type="submit">Enviar reto ⚔️</button>
+      </form>
+
+      <h2 class="section-title">🔥 En la mesa ahora</h2>
+      <ul id="live-challenges" class="challenges"></ul>
+
+      <details id="direct-duel" class="card direct" hidden>
+        <summary>🏦 Registro directo (solo Banca)</summary>
+        <p class="hint">Para duelos por equipos, gente sin móvil o arreglar entuertos. No necesita aceptación.</p>
+      <form id="duel-form" autocomplete="off">
+        <div class="vs">
+          <label>Retador<select id="d-a"></select></label>
+          <div class="vs-badge">VS</div>
+          <label>Retado<select id="d-b"></select></label>
+        </div>
+
+        <label>Minijuego<select id="d-game"></select></label>
+        <input id="d-game-other" placeholder="¿Qué minijuego?" maxlength="60" hidden>
+
+        <label>Apuesta</label>
+        <div class="bet">
+          <input type="range" id="d-bet-range" min="1" value="1">
+          <input type="number" id="d-bet" min="1" inputmode="numeric">
+        </div>
+        <p id="d-max" class="hint"></p>
+
+        <label>¿Quién ha ganado?</label>
+        <div id="d-winner" class="winner-pick"></div>
+
+        <button id="d-submit" class="btn primary" type="submit">Registrar resultado</button>
+        <p class="hint center">¿Empate? No se registra nada: cada uno se queda con sus fichas.</p>
+      </form>
+      </details>
+    </section>
+
+    <!-- ============ HISTORIAL ============ -->
+    <section id="view-historial" class="view" hidden>
+      <div class="section-head">
+        <h2 class="section-title">📜 Historial</h2>
+        <select id="h-filter"></select>
+      </div>
+      <ul id="history-list" class="feed"></ul>
+    </section>
+
+    <!-- ============ PERFIL ============ -->
+    <section id="view-perfil" class="view" hidden>
+      <div id="profile-none" class="empty">
+        Estás en modo espectador 👀<br><br>
+        <button type="button" id="pf-register" class="btn primary">Quiero jugar</button>
+      </div>
+
+      <div id="profile">
+        <div class="profile-head card">
+          <div class="profile-avatar" id="pf-avatar"></div>
+          <div class="info">
+            <div class="profile-name" id="pf-name"></div>
+            <div class="sub" id="pf-pos"></div>
+          </div>
+          <div class="chips"><div class="amount" id="pf-chips"></div><div class="delta">fichas</div></div>
+        </div>
+
+        <div id="pf-stats" class="stats stats-grid"></div>
+
+        <div class="card">
+          <h3>✏️ Editar perfil</h3>
+          <form id="profile-form" autocomplete="off">
+            <label>Nombre<input id="pf-name-input" maxlength="24"></label>
+            <label>Avatar</label>
+            <div id="pf-emojis" class="emoji-grid"></div>
+            <button class="btn primary" type="submit">Guardar cambios</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>🔑 Código de recuperación</h3>
+          <p class="hint">Si cambias de móvil o borras los datos del navegador, con este código recuperas tu jugador. No se lo enseñes a nadie.</p>
+          <div class="row">
+            <div class="code-display" id="pf-code">••••</div>
+            <button type="button" id="pf-code-btn" class="btn ghost">Mostrar</button>
+          </div>
+        </div>
+
+        <h2 class="section-title">📜 Tus movimientos</h2>
+        <ul id="pf-history" class="feed"></ul>
+
+        <button type="button" id="unlink-btn" class="btn ghost wide">🚪 Desvincular este dispositivo</button>
+      </div>
+    </section>
+
+    <!-- ============ BANCA ============ -->
+    <section id="view-banca" class="view" hidden>
+      <h2 class="section-title">🍺 Muro de la vergüenza</h2>
+      <p class="hint">Castigos pendientes por préstamos de la Banca. Mientras no se cumplan, el deudor aparece como <span class="tag moroso">MOROSO</span>.</p>
+      <ul id="shame-list" class="feed"></ul>
+
+      <div id="admin-locked" class="card">
+        <h3>🔒 Zona de la Banca</h3>
+        <p class="hint">Solo la Banca puede dar préstamos, sentar jugadores, anular movimientos y cambiar las reglas.</p>
+        <form id="unlock-form" class="row" autocomplete="off">
+          <input type="password" id="pin" inputmode="numeric" placeholder="PIN de la Banca">
+          <button class="btn primary" type="submit">Entrar</button>
+        </form>
+      </div>
+
+      <div id="admin-panel" hidden>
+        <div class="card">
+          <h3>💸 Conceder préstamo</h3>
+          <p class="hint">Solo para quien está en la ruina (menos fichas que la apuesta mínima).</p>
+          <form id="loan-form" autocomplete="off">
+            <label>Jugador<select id="l-player"></select></label>
+            <label>Fichas<input type="number" id="l-amount" min="1" inputmode="numeric"></label>
+            <label>Castigo</label>
+            <div class="row">
+              <input id="l-punish" list="punish-list" placeholder="Elige o escribe un castigo" maxlength="80">
+              <button type="button" id="l-roulette" class="btn ghost" title="Ruleta de castigos">🎲</button>
+            </div>
+            <datalist id="punish-list"></datalist>
+            <button class="btn primary" type="submit">Prestar fichas</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>🪑 Sentar a un jugador</h3>
+          <form id="player-form" autocomplete="off">
+            <div class="row">
+              <input id="p-emoji" class="emoji-input" maxlength="4" aria-label="Emoji">
+              <input id="p-name" placeholder="Nombre" maxlength="24">
+            </div>
+            <p class="hint" id="p-hint"></p>
+            <button class="btn primary" type="submit">Sentar en la mesa</button>
+          </form>
+          <ul id="admin-players" class="mini-list"></ul>
+        </div>
+
+        <div class="card">
+          <h3>✏️ Ajuste manual</h3>
+          <p class="hint">Para corregir errores o premiar/castigar con fichas. Usa negativo para quitar.</p>
+          <form id="adjust-form" autocomplete="off">
+            <label>Jugador<select id="a-player"></select></label>
+            <label>Fichas (+/−)<input type="number" id="a-amount" inputmode="numeric"></label>
+            <label>Motivo<input id="a-reason" maxlength="80" placeholder="Ej: hizo trampas en el trivial"></label>
+            <button class="btn primary" type="submit">Aplicar ajuste</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>⚙️ Reglas de la casa</h3>
+          <form id="settings-form" autocomplete="off">
+            <div class="grid-2">
+              <label>Fichas iniciales<input type="number" id="s-start" min="1"></label>
+              <label>Apuesta mínima<input type="number" id="s-min" min="1"></label>
+              <label>Préstamo por defecto<input type="number" id="s-loan" min="1"></label>
+              <label>PIN de la Banca<input id="s-pin" maxlength="12"></label>
+            </div>
+            <label>Cierre de la partida<input type="datetime-local" id="s-end"></label>
+            <label>Límite de apuesta (% del capital) por fecha
+              <textarea id="s-schedule" rows="3" placeholder="2026-12-01 = 20"></textarea>
+            </label>
+            <p class="hint">Una línea por cambio: <code>AAAA-MM-DD = porcentaje</code>. Se aplica desde las 00:00 de ese día.</p>
+            <label>Minijuegos (uno por línea)<textarea id="s-games" rows="5"></textarea></label>
+            <label>Castigos (uno por línea)<textarea id="s-punish" rows="5"></textarea></label>
+            <button class="btn primary" type="submit">Guardar reglas</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>💾 Copia de seguridad</h3>
+          <div class="row">
+            <button type="button" id="export-btn" class="btn ghost">⬇️ Exportar</button>
+            <label class="btn ghost file-btn">⬆️ Importar<input type="file" id="import-file" accept="application/json" hidden></label>
+          </div>
+        </div>
+
+        <div class="card test-card">
+          <h3>🧪 Pruebas</h3>
+          <p class="hint">Herramientas para probar antes de la partida de verdad.</p>
+          <div class="row wrap">
+            <button type="button" id="seed-btn" class="btn ghost">➕ 6 jugadores de prueba</button>
+            <button type="button" id="fake-challenge-btn" class="btn ghost">📨 Recibir un reto de prueba</button>
+            <button type="button" id="impersonate-btn" class="btn ghost">🎭 Ser otro jugador</button>
+            <button type="button" id="wipe-btn" class="btn ghost danger-btn">🧨 Borrar todo</button>
+          </div>
+        </div>
+
+        <button type="button" id="lock-btn" class="btn ghost wide">🔒 Cerrar la Banca</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-view="ranking"><span>🏆</span>Ranking</button>
+    <button data-view="duelo"><span>⚔️</span>Duelo<b id="duel-badge" class="badge" hidden></b></button>
+    <button data-view="historial"><span>📜</span>Historial</button>
+    <button data-view="perfil"><span id="tab-me">👤</span>Perfil</button>
+    <button data-view="banca"><span>🏦</span>Banca</button>
+  </nav>
+
+  <!-- ============ BIENVENIDA / REGISTRO ============ -->
+  <div id="welcome" class="welcome" hidden>
+    <div class="welcome-box">
+      <div class="welcome-logo">🎰</div>
+      <h2>Bienvenido al<br>Mercado Negro</h2>
+
+      <div id="w-register">
+        <p class="hint center">Elige tu nombre de jugador. Este dispositivo quedará asociado a él.</p>
+        <form id="register-form" autocomplete="off">
+          <label>Tu nombre<input id="r-name" maxlength="24" placeholder="¿Cómo te llaman en la mesa?"></label>
+          <label>Tu avatar</label>
+          <div id="r-emojis" class="emoji-grid"></div>
+          <button class="btn primary" type="submit">Sentarme a la mesa</button>
+        </form>
+        <div class="welcome-links">
+          <button type="button" class="link" id="w-to-recover">Ya tengo jugador (otro móvil, borré datos…)</button>
+          <button type="button" class="link" id="w-spectate">Solo quiero mirar 👀</button>
+        </div>
+      </div>
+
+      <div id="w-recover" hidden>
+        <p class="hint center">Elige tu jugador y escribe tu código de recuperación. Lo tienes en tu perfil del otro dispositivo, o pídeselo a la Banca.</p>
+        <form id="recover-form" autocomplete="off">
+          <label>Jugador<select id="rc-player"></select></label>
+          <label>Código<input id="rc-code" maxlength="4" class="code-input" placeholder="ABCD" autocapitalize="characters"></label>
+          <button class="btn primary" type="submit">Recuperar mi jugador</button>
+        </form>
+        <div class="welcome-links">
+          <button type="button" class="link" id="w-to-register">← Volver</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <form class="modal-box" id="modal-form">
+      <div id="modal-body"></div>
+      <div class="row end">
+        <button type="button" class="btn ghost" id="modal-cancel">Cancelar</button>
+        <button type="submit" class="btn primary" id="modal-ok">Confirmar</button>
+      </div>
+    </form>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
