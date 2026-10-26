@@ -465,13 +465,13 @@
     } else if (c.status === 'reported') {
       const w = `<b class="who">${esc(player(c.winner).name)}</b>`;
       if (mineC && c.reportedBy === myId) {
-        status = `⏳ Has dicho que ganó ${c.winner === myId ? '<b class="who">tú</b>' : w}. Esperando a que ${esc(rival.name)} confirme.`;
+        status = `⏳ Has dicho que ${c.winner === myId ? 'has ganado <b class="who">tú</b>' : `ha ganado ${w}`}. Esperando a que ${esc(rival.name)} lo confirme.`;
         actions = btn('unreport', 'Me he equivocado', 'ghost');
       } else if (mineC) {
-        status = `⚖️ <b class="who">${esc(rival.name)}</b> dice que ganó ${c.winner === myId ? '<b class="who">tú</b>' : w}. ¿Es así?`;
+        status = `⚖️ <b class="who">${esc(rival.name)}</b> dice que ${c.winner === myId ? 'has ganado <b class="who">tú</b>' : 'te ha ganado'}. ¿Es así?`;
         actions = btn('confirm', '✅ Confirmar', 'primary') + btn('dispute', '❌ No es así', 'ghost');
       } else {
-        status = `⚖️ ${esc(player(c.reportedBy).name)} dice que ganó ${w}. Falta confirmación.`;
+        status = `⚖️ ${esc(player(c.reportedBy).name)} dice que ha ganado ${w}. Falta confirmación.`;
       }
     }
 

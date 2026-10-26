@@ -7,7 +7,10 @@ con Firebase Firestore como base de datos compartida en tiempo real.
 ## Qué hace
 
 - **🏆 Ranking** en directo: fichas, variación del día, apuesta máxima de cada uno, etiqueta de MOROSO.
-- **⚔️ Duelos**: eliges retador, retado, minijuego, apuesta y ganador. El límite de apuesta se calcula solo.
+- **⚔️ Retos**: envías un reto (rival, minijuego, apuesta). El rival lo acepta o rechaza desde su móvil.
+  Tras jugar, uno registra quién ha ganado y el otro lo confirma; si no está de acuerdo, se vuelve a registrar
+  y la Banca puede resolverlo. El límite de apuesta se comprueba al enviar y al aceptar.
+  Avisos con contador en la pestaña Duelo. La Banca tiene además un registro directo (sin aceptación).
 - **📜 Historial** de todos los movimientos (filtrable por jugador). La Banca puede anular errores.
 - **🏦 Banca** (con PIN): préstamos a quien está en la ruina a cambio de un castigo (con ruleta 🎲),
   sentar jugadores, ajustes manuales, reglas de la casa y copias de seguridad.
