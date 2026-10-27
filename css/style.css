@@ -850,7 +850,16 @@ img.face.tab { width: 26px; height: 26px; margin: 0 auto; }
 /* ---------- Sin scroll horizontal ---------- */
 html, body { max-width: 100%; overflow-x: hidden; }
 @supports (overflow: clip) { html, body { overflow-x: clip; } }
-body { overscroll-behavior-x: none; }
+body { overscroll-behavior-x: none; position: relative; }
+/* Blindaje extra (iPhone ignora a veces el overflow del body): el dedo solo desplaza en vertical
+   (y se puede seguir haciendo zoom), y cada bloque recorta lo que se salga */
+html, body { touch-action: pan-y pinch-zoom; }
+header.top, main, .tabs { max-width: 100vw; overflow-x: hidden; }
+@supports (overflow: clip) { header.top, main { overflow-x: clip; } }
+.show, .tutorial, .ceremony, .wrapped, .sw-game, .modal, .welcome, .tv { overflow-x: hidden; }
+.btn { max-width: 100%; }
+.photo-pick .btn, .row.wrap .btn, .ev-actions .btn { white-space: normal; }
+select, input, textarea { max-width: 100%; }
 main, .view, .card, .challenge, .feed-item, .rank-row, .ev-hero, .cal-item { min-width: 0; max-width: 100%; }
 .name, .who, .ch-head, .feed-body, .ev-body, .cal-body, .tut-body, .dedication, .seat { overflow-wrap: anywhere; }
 img, svg, canvas, video { max-width: 100%; }
