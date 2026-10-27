@@ -95,7 +95,7 @@ exports.mesas = onDocumentWritten('games/{gameId}/tables/{id}', async (e) => {
   const seats = (t.seats || []).map((s) => s.player);
   if (!before && t.status === 'open') {
     const n = await names(g);
-    return send(g, null, `🃏 ${n[t.createdBy] || 'Alguien'} abre una mesa de ${t.game} (entrada ${t.buyIn}). ¡Siéntate!`, t.createdBy);
+    return send(g, null, `🃏 ${n[t.createdBy] || 'Alguien'} abre una mesa de ${t.game} (entrada ${t.buyIn})${t.msg ? `: «${t.msg}»` : ''}. ¡Siéntate!`, t.createdBy);
   }
   if (t.status === 'playing' && before && before.status === 'open') return send(g, seats, `🃏 La mesa de ${t.game} ha empezado. ¡A jugar!`, t.createdBy);
   if (t.status === 'reported') {

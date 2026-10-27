@@ -90,6 +90,7 @@
     return `<li class="challenge table-card status-${t.status === 'open' ? 'pending' : t.status === 'playing' ? 'accepted' : 'reported'} ${mine && needsMe(t, myId) ? 'needs-me' : ''}">
       <div class="ch-head">🃏 <b>${esc(t.game)}</b>${t.mode === 'teams' ? '<span class="tag">EQUIPOS</span>' : ''}<span class="ch-amount">${t.buyIn}</span></div>
       <div class="ch-sub">Entrada por cabeza · bote actual: <b>${pot}</b> fichas · abierta por ${esc(MN.player(t.createdBy).name)} ${MN.ago(t.createdAt)}</div>
+      ${t.msg ? `<div class="table-msg">💬 “${esc(t.msg)}”</div>` : ''}
       <div class="seats">${seatsHtml(t)}</div>
       <div class="ch-status">${status}</div>
       ${actions ? `<div class="ch-actions">${actions}</div>` : ''}
@@ -119,6 +120,8 @@
     renderForm();
   }
 
+  const openLine = (t) => `🃏 ${MN.esc(MN.player(t.createdBy).name)} abre una mesa de ${MN.esc(t.game)} (entrada ${t.buyIn})${t.msg ? `: «${MN.esc(t.msg)}»` : ''}. ¡Siéntate!`;
+
   // Avisos cuando otro jugador cambia una mesa en la que estoy sentado
   let prev = null;
   function onState() {
@@ -126,6 +129,8 @@
     tables().forEach((t) => { now[t.id] = t.status; });
     if (prev && mine) {
       const msgs = [];
+      // Mesa nueva: aviso a todos menos a quien la abre (mismo texto que la push del servidor)
+      tables().filter((t) => !(t.id in prev) && t.status === 'open' && t.createdBy !== mine.id).forEach((t) => msgs.push(openLine(t)));
       tables().forEach((t) => {
         const before = prev[t.id];
         if (before === t.status || !seated(t, mine.id)) return;
@@ -226,9 +231,10 @@
         let game = MN.$('#t-game').value;
         if (game === '__other') game = MN.$('#t-game-other').value.trim() || 'Juego misterioso';
         const mode = MN.$('#t-mode').value;
-        const t = { id: Store.uid(), game, buyIn, mode, createdBy: mine.id, createdAt: Date.now(), status: 'open', seats: [{ player: mine.id, team: mode === 'teams' ? 'A' : null }] };
+        const msg = MN.$('#t-msg').value.trim().slice(0, 100);
+        const t = Object.assign({ id: Store.uid(), game, buyIn, mode, createdBy: mine.id, createdAt: Date.now(), status: 'open', seats: [{ player: mine.id, team: mode === 'teams' ? 'A' : null }] }, msg ? { msg } : {});
         const done = await MN.act(() => Store.put('tables', t), `🃏 Mesa de ${MN.esc(game)} abierta. ¡Que se sienten!`);
-        if (done) { MN.$('#table-new').open = false; MN.$('#t-game-other').value = ''; }
+        if (done) { MN.$('#table-new').open = false; MN.$('#t-game-other').value = ''; MN.$('#t-msg').value = ''; }
       });
     },
     render,
