@@ -1208,6 +1208,8 @@
     $('#s-cooldown').value = s.rejectCooldownHours;
     $('#s-maxpend').value = s.maxPendingOut;
     $('#s-expiry').value = s.challengeExpiryHours;
+    $('#s-bounty').value = s.bountyPerWin;
+    $('#s-bountymin').value = s.bountyMinStreak;
     $('#s-startdate').value = s.startDate;
     $('#s-end').value = s.endDate;
     $('#s-schedule').value = schedule().map((x) => `${x.from.replace('T', ' ')} = ${x.pct}`).join('\n');
@@ -1508,6 +1510,8 @@
         rejectCooldownHours: Math.max(0, parseFloat($('#s-cooldown').value) || 0),
         maxPendingOut: Math.max(1, parseInt($('#s-maxpend').value, 10) || Store.DEFAULTS.maxPendingOut),
         challengeExpiryHours: Math.max(1, parseFloat($('#s-expiry').value) || Store.DEFAULTS.challengeExpiryHours),
+        bountyPerWin: Math.max(0, parseInt($('#s-bounty').value, 10) || 0),
+        bountyMinStreak: Math.max(1, parseInt($('#s-bountymin').value, 10) || Store.DEFAULTS.bountyMinStreak),
         startDate: $('#s-startdate').value || Store.DEFAULTS.startDate,
         endDate: $('#s-end').value || Store.DEFAULTS.endDate,
         limitSchedule: sched.length ? sched : Store.DEFAULTS.limitSchedule,

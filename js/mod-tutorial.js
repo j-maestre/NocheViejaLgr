@@ -29,7 +29,7 @@
       { art: '📅', title: 'Los eventos',
         body: `Durante la partida hay eventos (en <b>📅 Eventos</b> y en la portada):<ul class="tut-list"><li>☭ <b>Comunista</b>: se expropia al primero.</li><li>🍻 <b>Happy hour</b>: los duelos pagan doble.</li><li>🎟️ <b>Lotería</b>: compra boletos.</li><li>⏱️ <b>Cronómetro</b>: para el reloj en ${s.stopwatchTarget},00 s.</li><li>🦅 <b>Fascista</b>: votación secreta (y comprable) para elegir al Dictador.</li></ul>Te avisamos 15 minutos antes.` },
       { art: '🛒', title: 'Ventajas y piques',
-        body: `En tu <b>perfil</b> (tu foto, arriba a la derecha) está el <b>🛒 mercado negro</b>: inmunidad, retos obligatorios y seguros.<br><br>Gana 3 seguidos y te sale el <b>🔥</b>. Con 5, tu cabeza tiene precio (<b>🎯 cazarrecompensas</b>). Y si pierdes, tienes <b>🔁 revancha</b>.` },
+        body: `En tu <b>perfil</b> (tu foto, arriba a la derecha) está el <b>🛒 mercado negro</b>: inmunidad, retos obligatorios y seguros.<br><br>Gana 3 seguidos y te sale el <b>🔥</b>. Con ${s.bountyMinStreak}, tu cabeza tiene precio (<b>🎯 cazarrecompensas</b>: quien te gane cobra ${s.bountyPerWin} fichas por victoria de tu racha, de la Banca). Y si pierdes, tienes <b>🔁 revancha</b>.` },
       { art: '📲', title: 'Último paso',
         body: `<b>Instala la app</b> y <b>activa las notificaciones</b> desde tu perfil para enterarte cuando te reten.<br><br>Las normas completas están siempre en <b>📖 Normas</b>. Y recuerda: <b>la Banca siempre gana</b>.`, last: true },
     ];

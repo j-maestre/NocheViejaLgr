@@ -9,14 +9,15 @@
   const REMATCH_HOURS = 12;
 
   // ---------------------------------------------------------- cazarrecompensas
-  // Recorre los duelos en orden: si el perdedor llevaba una racha de 5+, el ganador cobra la recompensa
+  // Recorre los duelos en orden: si el perdedor llevaba una racha de N+, el ganador cobra la recompensa
+  const minStreak = () => Math.max(1, Number(MN.S.settings.bountyMinStreak) || 5);
   function bounties() {
     const streak = {}; const out = [];
-    const per = Number(MN.S.settings.bountyPerWin) || 0;
+    const per = Number(MN.S.settings.bountyPerWin) || 0; const min = minStreak();
     MN.S.txs.forEach((t) => {
       if (t.type !== 'duel' || t.voided) return;
       const prior = streak[t.loser] || 0;
-      if (per && prior >= 5) out.push({ src: t, player: t.winner, victim: t.loser, streak: prior, amount: prior * per });
+      if (per && prior >= min) out.push({ src: t, player: t.winner, victim: t.loser, streak: prior, amount: prior * per });
       streak[t.winner] = (streak[t.winner] || 0) + 1;
       streak[t.loser] = 0;
     });
@@ -39,7 +40,7 @@
   const pending = [];
   const await_ = (p) => pending.push(p);
 
-  const bountyOn = (id, st) => (st.streakWin && st.streak >= 5 ? st.streak * (Number(MN.S.settings.bountyPerWin) || 0) : 0);
+  const bountyOn = (id, st) => (st.streakWin && st.streak >= minStreak() ? st.streak * (Number(MN.S.settings.bountyPerWin) || 0) : 0);
 
   // ---------------------------------------------------------- revanchas
   function rematchable(myId) {
@@ -159,7 +160,7 @@
         <ul>
           <li><b>🔁 Revancha</b>: durante ${REMATCH_HOURS} horas después de perder un duelo puedes retar al ganador al mismo juego.</li>
           <li><b>💥 Doble o nada</b>: lo mismo, pero por el doble (si cabe en el límite de apuesta).</li>
-          ${per ? `<li><b>🎯 Cazarrecompensas</b>: quien corte una racha de 5 o más victorias cobra ${per} fichas por cada victoria de la racha. Las paga la Banca.</li>` : ''}
+          ${per ? `<li><b>🎯 Cazarrecompensas</b>: quien corte una racha de ${minStreak()} o más victorias cobra ${per} fichas por cada victoria de la racha. Las paga la Banca.</li>` : ''}
           <li><b>💬 Dedicatoria</b>: el ganador de un duelo puede dejarle una frase al perdedor. Queda en el historial para siempre.</li>
           <li><b>🎮 Especialista</b>: quien más gana en cada minijuego (mínimo 2 victorias) se lleva el título.</li>
         </ul>`);

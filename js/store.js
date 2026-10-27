@@ -69,7 +69,8 @@
     plebisciteTribute: 5,      // lo que paga cada jugador al Dictador
 
     // Extras
-    bountyPerWin: 3,         // cazarrecompensas: fichas por cada victoria de la racha cortada (racha 5+)
+    bountyPerWin: 6,         // 🎯 cazarrecompensas: fichas por cada victoria de la racha cortada (las pone la Banca)
+    bountyMinStreak: 5,      // racha a partir de la cual la cabeza tiene precio
     betWindowMinutes: 10,    // apuestas de espectadores abiertas X min desde que empieza el duelo
     betMaxPct: 10,           // apuesta máxima de un espectador: % de su capital
     marketPrices: { immunity: 15, forced: 20, insurance: 10 },
@@ -96,6 +97,8 @@
     if ([60, 3].includes(Number(out.settings.communistMaskMinutes))) out.settings.communistMaskMinutes = 30;
     // El tributo al Dictador pasó de 2 a 5 fichas por cabeza
     if (Number(out.settings.plebisciteTribute) === 2) out.settings.plebisciteTribute = 5;
+    // La recompensa de la diana pasó de 3 a 6 fichas por victoria
+    if (Number(out.settings.bountyPerWin) === 3) out.settings.bountyPerWin = 6;
     out.settings.marketPrices = Object.assign({}, DEFAULTS.marketPrices, (raw.settings || {}).marketPrices || {});
     NAMES.forEach((n) => {
       const k = COLLECTIONS[n];
