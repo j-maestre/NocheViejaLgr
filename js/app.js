@@ -89,6 +89,7 @@
     switch (t.type) {
       case 'init': case 'loan': case 'adjust': return [[t.player, t.amount]];
       case 'duel': return [[t.winner, t.amount], [t.loser, -t.amount]];
+      case 'fine': return [[t.player, -t.amount]];
       default: return [];
     }
   }
@@ -110,7 +111,10 @@
     return d;
   }
 
-  const dayStart = (str) => new Date(str + 'T00:00').getTime();
+  // Inicio de un tramo del límite: 'AAAA-MM-DD' (00:00) o 'AAAA-MM-DDTHH:MM'
+  const dayStart = (str) => new Date(str.includes('T') ? str : str + 'T00:00').getTime();
+  const fmtFrom = (str) => new Date(dayStart(str)).toLocaleString('es-ES', str.includes('T')
+    ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' });
   const schedule = () => (S.settings.limitSchedule || []).slice().sort((a, b) => (a.from < b.from ? -1 : 1));
   function currentPct() {
     const sc = schedule(); const now = Date.now();
@@ -118,7 +122,8 @@
     sc.forEach((s) => { if (dayStart(s.from) <= now) pct = s.pct; });
     return pct;
   }
-  const nextChange = () => schedule().find((s) => dayStart(s.from) > Date.now());
+  // Próximo tramo que de verdad cambia el porcentaje
+  const nextChange = () => { const cur = currentPct(); return schedule().find((s) => dayStart(s.from) > Date.now() && s.pct !== cur); };
 
   function maxBetFor(capital) {
     if (capital <= 0) return 0;
@@ -127,6 +132,8 @@
   }
 
   const endTs = () => new Date(S.settings.endDate).getTime();
+  const startTs = () => new Date(S.settings.startDate).getTime();
+  const started = () => Date.now() >= startTs();
   const ended = () => Date.now() >= endTs();
   const pendingPunishments = () => S.txs.filter((t) => t.type === 'loan' && !t.voided && !t.done);
 
@@ -138,11 +145,85 @@
   //         si el rival no está de acuerdo con el resultado.
   // ------------------------------------------------------------
   const ACTIVE = ['pending', 'accepted', 'reported'];
-  const activeChallenges = () => S.challenges.filter((c) => ACTIVE.includes(c.status));
+  const HOUR = 3600000;
+  const isExpired = (c) => c.status === 'pending' && Date.now() - c.createdAt > (Number(S.settings.challengeExpiryHours) || 12) * HOUR;
+  const activeChallenges = () => S.challenges.filter((c) => ACTIVE.includes(c.status) && !isExpired(c));
+
+  // Anti-spam: ¿puede `from` retar ahora a `to`? Devuelve el motivo si no.
+  function challengeBlock(from, to) {
+    if (activeBetween(from, to)) return `Ya tienes un reto abierto con <b>${esc(player(to).name)}</b>. Terminadlo primero.`;
+    const maxOut = Number(S.settings.maxPendingOut) || 2;
+    const out = activeChallenges().filter((c) => c.from === from && c.status === 'pending').length;
+    if (out >= maxOut) return `Ya tienes ${out} reto${out > 1 ? 's' : ''} sin contestar. Espera a que respondan.`;
+    const cd = (Number(S.settings.rejectCooldownHours) || 0) * HOUR;
+    const last = S.challenges.filter((c) => c.from === from && c.to === to && c.status === 'rejected')
+      .reduce((m, c) => Math.max(m, c.closedAt || 0), 0);
+    const left = last + cd - Date.now();
+    if (cd && left > 0) {
+      const mins = Math.ceil(left / 60000); const h = Math.floor(mins / 60); const min = mins % 60;
+      return `🐔 ${esc(player(to).name)} te rechazó hace poco. Podrás volver a retarle en ${h ? h + ' h' : ''}${h && min ? ' ' : ''}${min ? min + ' min' : ''}.`;
+    }
+    return null;
+  }
   const activeBetween = (a, b) => activeChallenges().find((c) => (c.from === a && c.to === b) || (c.from === b && c.to === a));
   const rivalOf = (c, id) => (c.from === id ? c.to : c.from);
   // ¿Este reto espera una acción mía?
   const needsMe = (c, myId) => (c.status === 'pending' && c.to === myId) || (c.status === 'reported' && c.reportedBy !== myId && (c.from === myId || c.to === myId));
+
+  // Fuego animado para rachas de 3+ victorias (crece con la racha)
+  function fireHtml(st, big) {
+    if (!st.streakWin || st.streak < 3) return '';
+    const lvl = st.streak >= 7 ? 3 : st.streak >= 5 ? 2 : 1;
+    return `<span class="fire lvl-${lvl}${big ? ' big' : ''}" title="Racha de ${st.streak} victorias"><span class="flame">🔥</span>${st.streak}</span>`;
+  }
+
+  const BADGES = [
+    { id: 'shark', icon: '🦈', name: 'Tiburón', desc: 'Ganar 5 duelos seguidos' },
+    { id: 'chicken', icon: '🐔', name: 'Gallina', desc: 'Rechazar 3 retos' },
+    { id: 'broke', icon: '💀', name: 'Quebrado', desc: 'Quedarse a 0 fichas' },
+    { id: 'drunk', icon: '🍺', name: 'Moroso habitual', desc: 'Pedir 2 préstamos a la Banca' },
+  ];
+
+  // Insignias ganadas por cada jugador (son permanentes una vez conseguidas)
+  function achievements() {
+    const res = {}; const run = {}; const streak = {}; const best = {}; const loans = {};
+    S.players.forEach((p) => { res[p.id] = new Set(); run[p.id] = 0; streak[p.id] = 0; best[p.id] = 0; loans[p.id] = 0; });
+    S.txs.forEach((t) => {
+      if (t.voided) return;
+      effects(t).forEach(([id, d]) => { if (id in run) run[id] += d; });
+      if (t.type === 'duel') {
+        if (t.winner in streak) { streak[t.winner]++; best[t.winner] = Math.max(best[t.winner], streak[t.winner]); }
+        if (t.loser in streak) streak[t.loser] = 0;
+      }
+      if (t.type === 'loan' && t.player in loans) loans[t.player]++;
+      effects(t).forEach(([id]) => { if (id in run && run[id] <= 0) res[id].add('broke'); });
+    });
+    const rejected = {};
+    S.challenges.forEach((c) => { if (c.status === 'rejected') rejected[c.to] = (rejected[c.to] || 0) + 1; });
+    S.players.forEach((p) => {
+      if (best[p.id] >= 5) res[p.id].add('shark');
+      if ((rejected[p.id] || 0) >= 3) res[p.id].add('chicken');
+      if (loans[p.id] >= 2) res[p.id].add('drunk');
+    });
+    return res;
+  }
+
+  // Serie temporal de fichas de cada jugador: { id: [[ts, fichas], ...] }
+  function balanceSeries() {
+    const run = {}; const series = {};
+    S.players.forEach((p) => { run[p.id] = 0; series[p.id] = []; });
+    S.txs.forEach((t) => {
+      if (t.voided) return;
+      effects(t).forEach(([id, d]) => {
+        if (!(id in run)) return;
+        run[id] += d;
+        const s = series[id];
+        if (s.length && s[s.length - 1][0] === t.ts) s[s.length - 1][1] = run[id];
+        else s.push([t.ts, run[id]]);
+      });
+    });
+    return series;
+  }
 
   function sortedPlayers(bal) {
     return [...S.players].sort((a, b) => bal[b.id] - bal[a.id] || a.name.localeCompare(b.name));
@@ -188,6 +269,8 @@
         return { icon: '🏦', text: `La Banca presta <b>${t.amount}</b> fichas a ${who(t.player)}`, sub: `Castigo: ${esc(t.punishment)} · ${t.done ? '✅ cumplido' : '⏳ pendiente'}` };
       case 'adjust':
         return { icon: '✏️', text: `Ajuste de la Banca: <b>${t.amount > 0 ? '+' : ''}${t.amount}</b> a ${who(t.player)}`, sub: esc(t.reason || '') };
+      case 'fine':
+        return { icon: '🐔', text: `${who(t.player)} paga <b>${t.amount}</b> fichas de multa por cobarde`, sub: esc(t.reason || '') };
       case 'init':
         return { icon: '🪑', text: `${who(t.player)} se sienta a la mesa con <b>${t.amount}</b> fichas`, sub: '' };
       default:
@@ -238,10 +321,13 @@
 
   function go(v) {
     view = v;
+    if (v !== 'normas' && peekRules) { peekRules = false; if (S) renderWelcome(); }
+    $('#rules-btn').classList.toggle('active', v === 'normas');
     $$('.view').forEach((el) => { el.hidden = el.id !== 'view-' + v; });
     $$('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
     if (v === 'banca' && isAdmin()) fillSettingsForm();
-    if (v === 'perfil') fillProfileForm();
+    if (v === 'perfil') { fillProfileForm(); if (S) renderProfile(); }
+    if (v === 'ranking' && S && S.players.length) renderRankChart(balances());
     try { localStorage.setItem('mn_view', v); } catch (e) { /* nada */ }
     window.scrollTo(0, 0);
   }
@@ -258,9 +344,10 @@
     const mine = me();
 
     const next = nextChange();
-    $('#limit-info').innerHTML = isEnd ? '' :
-      `🎯 Apuesta máxima: <b>${currentPct()}%</b> del capital <span class="muted">(mín. ${esc(S.settings.minBet)})</span>` +
-      (next ? ` · <span class="muted">sube al ${esc(next.pct)}% el ${new Date(next.from + 'T00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>` : '');
+    $('#limit-info').innerHTML = isEnd ? '' : !started()
+      ? `🗓️ La partida empieza el <b>${esc(new Date(startTs()).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</b> · apuesta máxima al empezar: <b>${currentPct()}%</b>`
+      : `🎯 Apuesta máxima: <b>${currentPct()}%</b> del capital <span class="muted">(mín. ${esc(S.settings.minBet)})</span>` +
+      (next ? ` · <span class="muted">sube al ${esc(next.pct)}% el ${esc(fmtFrom(next.from))}</span>` : '');
 
     $('#final-banner').innerHTML = isEnd && sorted.length ?
       `<div class="final"><div class="final-crown">👑</div><div>La mesa está cerrada.<br>Gana <b>${esc(sorted[0].emoji)} ${esc(sorted[0].name)}</b> con <b>${bal[sorted[0].id]}</b> fichas</div></div>` : '';
@@ -271,19 +358,23 @@
       return;
     }
 
+    const ach = achievements();
     let pos = 0; let lastBal = null;
     $('#ranking-list').innerHTML = sorted.map((p, i) => {
+      const st = playerStats(p.id);
+      const onFire = st.streakWin && st.streak >= 5;
+      const badges = BADGES.filter((b) => ach[p.id].has(b.id)).map((b) => `<span class="mini-badge" title="${esc(b.name)}">${b.icon}</span>`).join('');
       if (bal[p.id] !== lastBal) { pos = i; lastBal = bal[p.id]; } // empates comparten puesto
       const d = today[p.id] || 0;
       const prev = prevBal[p.id];
       const flash = prev === undefined || prev === bal[p.id] ? '' : (bal[p.id] > prev ? 'flash-up' : 'flash-down');
       return `
-        <li class="rank-row pos-${pos + 1} ${bal[p.id] <= 0 ? 'broke' : ''} ${mine && mine.id === p.id ? 'is-me' : ''}">
+        <li class="rank-row pos-${pos + 1} ${bal[p.id] <= 0 ? 'broke' : ''} ${mine && mine.id === p.id ? 'is-me' : ''} ${onFire ? 'on-fire' : ''}">
           <div class="pos">${pos < 3 ? MEDALS[pos] : '#' + (pos + 1)}</div>
           <div class="avatar">${esc(p.emoji)}</div>
           <div class="info">
-            <div class="name">${esc(p.name)} ${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}${morosos.has(p.id) ? '<span class="tag moroso">MOROSO</span>' : ''}${bal[p.id] <= 0 ? '<span class="tag broke-tag">EN BANCARROTA</span>' : ''}</div>
-            <div class="sub">${isEnd ? '' : `Apuesta máx.: ${maxBetFor(bal[p.id])}`}</div>
+            <div class="name">${esc(p.name)} ${fireHtml(st)}${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}${morosos.has(p.id) ? '<span class="tag moroso">MOROSO</span>' : ''}${bal[p.id] <= 0 ? '<span class="tag broke-tag">EN BANCARROTA</span>' : ''}</div>
+            <div class="sub">${isEnd ? '' : `Apuesta máx.: ${maxBetFor(bal[p.id])}`}${badges ? ` <span class="badges-inline">${badges}</span>` : ''}</div>
           </div>
           <div class="chips ${flash}">
             <div class="amount">${bal[p.id]}</div>
@@ -300,6 +391,73 @@
       <div class="stat"><b>${total}</b><span>fichas en juego</span></div>
       <div class="stat"><b>${duels.length}</b><span>duelos</span></div>
       <div class="stat"><b>${biggest ? biggest.amount : 0}</b><span>mayor golpe${biggest ? ' · ' + esc(player(biggest.winner).name) : ''}</span></div>`;
+
+    renderRankChart(bal);
+  }
+
+  // ------------------------------------------------------------
+  //  Gráficas
+  //  Máximo 3 jugadores destacados con color; el resto en gris.
+  //  El color sigue al jugador mientras esté destacado (no al puesto).
+  // ------------------------------------------------------------
+  const CHART_COLORS = ['#3987e5', '#d95926', '#199e70']; // validados para daltonismo sobre el fondo oscuro
+  let chartSel = null; // { playerId: índice de color }
+
+  function chartSelection(bal) {
+    if (!chartSel) {
+      chartSel = {};
+      try { chartSel = JSON.parse(localStorage.getItem('mn_chart_sel')) || null; } catch (e) { chartSel = null; }
+      if (!chartSel) {
+        chartSel = {};
+        const mine = me();
+        const ids = [...(mine ? [mine.id] : []), ...sortedPlayers(bal).map((p) => p.id)];
+        [...new Set(ids)].slice(0, 3).forEach((id, i) => { chartSel[id] = i; });
+      }
+    }
+    Object.keys(chartSel).forEach((id) => { if (!S.players.some((p) => p.id === id)) delete chartSel[id]; });
+    return chartSel;
+  }
+
+  function toggleChartPlayer(id) {
+    if (id in chartSel) delete chartSel[id];
+    else {
+      const used = new Set(Object.values(chartSel));
+      const free = [0, 1, 2].find((i) => !used.has(i));
+      if (free === undefined) return toast('Máximo 3 jugadores destacados. Quita uno primero.', 'bad');
+      chartSel[id] = free;
+    }
+    try { localStorage.setItem('mn_chart_sel', JSON.stringify(chartSel)); } catch (e) { /* nada */ }
+    renderRankChart(balances());
+  }
+
+  const chartRange = () => {
+    const first = S.txs.length ? S.txs[0].ts : Date.now();
+    return { xMin: first, xMax: Math.min(Date.now(), endTs()) };
+  };
+
+  function renderRankChart(bal) {
+    if (!S.players.length) { $('#rank-chart').innerHTML = ''; $('#rank-chart-legend').innerHTML = ''; return; }
+    const sel = chartSelection(bal);
+    const series = balanceSeries();
+    const list = sortedPlayers(bal).map((p) => ({
+      id: p.id, label: `${p.emoji} ${p.name}`, points: series[p.id],
+      color: p.id in sel ? CHART_COLORS[sel[p.id]] : null,
+    })).filter((s) => s.points.length);
+    MNChart.render($('#rank-chart'), list, chartRange());
+    $('#rank-chart-legend').innerHTML = sortedPlayers(bal).map((p) => {
+      const on = p.id in sel;
+      return `<button type="button" class="legend-chip ${on ? 'on' : ''}" data-chart="${esc(p.id)}" aria-pressed="${on}">
+        <span class="c-sw" style="background:${on ? CHART_COLORS[sel[p.id]] : 'transparent'}"></span>${esc(p.emoji)} ${esc(p.name)}</button>`;
+    }).join('');
+  }
+
+  function renderProfileChart(mine) {
+    const series = balanceSeries();
+    const list = S.players.map((p) => ({
+      id: p.id, label: p.id === mine.id ? 'Tú' : `${p.emoji} ${p.name}`, points: series[p.id],
+      color: p.id === mine.id ? CHART_COLORS[0] : null,
+    })).filter((s) => s.points.length);
+    MNChart.render($('#pf-chart'), list, Object.assign(chartRange(), { height: 180 }));
   }
 
   // ============================================================
@@ -424,7 +582,7 @@
     let max = 0; let msg;
     if (ended()) msg = '🏁 La partida ha terminado. No se aceptan más retos.';
     else if (!rival) msg = 'Elige a tu víctima para ver la apuesta máxima.';
-    else if (activeBetween(mine.id, rival)) msg = `Ya tienes un reto abierto con <b>${esc(player(rival).name)}</b>. Terminadlo primero.`;
+    else if (challengeBlock(mine.id, rival)) msg = challengeBlock(mine.id, rival);
     else {
       max = pairMax(mine.id, rival, bal);
       if (max <= 0) msg = bal[mine.id] <= 0 ? 'Estás en bancarrota: pásate por la Banca 🏦' : `<b>${esc(player(rival).name)}</b> está en bancarrota.`;
@@ -520,6 +678,7 @@
         if (!before && c.status === 'pending' && c.to === id) msgs.push(`⚔️ ${r} te reta a ${esc(c.game)} por ${c.amount} fichas`);
         else if (before === 'pending' && c.status === 'accepted' && c.from === id) msgs.push(`✅ ${r} ha aceptado tu reto. ¡A jugar!`);
         else if (c.status === 'rejected' && c.from === id) msgs.push(`🐔 ${r} ha rechazado tu reto`);
+        else if (c.status === 'expired' && c.from === id) msgs.push(`⌛ ${r} no contestó a tu reto y ha caducado`);
         else if (c.status === 'cancelled' && c.cancelledBy !== id) msgs.push(`🚫 Se ha cancelado el reto con ${r}`);
         else if (c.status === 'reported' && c.reportedBy !== id) msgs.push(`⚖️ ${r} ha registrado el resultado. Confírmalo.`);
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
@@ -552,9 +711,22 @@
             amount < c.amount ? `Aceptado, pero la apuesta baja a ${amount} (el máximo actual)` : '✅ Reto aceptado. ¡A jugar!');
           break;
         }
-        case 'reject':
-          await act(() => Store.updateChallenge(c.id, { status: 'rejected', closedAt: now }), '🐔 Reto rechazado');
+        case 'reject': {
+          const fine = Math.min(Number(S.settings.cowardFine) || 0, Math.max(0, balances()[myId]));
+          const ok = await modal(`<div class="modal-icon">🐔</div>
+            <p class="modal-text">¿Rechazar el reto de ${who(c.from)}?</p>
+            <p class="hint center">${fine ? `La multa de cobardía es de <b>${fine}</b> fichas (se las queda la Banca).` : 'Sin multa… esta vez.'}</p>`, 'Rechazar');
+          if (!ok) return;
+          await act(async () => {
+            let fineTxId = null;
+            if (fine) {
+              fineTxId = Store.uid();
+              await Store.addTx({ id: fineTxId, type: 'fine', ts: now, player: myId, amount: fine, reason: `Rechazó el reto de ${player(c.from).name}`, challengeId: c.id });
+            }
+            await Store.updateChallenge(c.id, { status: 'rejected', closedAt: now, fineTxId });
+          }, fine ? `🐔 Reto rechazado. Pagas ${fine} fichas de multa.` : '🐔 Reto rechazado');
           break;
+        }
         case 'cancel':
           if (!await modal('<div class="modal-icon">🚫</div><p class="modal-text">¿Cancelar este reto?</p>', 'Cancelar reto')) return;
           await act(() => Store.updateChallenge(c.id, { status: 'cancelled', cancelledBy: myId || 'banca', closedAt: now }), 'Reto cancelado');
@@ -649,10 +821,18 @@
     $('#pf-stats').innerHTML = `
       <div class="stat"><b>${st.won}-${st.lost}</b><span>victorias-derrotas</span></div>
       <div class="stat"><b>${st.total ? Math.round((st.won / st.total) * 100) + '%' : '—'}</b><span>de victorias</span></div>
-      <div class="stat"><b>${st.streak ? (st.streakWin ? '🔥 ' : '🧊 ') + st.streak : '—'}</b><span>${st.streak ? (st.streakWin ? 'racha ganando' : 'racha perdiendo') : 'racha'}</span></div>
+      <div class="stat"><b>${fireHtml(st, true) || (st.streak ? (st.streakWin ? '' : '🧊 ') + st.streak : '—')}</b><span>${st.streak ? (st.streakWin ? 'racha ganando' : 'racha perdiendo') : 'racha'}</span></div>
       <div class="stat"><b>${st.best ? st.best.amount : '—'}</b><span>mayor golpe</span></div>
       <div class="stat stat-text"><b>${rival(st.nemesis)}</b><span>némesis${st.nemesis ? ` (${st.nemesis[1]})` : ''}</span></div>
       <div class="stat stat-text"><b>${rival(st.victim)}</b><span>víctima favorita${st.victim ? ` (+${st.victim[1]})` : ''}</span></div>`;
+
+    const ach = achievements()[mine.id];
+    $('#pf-badges').innerHTML = BADGES.map((b) => `
+      <li class="badge-item ${ach.has(b.id) ? 'earned' : ''}">
+        <span class="badge-icon">${b.icon}</span>
+        <span><b>${esc(b.name)}</b><br><span class="muted small">${esc(b.desc)}</span></span>
+      </li>`).join('');
+    renderProfileChart(mine);
 
     const mineTx = S.txs.filter((t) => effects(t).some(([id]) => id === mine.id)).reverse();
     $('#pf-history').innerHTML = mineTx.map((t) => txItem(t, false)).join('');
@@ -669,10 +849,93 @@
   }
 
   // ============================================================
+  //  RENDER: NORMAS (las cifras salen de las reglas de la Banca)
+  // ============================================================
+  let peekRules = false; // leyendo las normas desde la pantalla de bienvenida
+
+  function renderRules() {
+    const s = S.settings;
+    const n = (v) => `<b>${esc(v)}</b>`;
+    const hours = (h) => `${n(h)} ${Number(h) === 1 ? 'hora' : 'horas'}`;
+    const longDate = (v) => new Date(v).toLocaleString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    const endTxt = longDate(s.endDate);
+    const startTxt = longDate(s.startDate);
+    const sched = schedule();
+    const cur = currentPct();
+    const fine = Number(s.cowardFine) || 0;
+    const cooldown = Number(s.rejectCooldownHours) || 0;
+    const section = (icon, title, body) => `<div class="card rule"><h3>${icon} ${title}</h3>${body}</div>`;
+
+    $('#rules').innerHTML = [
+      section('🎯', 'El objetivo', `
+        <ul>
+          <li>Cada jugador empieza con ${n(s.startChips)} fichas.</li>
+          <li>Las fichas se ganan y se pierden retando a otros jugadores a minijuegos.</li>
+          <li>La mesa abre el ${n(startTxt)} y cierra el ${n(endTxt)}.</li>
+          <li>Quien tenga más fichas al cierre <b>gana el premio</b>.</li>
+        </ul>`),
+      section('⚔️', 'Cómo funciona un reto', `
+        <ol>
+          <li>Eliges rival, minijuego y cuántas fichas os jugáis.</li>
+          <li>El rival lo <b>acepta</b> o lo <b>rechaza</b> (ver cobardía 🐔).</li>
+          <li>Jugáis en la vida real.</li>
+          <li>Uno de los dos registra quién ha ganado y <b>el otro lo confirma</b>. Hasta entonces no se mueve ninguna ficha.</li>
+        </ol>
+        <ul>
+          <li>Si no estáis de acuerdo con el resultado, se vuelve a registrar. Si seguís sin poneros de acuerdo, <b>decide la Banca</b>.</li>
+          <li>Solo puede haber <b>un reto abierto</b> entre las mismas dos personas.</li>
+          <li>Los <b>empates</b> no se registran: cada uno se queda con sus fichas.</li>
+        </ul>`),
+      section('💰', 'Límite de apuesta', `
+        <p>Para que nadie se arruine de un golpe, lo máximo que se puede apostar es un <b>porcentaje del capital del más pobre</b> de los dos (nunca menos de ${n(s.minBet)} fichas ni más de lo que tiene).</p>
+        <p>El porcentaje sube según se acerca el final:</p>
+        <table class="rule-table">
+          ${sched.map((x, i) => `<tr class="${x.pct === cur && dayStart(x.from) <= Date.now() && (!sched[i + 1] || dayStart(sched[i + 1].from) > Date.now()) ? 'current' : ''}">
+            <td>${i === 0 ? 'Al empezar' : `Desde el ${esc(fmtFrom(x.from))}`}</td><td><b>${esc(x.pct)}%</b></td></tr>`).join('')}
+        </table>
+        <p class="hint">Ahora mismo: ${n(cur + '%')}. Al aceptar un reto se vuelve a comprobar el límite: si alguien ha perdido fichas mientras tanto, la apuesta baja sola.</p>`),
+      section('🐔', 'Multa de cobardía', fine ? `
+        <p>Rechazar un reto cuesta ${n(fine)} ${fine === 1 ? 'ficha' : 'fichas'}. La multa <b>se la queda la Banca</b>, no el que te reta.</p>
+        <p>Quien rechace 3 retos se gana la insignia de <b>🐔 Gallina</b> para siempre.</p>` : `
+        <p>Ahora mismo rechazar un reto <b>no tiene multa</b>. Pero quien rechace 3 retos se gana la insignia de <b>🐔 Gallina</b> para siempre.</p>`),
+      section('🛡️', 'Anti-spam (para los pillos)', `
+        <ul>
+          <li>Nadie puede tener más de ${n(s.maxPendingOut)} retos enviados sin contestar a la vez.</li>
+          ${cooldown ? `<li>Si alguien te rechaza un reto, no puedes volver a retarle hasta que pasen ${hours(cooldown)}.</li>` : ''}
+          <li>Los retos sin respuesta <b>caducan</b> a las ${hours(s.challengeExpiryHours)}, sin multa para nadie.</li>
+          <li>Como las multas van a la Banca, spamear retos no te da ni una ficha.</li>
+        </ul>`),
+      section('🏦', 'Préstamos y morosidad', `
+        <ul>
+          <li>Si te quedas con menos de ${n(s.minBet)} fichas, puedes pedirle un préstamo a la Banca (normalmente ${n(s.loanAmount)} fichas).</li>
+          <li>El préstamo <b>no se devuelve en fichas</b>: se paga con un <b>castigo</b> (chupito, fregar los platos…).</li>
+          <li>Hasta que cumplas el castigo apareces como <span class="tag moroso">MOROSO</span> en el ranking y en el <b>Muro de la vergüenza</b>.</li>
+          <li>La Banca decide cuándo un castigo está cumplido.</li>
+        </ul>`),
+      section('🔥', 'Rachas e insignias', `
+        <p>Con 3 victorias seguidas te sale el fuego 🔥 en el ranking. Cuanto más larga la racha, más arde.</p>
+        <ul class="rule-badges">
+          ${BADGES.map((b) => `<li><span>${b.icon}</span><b>${esc(b.name)}</b>: ${esc(b.desc.charAt(0).toLowerCase() + b.desc.slice(1))}.</li>`).join('')}
+        </ul>
+        <p class="hint">Las insignias son para siempre: no se pierden aunque luego remontes.</p>`),
+      section('👤', 'Tu jugador', `
+        <ul>
+          <li>Tu móvil queda vinculado a tu jugador la primera vez que entras.</li>
+          <li>Si cambias de móvil o borras los datos del navegador, usa tu <b>código de recuperación</b> (está en tu perfil). Si lo pierdes, pídeselo a la Banca.</li>
+        </ul>`),
+      section('🎩', 'La Banca', `
+        <ul>
+          <li>La Banca puede corregir errores, anular movimientos, resolver disputas y cambiar estas reglas.</li>
+          <li>Sus decisiones son <b>inapelables</b>. La Banca siempre gana.</li>
+        </ul>`),
+    ].join('') + (!me() ? '<button type="button" id="rules-back" class="btn primary wide">🪑 Sentarme a la mesa</button>' : '');
+  }
+
+  // ============================================================
   //  RENDER: BIENVENIDA
   // ============================================================
   function renderWelcome() {
-    const show = !me() && !isSpectator();
+    const show = !me() && !isSpectator() && !peekRules;
     const w = $('#welcome');
     if (show && w.hidden) {
       // Se abre: estado inicial limpio
@@ -732,14 +995,29 @@
     $('#s-min').value = s.minBet;
     $('#s-loan').value = s.loanAmount;
     $('#s-pin').value = s.adminPin;
+    $('#s-fine').value = s.cowardFine;
+    $('#s-cooldown').value = s.rejectCooldownHours;
+    $('#s-maxpend').value = s.maxPendingOut;
+    $('#s-expiry').value = s.challengeExpiryHours;
+    $('#s-startdate').value = s.startDate;
     $('#s-end').value = s.endDate;
-    $('#s-schedule').value = schedule().map((x) => `${x.from} = ${x.pct}`).join('\n');
+    $('#s-schedule').value = schedule().map((x) => `${x.from.replace('T', ' ')} = ${x.pct}`).join('\n');
     $('#s-games').value = (s.games || []).join('\n');
     $('#s-punish').value = (s.punishments || []).join('\n');
   }
 
+  // Marca como caducados los retos sin respuesta (lo hace el primer dispositivo que lo vea)
+  const expiring = new Set();
+  function sweepExpired() {
+    S.challenges.filter((c) => isExpired(c) && !expiring.has(c.id)).forEach((c) => {
+      expiring.add(c.id);
+      Store.updateChallenge(c.id, { status: 'expired', closedAt: Date.now() }).catch(() => expiring.delete(c.id));
+    });
+  }
+
   function renderAll() {
     if (!S) return;
+    sweepExpired();
     renderRanking();
     renderChallengeForm();
     renderChallenges();
@@ -747,6 +1025,7 @@
     renderHistory();
     renderProfile();
     renderBanca();
+    renderRules();
     renderWelcome();
   }
 
@@ -775,11 +1054,13 @@
     let ts = t0 + 3600000;
     for (let k = 0; k < 18; k++) {
       ts += Math.floor(Math.random() * ((5 * 86400000 - 3600000) / 18));
-      const [a, b] = shuffle(players.slice());
+      // Los últimos 5 duelos los gana el mismo jugador, para que haya alguien "en racha"
+      const hot = players[0]; const streaky = k >= 13;
+      const [a, b] = streaky ? [hot, shuffle(players.slice(1))[0]] : shuffle(players.slice());
       const max = Math.min(maxBetFor(bal[a.id]), maxBetFor(bal[b.id]));
       if (max <= 0) continue;
       const amount = Math.max(1, Math.round(max * (0.4 + Math.random() * 0.6)));
-      const [w, l] = Math.random() < 0.5 ? [a, b] : [b, a];
+      const [w, l] = streaky || Math.random() < 0.5 ? [a, b] : [b, a];
       bal[w.id] += amount; bal[l.id] -= amount;
       txs.push({ id: Store.uid(), type: 'duel', ts, challenger: a.id, winner: w.id, loser: l.id, amount, game: games[Math.floor(Math.random() * games.length)] });
     }
@@ -798,19 +1079,21 @@
   // ============================================================
   function tick() {
     if (!S) return;
-    const ms = endTs() - Date.now();
+    const pre = !started();
+    const ms = (pre ? startTs() : endTs()) - Date.now();
     const el = $('#countdown');
-    if (ms <= 0) {
+    el.classList.toggle('pre', pre);
+    if (!pre && ms <= 0) {
       el.innerHTML = '<div class="cd-label">La mesa está</div><div class="cd-time">CERRADA</div>';
     } else {
       const d = Math.floor(ms / 86400000);
       const h = Math.floor(ms / 3600000) % 24;
       const m = Math.floor(ms / 60000) % 60;
       const s = Math.floor(ms / 1000) % 60;
-      el.innerHTML = `<div class="cd-label">Cierre de la mesa</div><div class="cd-time">${d > 0 ? d + '<small>d</small> ' : ''}${pad(h)}:${pad(m)}:${pad(s)}</div>`;
-      el.classList.toggle('urgent', ms < 3600000);
+      el.innerHTML = `<div class="cd-label">${pre ? 'La mesa abre en' : 'Cierre de la mesa'}</div><div class="cd-time">${d > 0 ? d + '<small>d</small> ' : ''}${pad(h)}:${pad(m)}:${pad(s)}</div>`;
+      el.classList.toggle('urgent', !pre && ms < 3600000);
     }
-    const e = ms <= 0;
+    const e = (pre ? 'pre' : ms <= 0 ? 'end' : 'live');
     if (wasEnded !== null && e !== wasEnded) renderAll();
     wasEnded = e;
   }
@@ -820,6 +1103,11 @@
   // ============================================================
   function bindEvents() {
     $$('.tabs button').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
+    $('#rules-btn').addEventListener('click', () => go('normas'));
+    $('#w-rules').addEventListener('click', () => { peekRules = true; renderWelcome(); go('normas'); });
+    $('#rules').addEventListener('click', (e) => {
+      if (e.target.closest('#rules-back')) { setSpectator(false); peekRules = false; renderWelcome(); }
+    });
 
     // --- Duelo
     $('#d-a').addEventListener('change', updateDuel);
@@ -840,6 +1128,14 @@
     $('#c-bet').addEventListener('input', (e) => { $('#c-bet-range').value = e.target.value; });
     $('#c-register').addEventListener('click', () => { setSpectator(false); renderAll(); });
     $('#my-challenges').addEventListener('click', challengeAction);
+    $('#rank-chart-legend').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-chart]'); if (b) toggleChartPlayer(b.dataset.chart);
+    });
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (S) { renderRankChart(balances()); renderProfile(); } }, 150);
+    });
     $('#live-challenges').addEventListener('click', challengeAction);
     $('#challenge-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -848,7 +1144,8 @@
       const amount = parseInt($('#c-bet').value, 10);
       if (ended()) return toast('🏁 La partida ha terminado', 'bad');
       if (!rival) return toast('Elige a tu rival', 'bad');
-      if (activeBetween(mine.id, rival)) return toast('Ya tenéis un reto abierto', 'bad');
+      const block = challengeBlock(mine.id, rival);
+      if (block) return toast(block, 'bad');
       const max = pairMax(mine.id, rival);
       if (!amount || amount < 1 || amount > max) return toast(`La apuesta debe estar entre 1 y ${max}`, 'bad');
       let game = $('#c-game').value;
@@ -957,10 +1254,10 @@
     $('#settings-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const sched = lines($('#s-schedule').value).map((l) => {
-        const m = l.match(/^(\d{4}-\d{2}-\d{2})\D+(\d+(?:\.\d+)?)/);
-        return m ? { from: m[1], pct: Number(m[2]) } : null;
+        const m = l.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?\s*[=:\-]?\s*(\d+(?:\.\d+)?)\s*%?$/);
+        return m ? { from: m[2] ? `${m[1]}T${m[2].padStart(5, '0')}` : m[1], pct: Number(m[3]) } : null;
       });
-      if (sched.some((x) => !x)) return toast('Revisa el formato del límite: AAAA-MM-DD = 10', 'bad');
+      if (sched.some((x) => !x)) return toast('Revisa el formato del límite: AAAA-MM-DD = 10 o AAAA-MM-DD HH:MM = 50', 'bad');
       const pin = $('#s-pin').value.trim();
       if (!pin) return toast('El PIN no puede estar vacío', 'bad');
       const s = {
@@ -968,6 +1265,11 @@
         minBet: parseInt($('#s-min').value, 10) || Store.DEFAULTS.minBet,
         loanAmount: parseInt($('#s-loan').value, 10) || Store.DEFAULTS.loanAmount,
         adminPin: pin,
+        cowardFine: Math.max(0, parseInt($('#s-fine').value, 10) || 0),
+        rejectCooldownHours: Math.max(0, parseFloat($('#s-cooldown').value) || 0),
+        maxPendingOut: Math.max(1, parseInt($('#s-maxpend').value, 10) || Store.DEFAULTS.maxPendingOut),
+        challengeExpiryHours: Math.max(1, parseFloat($('#s-expiry').value) || Store.DEFAULTS.challengeExpiryHours),
+        startDate: $('#s-startdate').value || Store.DEFAULTS.startDate,
         endDate: $('#s-end').value || Store.DEFAULTS.endDate,
         limitSchedule: sched.length ? sched : Store.DEFAULTS.limitSchedule,
         games: lines($('#s-games').value),
@@ -1087,7 +1389,7 @@
     });
 
     // Refresca textos relativos ("hace 5 min") y límites por fecha
-    setInterval(() => { if (S) { renderRanking(); renderChallenges(); renderHistory(); renderProfile(); renderBanca(); } }, 60000);
+    setInterval(() => { if (S) { sweepExpired(); renderRanking(); renderChallenges(); renderHistory(); renderProfile(); renderBanca(); } }, 60000);
     setInterval(tick, 1000);
   }
 

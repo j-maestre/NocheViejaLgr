@@ -15,11 +15,14 @@
     startChips: 100,
     minBet: 5,
     loanAmount: 50,
+    startDate: '2026-12-29T00:00', // empieza la partida (llegada a Nochevieja)
     endDate: '2026-12-31T23:00',
+    // Límite de apuesta por tramos. `from` admite fecha (00:00) o fecha y hora.
     limitSchedule: [
-      { from: '2026-01-01', pct: 10 },
-      { from: '2026-12-01', pct: 20 },
-      { from: '2026-12-31', pct: 50 },
+      { from: '2026-12-29', pct: 10 },
+      { from: '2026-12-30', pct: 20 },
+      { from: '2026-12-31', pct: 30 },
+      { from: '2026-12-31T20:00', pct: 50 },
     ],
     games: [
       'Lanzamiento de corcho logroñés',
@@ -40,6 +43,10 @@
       'Servir las copas durante una hora',
     ],
     adminPin: '1234',
+    cowardFine: 2,           // multa por rechazar un reto (va a la Banca)
+    rejectCooldownHours: 6,  // tras un rechazo, el retador no puede repetir con esa persona
+    maxPendingOut: 2,        // retos enviados sin contestar a la vez
+    challengeExpiryHours: 12, // los retos sin respuesta caducan (sin multa)
   };
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);

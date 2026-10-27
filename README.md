@@ -17,13 +17,15 @@ con Firebase Firestore como base de datos compartida en tiempo real.
 - **👤 Registro y perfil**: la primera vez que alguien entra elige nombre y avatar, y su dispositivo queda
   vinculado. En el perfil ve sus estadísticas (racha, némesis, víctima favorita…), puede cambiar nombre/avatar
   y tiene un **código de recuperación** de 4 letras para entrar desde otro móvil. La Banca ve todos los códigos.
-- **⏱️ Cuenta atrás** hasta el cierre (31 dic, 23:00). Al llegar, se congela todo y se corona al ganador.
+- **⏱️ Cuenta atrás**: hasta el inicio de la partida (29 dic) y, una vez empezada, hasta el cierre (31 dic, 23:00).
+  Al cerrar, se congela todo y se corona al ganador.
+- **📖 Normas**: sección generada con las cifras de las reglas de la Banca (siempre al día).
 
 ### Reglas que aplica
 
 - **Apuesta máxima** = `% del capital` del jugador más pobre del duelo (nunca menos que la apuesta mínima
   ni más de lo que tiene). El % sube según las fechas que pongas en *Reglas de la casa*
-  (por defecto: 10 % → 20 % desde el 1 dic → 50 % el 31 dic).
+  (por defecto: 10 % el 29 dic → 20 % el 30 → 30 % el 31 → 50 % desde las 20:00 del 31).
 - **Préstamos**: solo para quien tiene menos fichas que la apuesta mínima. No se devuelven:
   se pagan cumpliendo el castigo. Hasta entonces el jugador sale en el *Muro de la vergüenza*.
 - **Empates**: no se registran.
