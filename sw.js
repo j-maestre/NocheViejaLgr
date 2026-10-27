@@ -6,7 +6,7 @@
 //  - Muestra notificaciones: las que pide la propia web y las push
 //    que envían las Cloud Functions con la app cerrada.
 // ============================================================
-const CACHE = 'mn-v14';
+const CACHE = 'mn-v15';
 const SHELL = [
   './', 'index.html', 'manifest.json',
   'css/style.css',

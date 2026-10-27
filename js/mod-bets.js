@@ -17,6 +17,17 @@
   const isOpen = (c) => c.status === 'accepted' && Date.now() < windowEnd(c) && !MN.ended();
   const maxBet = (id) => Math.max(0, Math.floor(((MN.balances()[id] || 0) * (Number(MN.S.settings.betMaxPct) || 10)) / 100));
 
+  // ¿Puede apostar este jugador en este duelo ahora mismo?
+  const canBet = (c, myId) => isOpen(c) && myId && myId !== c.from && myId !== c.to && !betsOf(c.id).some((b) => b.player === myId) && maxBet(myId) > 0;
+  const betLine = (c) => `${c.allIn ? '💣 ALL IN: ' : '🎰 '}${MN.esc(MN.player(c.from).name)} vs ${MN.esc(MN.player(c.to).name)} a ${MN.esc(c.game)} por ${c.amount} fichas. ¡Tienes ${Number(MN.S.settings.betWindowMinutes) || 10} min para apostar!`;
+
+  // Distintivo flotante en la pestaña Duelo mientras haya un duelo en el que puedo apostar
+  function renderTab() {
+    const el = MN.$('#bet-tab-live'); if (!el || !MN.S) return;
+    const mine = MN.me();
+    el.hidden = !(mine && MN.activeChallenges().some((c) => canBet(c, mine.id)));
+  }
+
   function pools(cid) {
     const p = {};
     betsOf(cid).forEach((b) => { p[b.on] = p[b.on] || { total: 0, n: 0 }; p[b.on].total += b.amount; p[b.on].n++; });
@@ -75,12 +86,20 @@
     const list = MN.activeChallenges().filter((c) => (c.status === 'accepted' || c.status === 'reported') && (isOpen(c) || betsOf(c.id).length));
     MN.$('#bets-wrap').hidden = !list.length;
     el.innerHTML = list.map((c) => card(c, myId)).join('');
+    renderTab();
   }
 
   // Aviso al apostante cuando se resuelve su apuesta
-  let prev = null;
+  let prev = null; let prevCh = null;
   function onState() {
     const mine = MN.me(); const now = {};
+    // A todos (menos a los dos que juegan): se ha aceptado un duelo y se puede apostar
+    const st = {}; MN.S.challenges.forEach((c) => { st[c.id] = c.status; });
+    if (prevCh && mine) {
+      const open = MN.S.challenges.filter((c) => prevCh[c.id] === 'pending' && c.status === 'accepted' && canBet(c, mine.id));
+      if (open.length) MN.notify(open.map(betLine));
+    }
+    prevCh = st;
     MN.S.txs.filter((t) => t.kind === 'bets').forEach((t) => { now[t.id] = JSON.stringify(t.payouts); });
     if (prev && mine) {
       const msgs = [];
@@ -134,6 +153,7 @@
       // Cierra visualmente la ventana de apuestas cuando se acaba
       const open = MN.activeChallenges().filter(isOpen).length;
       if (open !== this._open) { this._open = open; if (MN.S) render(); }
+      renderTab();
       const now = Date.now();
       MN.$$('#bets-list .bet-cd').forEach((el) => { const ms = Number(el.dataset.to) - now; el.textContent = ms > 0 ? `${Math.floor(ms / 60000)}:${MN.pad(Math.floor(ms / 1000) % 60)}` : ''; });
     },

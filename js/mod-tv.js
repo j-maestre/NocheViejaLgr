@@ -196,7 +196,7 @@
     const fg = favGame(allGames); if (fg) slides.push({ icon: '🃏', title: 'El juego de la partida', body: `<div class="wr-name">${esc(fg[0])}</div><div>se jugó <b>${fg[1]}</b> ${fg[1] === 1 ? 'vez' : 'veces'}</div>` });
 
     const dict = S.txs.filter((t) => !t.voided && t.kind === 'plebiscite');
-    if (dict.length) { const d = dict[dict.length - 1]; slides.push({ icon: '🎖️', title: 'El Dictador', body: `${big(d.winner)}<div>ganó el plebiscito con <b>${d.votes}</b> votos y cobró <b>${d.pot}</b> fichas de tributo</div><div class="muted">Elecciones limpísimas</div>` }); }
+    if (dict.length) { const d = dict[dict.length - 1]; slides.push({ icon: '🎖️', title: 'El Dictador', body: `${big(d.winner)}<div>ganó el evento fascista con <b>${d.votes}</b> votos y cobró <b>${d.pot}</b> fichas de tributo</div><div class="muted">Elecciones limpísimas</div>` }); }
 
     const luck = S.txs.filter((t) => !t.voided && (t.kind === 'lottery' || t.kind === 'stopwatch'))
       .map((t) => `<li>${t.kind === 'lottery' ? '🎟️ Lotería' : '⏱️ Cronómetro'}: ${name(t.winner)} (+${t.pot})</li>`);

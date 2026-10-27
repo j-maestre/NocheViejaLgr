@@ -950,3 +950,7 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .photo-load { display: grid; place-items: center; text-align: center; font-size: 13px; color: var(--muted); background: #0006; animation: pulse 1.5s infinite; }
 .photo-opt.sel { border-color: var(--gold); box-shadow: 0 0 18px rgba(245, 197, 66, .45); color: var(--gold); }
 .photo-opt[disabled] { opacity: .5; }
+
+/* Distintivo flotante sobre la pestaña Duelo cuando hay apuestas abiertas */
+.float-badge { left: 50%; top: -11px; transform: translateX(-50%); height: 18px; padding: 0 7px; font-size: 9px; letter-spacing: .5px; white-space: nowrap;
+  background: linear-gradient(135deg, #f5c542, #c8961c); color: #1a1205; box-shadow: 0 0 12px rgba(245, 197, 66, .7); }

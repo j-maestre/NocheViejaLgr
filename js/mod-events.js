@@ -1,6 +1,6 @@
 // ============================================================
 //  MÓDULO: EVENTOS Y CALENDARIO
-//  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global · 🗳️ plebiscito
+//  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global · 🦅 fascista (plebiscito)
 //
 //  Los eventos se guardan en la colección `events` y los ejecuta el
 //  primer móvil que tenga la web abierta cuando toca. Todo se calcula
@@ -76,8 +76,8 @@
       desc: (s) => `Apúntate en los ${s.stopwatchSignupMinutes} minutos previos. Cada uno pone el ${s.stopwatchPct}% del capital del más pobre de los apuntados. Para el reloj en ${s.stopwatchTarget},00 s (el número se oculta a los 3 s): el que más se acerque se lleva el bote.`,
     },
     plebiscite: {
-      name: 'Plebiscito amañado', icon: '🗳️',
-      desc: (s) => `Durante ${s.plebisciteVoteMinutes} minutos se vota a un Dictador. Cada uno tiene un voto gratis, y los votos extra se compran a ${s.plebiscitePrice} fichas (sin límite: democracia de mercado). El más votado cobra ${s.plebisciteTribute} fichas a cada jugador y lleva el título de 🎖️ Dictador hasta el siguiente plebiscito.`,
+      name: 'Evento fascista', icon: '🦅',
+      desc: (s) => `Plebiscito amañado: durante ${s.plebisciteVoteMinutes} minutos se vota en secreto a un Dictador (nadie ve el recuento hasta el final). Cada uno tiene un voto gratis, y los votos extra se compran a ${s.plebiscitePrice} fichas (sin límite: democracia de mercado). El más votado cobra ${s.plebisciteTribute} fichas a cada jugador y lleva el título de 🎖️ Dictador hasta el siguiente plebiscito.`,
     },
   };
 
@@ -135,7 +135,7 @@
       case 'signup': return `📝 INSCRIPCIÓN ABIERTA · ${cd(ev.at, 'empieza en')}`;
       case 'playing': return `🔴 EN JUEGO · ${cd(playEnd(ev), 'cierra en')}`;
       case 'selling': return `🎟️ Boletos a la venta · ${cd(ev.at, 'sorteo en')}`;
-      case 'voting': return `🗳️ VOTACIÓN ABIERTA · ${cd(voteEnd(ev), 'cierra en')}`;
+      case 'voting': return `🦅 VOTACIÓN SECRETA · ${cd(voteEnd(ev), 'cierra en')}`;
       case 'over': return '⏳ Calculando resultado…';
       default: return resultLine(ev);
     }
@@ -148,7 +148,7 @@
       case 'communist': return r.from ? `☭ Se expropiaron <b>${r.amount}</b> fichas a ${who(r.from)} para ${r.to.map(who).join(', ')}` : 'No hubo nada que repartir';
       case 'happyhour': return `🍻 Terminó. ${r.bonuses ? `La Banca pagó <b>${r.bonuses}</b> fichas extra` : 'Nadie aprovechó la happy hour'}`;
       case 'lottery': return r.winner ? `🎟️ Ganó ${who(r.winner)}: <b>${r.pot}</b> fichas (${r.tickets} boletos)` : 'No se vendió ningún boleto';
-      case 'plebiscite': return r.winner ? `🗳️ ${who(r.winner)} es el nuevo Dictador con <b>${r.votes[r.winner]}</b> votos y cobró <b>${r.pot}</b> fichas de tributo` : 'Nadie votó: la democracia sobrevive (de momento)';
+      case 'plebiscite': return r.winner ? `🦅 ${who(r.winner)} es el nuevo Dictador con <b>${r.votes[r.winner]}</b> votos y cobró <b>${r.pot}</b> fichas de tributo` : 'Nadie votó: la democracia sobrevive (de momento)';
       case 'stopwatch': return r.winner ? `⏱️ Ganó ${who(r.winner)} con <b>${secs(r.ms)} s</b> y se llevó <b>${r.pot}</b> fichas` : (r.note || 'No hubo partida');
       default: return '';
     }
@@ -167,12 +167,12 @@
       return `<div class="ev-actions">${bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n} ${n === 1 ? 'boleto' : 'boletos'} · bote: <b>${lotteryPot(ev)}</b></span></div>`;
     }
     if (ev.type === 'plebiscite' && ph === 'voting') {
-      const v = tally(ev); const free = myFreeVote(ev, mine.id);
+      const free = myFreeVote(ev, mine.id);
       const opts = MN.sortedPlayers(MN.balances()).map((p) => `<option value="${MN.esc(p.id)}" ${(pvChoice[ev.id] || (free && free.for)) === p.id ? 'selected' : ''}>${MN.esc(p.emoji)} ${MN.esc(p.name)}${p.id === mine.id ? ' (tú)' : ''}</option>`).join('');
-      const board = Object.entries(v).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, n]) => `${MN.esc(MN.player(id).name)} <b>${n}</b>`).join(' · ');
+      const bought = entriesOf(ev, 'vote').filter((x) => x.player === mine.id && x.extra).length;
       return `<div class="ev-actions plebiscite-actions"><select class="pv-sel" data-ev="${MN.esc(ev.id)}">${opts}</select>
         ${b('vote', free ? '🔁 Cambiar mi voto' : '🗳️ Votar gratis')}${bal >= s.plebiscitePrice ? b('buyvote', `💰 Comprar voto (${s.plebiscitePrice})`, 'ghost') : ''}
-        <span class="muted small">${board ? `Recuento: ${board}` : 'Aún no ha votado nadie'}${free ? ` · Tu voto: ${MN.esc(MN.player(free.for).name)}` : ''}</span></div>`;
+        <span class="muted small">🤫 Voto secreto: el recuento se sabrá al final.${free ? ` · Tu voto: ${MN.esc(MN.player(free.for).name)}` : ''}${bought ? ` · Votos comprados: ${bought}` : ''}</span></div>`;
     }
     if (ev.type === 'stopwatch') {
       const me = mySignup(ev, mine.id);
@@ -350,7 +350,7 @@
       const startTs = ev.type === 'stopwatch' ? signupStart(ev) : ev.at;
       if (ph === 'upcoming' && startTs - now <= 15 * MIN && startTs - now > 0 && !seen(ev.id + ':15')) msgs.push(`⏰ En 15 minutos: ${T.icon} ${T.name}`);
       if (ph === 'live' && !seen(ev.id + ':start')) msgs.push(`🍻 ¡Empieza la happy hour! Los duelos pagan x${set().happyMultiplier} durante ${set().happyMinutes} min`);
-      if (ph === 'voting' && !seen(ev.id + ':voting')) msgs.push(`🗳️ ¡Plebiscito! Vota a tu Dictador en los próximos ${set().plebisciteVoteMinutes} min. Los votos extra se compran 😏`);
+      if (ph === 'voting' && !seen(ev.id + ':voting')) msgs.push(`🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${set().plebisciteVoteMinutes} min. Los votos extra se compran 😏`);
       if (ph === 'signup' && !seen(ev.id + ':signup')) msgs.push('⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya');
       if (ph === 'playing' && mine && mySignup(ev, mine.id) && !seen(ev.id + ':play')) msgs.push('⏱️ ¡Te toca! Juega al cronómetro global antes de que cierre');
       // Los eventos con animación no destripan el resultado en el aviso: se ve al entrar
@@ -638,8 +638,8 @@
       MN.registerTx('happy', { line: (t) => ({ icon: '🍻', text: `Happy hour: la Banca paga <b>${t.amount}</b> fichas extra a ${MN.who(t.player)}`, sub: 'Premio doble' }) });
       MN.registerTx('ticket', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.player)} compra un boleto de lotería`, sub: `${t.amount} fichas` }) });
       MN.registerTx('lottery', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.winner)} gana la lotería y se lleva <b>${t.pot}</b> fichas`, sub: `${t.tickets} boletos vendidos` }) });
-      MN.registerTx('vote', { line: (t) => ({ icon: '🗳️', text: `${MN.who(t.player)} compra un voto en el plebiscito`, sub: `${t.amount} fichas a la Banca` }) });
-      MN.registerTx('plebiscite', { line: (t) => ({ icon: '🎖️', text: `${MN.who(t.winner)} gana el plebiscito y cobra <b>${t.pot}</b> fichas de tributo`, sub: `${t.votes} votos` }) });
+      MN.registerTx('vote', { line: (t) => ({ icon: '🕶️', text: 'Alguien compra un voto secreto en el evento fascista', sub: `${t.amount} fichas a la Banca` }) });
+      MN.registerTx('plebiscite', { line: (t) => ({ icon: '🎖️', text: `${MN.who(t.winner)} gana el evento fascista y cobra <b>${t.pot}</b> fichas de tributo`, sub: `${t.votes} votos` }) });
       MN.registerTx('stopwatch', { line: (t) => ({ icon: '⏱️', text: `${MN.who(t.winner)} gana el cronómetro global con ${secs(t.ms)} s y se lleva <b>${t.pot}</b> fichas`, sub: `Entrada: ${t.buyIn} fichas por cabeza` }) });
 
       document.addEventListener('click', onClick);
@@ -691,7 +691,7 @@
         chart: '☭<br><b>Censurado por el Partido</b><br><span class="muted small">La gráfica vuelve tras la expropiación</span>',
       };
     },
-    rankExtra(id) { return id === dictator() ? '<span class="bounty-tag dictator-tag" title="Elegido en el plebiscito">🎖️ DICTADOR</span>' : ''; },
+    rankExtra(id) { return id === dictator() ? '<span class="bounty-tag dictator-tag" title="Elegido en el evento fascista">🎖️ DICTADOR</span>' : ''; },
     // Para otros módulos y las normas
     api: () => ({ events, phase, happyActiveAt, TYPES, ART, dictator }),
     rules(section) {

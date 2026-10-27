@@ -63,7 +63,13 @@ exports.retos = onDocumentWritten('games/{gameId}/challenges/{id}', async (e) =>
   const rival = (pid) => n[pid === c.from ? c.to : c.from] || '¿?';
 
   if (!b && c.status === 'pending') to(c.to, c.allIn ? `💣 ${rival(c.to)} te reta a un ALL IN a ${c.game}: ¡os jugáis todas las fichas!` : `⚔️ ${rival(c.to)} te reta a ${c.game} por ${c.amount} fichas`);
-  else if (b === 'pending' && c.status === 'accepted') to(c.from, `✅ ${rival(c.from)} ha aceptado tu reto. ¡A jugar!`);
+  else if (b === 'pending' && c.status === 'accepted') {
+    to(c.from, `✅ ${rival(c.from)} ha aceptado tu reto. ¡A jugar!`);
+    // Al resto: a apostar (mismo texto que en la web)
+    const set = await game(e.params.gameId).collection('meta').doc('settings').get();
+    const mins = Number((set.exists && set.data().betWindowMinutes) || 10);
+    jobs.push(send(e.params.gameId, null, `${c.allIn ? '💣 ALL IN: ' : '🎰 '}${n[c.from] || '¿?'} vs ${n[c.to] || '¿?'} a ${c.game} por ${c.amount} fichas. ¡Tienes ${mins} min para apostar!`, [c.from, c.to]));
+  }
   else if (c.status === 'rejected') to(c.from, `🐔 ${rival(c.from)} ha rechazado tu reto`);
   else if (c.status === 'expired') to(c.from, `⌛ ${rival(c.from)} no contestó a tu reto y ha caducado`);
   else if (c.status === 'cancelled') [c.from, c.to].filter((p) => p !== c.cancelledBy).forEach((p) => to(p, `🚫 Se ha cancelado el reto con ${rival(p)}`));
@@ -130,7 +136,7 @@ const EVENTS = {
   communist: ['☭', 'Evento comunista', '☭ ¡Empieza el evento comunista! Entra a ver a quién expropia el Partido 👀'],
   happyhour: ['🍻', 'Happy hour', '🍻 ¡Empieza la happy hour! Los duelos pagan el doble'],
   lottery: ['🎟️', 'Lotería', '🎟️ ¡Se sortea la lotería! Entra a ver quién se lleva el bote 👀'],
-  plebiscite: ['🗳️', 'Plebiscito amañado', '🗳️ ¡Plebiscito! Vota a tu Dictador. Los votos extra se compran 😏'],
+  plebiscite: ['🦅', 'Evento fascista', '🦅 ¡Evento fascista! Vota en secreto a tu Dictador. Los votos extra se compran 😏'],
   stopwatch: ['⏱️', 'Cronómetro global', '⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya'],
 };
 
@@ -151,7 +157,7 @@ exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Ma
         await send(g.id, null, msg);
       };
       if (start - now <= 15 * MIN && start - now > 2 * MIN) await fire('15', `⏰ En 15 minutos: ${T[0]} ${T[1]}`);
-      const msg = ev.type === 'plebiscite' ? `🗳️ ¡Plebiscito! Vota a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
+      const msg = ev.type === 'plebiscite' ? `🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
       if (now >= start && now - start < 5 * MIN) await fire('start', msg);
     }
   }

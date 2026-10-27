@@ -178,15 +178,15 @@
     boom({ colors: ['#ff4d4d', '#ffd400', '#ffffff'], count: 150 });
   }
 
-  // ---------------------------------------------------------- 🗳️ plebiscito
+  // ---------------------------------------------------------- 🦅 evento fascista (plebiscito)
   async function plebisciteShow(box, ev) {
     const r = ev.result || {};
     if (!r.winner) return;
     const rows = Object.entries(r.votes || {}).sort((a, b) => a[1] - b[1]); // de menos a más votos
     const max = Math.max(...rows.map(([, n]) => n));
     box.innerHTML = `<div class="show-inner plebiscite-show">
-      <div class="show-title">🗳️ PLEBISCITO AMAÑADO</div>
-      <div class="show-kicker">Escrutinio oficial (100% limpio, palabra de la Banca)…</div>
+      <div class="show-title">🦅 EVENTO FASCISTA</div>
+      <div class="show-kicker">Plebiscito amañado · escrutinio oficial (100% limpio, palabra de la Banca)…</div>
       <ul class="pv-bars" id="pv-bars">${rows.map(([id]) => `<li data-id="${MN.esc(id)}"><span class="pv-name">${MN.esc(name(id))}</span><span class="pv-bar"><i style="width:0"></i></span><b>0</b></li>`).join('')}</ul>
       <div class="pv-winner" id="pv-winner"></div>${closeBtn}</div>`;
     sfx('drum'); await sleep(1000);
