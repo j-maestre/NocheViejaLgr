@@ -205,6 +205,73 @@
       <div>es el nuevo <b>Dictador</b>${r.pot ? ` y cobra <b>${r.pot}</b> fichas de tributo` : ''}</div>`;
     MN.$('#pv-winner').classList.add('shown');
     sfx('win'); boom({ colors: ['#c9a227', '#ffffff', '#4a4f5c'], count: 160 });
+
+    // Segunda parte, distinta para cada uno: cobrar el tributo o que te lo requisen
+    const tx = MN.S.txs.find((t) => t.id === 'ev_' + ev.id && !t.voided);
+    const mine = MN.me(); if (!tx || !mine) return;
+    await sleep(1800);
+    if (mine.id === r.winner) await tributeIn(box, tx);
+    else if ((tx.payouts[mine.id] || 0) < 0) await tributeOut(box, r.winner, -tx.payouts[mine.id]);
+  }
+
+  // 🎖️ Eres el Dictador: cada súbdito te lanza sus monedas
+  async function tributeIn(box, tx) {
+    const payers = Object.entries(tx.payouts).filter(([, v]) => v < 0);
+    const scene = document.createElement('div'); scene.className = 'trib trib-in';
+    scene.innerHTML = `<div class="trib-title">💰 Tus súbditos pagan el tributo</div>
+      <div class="trib-lane" id="trib-lane"></div>
+      <div class="trib-throne"><span class="trib-crown">🎖️</span><span>Tu tesoro</span><b id="trib-total">0</b></div>`;
+    { const inner = box.querySelector('.show-inner'); inner.insertBefore(scene, inner.querySelector('[data-show-close]')); }
+    scene.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const lane = scene.querySelector('#trib-lane'); let total = 0;
+    const lines = ['con lágrimas', 'a regañadientes', 'sonriendo por miedo', 'jurando venganza', 'con el carnet del partido', 'de mala gana', 'haciendo la reverencia'];
+    for (const [id, v] of payers) {
+      const row = document.createElement('div'); row.className = 'trib-row';
+      row.innerHTML = `<span class="trib-payer">${MN.esc(name(id))}</span><span class="muted small">paga ${lines[Math.abs(MN.hash(id + tx.id)) % lines.length]}</span>`;
+      lane.appendChild(row);
+      for (let k = 0; k < -v; k++) {
+        const coin = document.createElement('span'); coin.className = 'trib-coin'; coin.textContent = '🪙';
+        coin.style.animationDelay = `${k * 0.12}s`; row.appendChild(coin);
+      }
+      await sleep(450);
+      total += -v; sfx('coin');
+      const t = scene.querySelector('#trib-total'); t.textContent = total; t.classList.remove('bump'); void t.offsetWidth; t.classList.add('bump');
+      await sleep(250);
+    }
+    await sleep(300);
+    scene.querySelector('.trib-throne').classList.add('rich');
+    sfx('win'); boom({ colors: ['#f5c542', '#ffe08a', '#c9a227'], count: 200 });
+  }
+
+  // 🥾 Te toca pagar: la Guardia del Dictador te requisa las fichas
+  async function tributeOut(box, winner, amount) {
+    const jokes = [
+      'Donación voluntaria obligatoria',
+      'Impuesto revolucionario… pero al revés',
+      'Gracias por tu contribución a la Patria (del Dictador)',
+      'Tu cartera ha sido nacionalizada',
+      'Por el bien común (el suyo)',
+      'Quejas, al buzón de sugerencias 🗑️',
+    ];
+    const scene = document.createElement('div'); scene.className = 'trib trib-out';
+    scene.innerHTML = `<div class="trib-title">🪖 Llega la Guardia del Dictador…</div>
+      <div class="trib-stage"><span class="trib-boot">🥾</span><span class="trib-wallet">👛</span><span class="trib-loot" id="trib-loot"></span></div>
+      <div class="trib-fine" id="trib-fine"></div>`;
+    { const inner = box.querySelector('.show-inner'); inner.insertBefore(scene, inner.querySelector('[data-show-close]')); }
+    scene.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    await sleep(700);
+    scene.querySelector('.trib-boot').classList.add('stomp'); await sleep(380); sfx('stomp');
+    scene.querySelector('.trib-wallet').classList.add('squash');
+    if (navigator.vibrate) try { navigator.vibrate([60, 40, 120]); } catch (e) { /* nada */ }
+    await sleep(500);
+    const loot = scene.querySelector('#trib-loot');
+    for (let k = 0; k < amount; k++) { loot.insertAdjacentHTML('beforeend', `<span class="trib-fly" style="animation-delay:${k * 0.18}s">🪙</span>`); }
+    await sleep(900 + amount * 180);
+    scene.querySelector('.trib-wallet').textContent = '🦋';
+    scene.querySelector('#trib-fine').innerHTML = `<div class="trib-minus">−${amount} fichas</div>
+      <div>para ${MN.esc(name(winner))}</div><div class="muted small">${jokes[Math.floor(Math.random() * jokes.length)]}</div>`;
+    scene.querySelector('#trib-fine').classList.add('shown');
+    sfx('trombone');
   }
 
   // ---------------------------------------------------------- ⏱️ cronómetro

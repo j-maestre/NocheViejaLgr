@@ -954,3 +954,32 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 /* Distintivo flotante sobre la pestaña Duelo cuando hay apuestas abiertas */
 .float-badge { left: 50%; top: -11px; transform: translateX(-50%); height: 18px; padding: 0 7px; font-size: 9px; letter-spacing: .5px; white-space: nowrap;
   background: linear-gradient(135deg, #f5c542, #c8961c); color: #1a1205; box-shadow: 0 0 12px rgba(245, 197, 66, .7); }
+
+/* ---------- Tributo del Dictador ---------- */
+.trib { margin-top: 18px; padding: 14px; border-radius: 16px; width: 100%; animation: pop .4s ease-out; }
+.trib-in { background: rgba(201, 162, 39, .1); border: 1px solid rgba(201, 162, 39, .5); }
+.trib-out { background: rgba(255, 77, 109, .08); border: 1px solid rgba(255, 77, 109, .4); }
+.trib-title { font-weight: 800; margin-bottom: 10px; }
+.trib-lane { display: grid; gap: 6px; text-align: left; }
+.trib-row { position: relative; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; animation: pop .3s ease-out; }
+.trib-payer { font-weight: 700; }
+.trib-coin { position: absolute; right: 30%; top: 0; font-size: 18px; animation: coinFly .7s cubic-bezier(.3, .7, .4, 1) forwards; }
+@keyframes coinFly { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(40px, 140px) scale(.4) rotate(540deg); opacity: 0; } }
+.trib-throne { margin-top: 14px; display: flex; gap: 10px; align-items: center; justify-content: center; font-weight: 700; }
+.trib-crown { font-size: 32px; }
+.trib-throne b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 40px; color: var(--gold); min-width: 2ch; }
+.trib-throne b.bump { animation: bump .25s ease-out; }
+@keyframes bump { 50% { transform: scale(1.5); color: #fff; } }
+.trib-throne.rich .trib-crown { animation: bob .6s ease-in-out 3; }
+.trib-stage { position: relative; height: 110px; display: grid; place-items: end center; }
+.trib-boot { position: absolute; top: -40px; left: 50%; font-size: 56px; transform: translate(-50%, -40px) rotate(-15deg); opacity: 0; }
+.trib-boot.stomp { animation: stomp .5s cubic-bezier(.6, 0, .9, .4) forwards; }
+@keyframes stomp { 0% { opacity: 1; transform: translate(-50%, -60px) rotate(-15deg); } 70% { opacity: 1; transform: translate(-50%, 34px) rotate(0); } 85% { transform: translate(-50%, 26px) rotate(3deg); } 100% { opacity: 1; transform: translate(-50%, 30px) rotate(0); } }
+.trib-wallet { font-size: 48px; transition: transform .2s; }
+.trib-wallet.squash { transform: scale(1.4, .5); }
+.trib-loot { position: absolute; bottom: 20px; left: 50%; }
+.trib-fly { position: absolute; font-size: 22px; opacity: 0; animation: lootFly .9s ease-out forwards; }
+@keyframes lootFly { 0% { opacity: 1; transform: translate(0, 0); } 100% { opacity: 0; transform: translate(120px, -110px) rotate(360deg) scale(.6); } }
+.trib-fine { opacity: 0; transform: scale(.8); transition: .4s; }
+.trib-fine.shown { opacity: 1; transform: none; }
+.trib-minus { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 44px; color: #ff6b6b; line-height: 1; }

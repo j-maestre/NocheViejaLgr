@@ -39,6 +39,9 @@
       if (kind === 'tick') tone(1400, 0, 0.04, 'square', 0.05);
       if (kind === 'stop') tone(220, 0, 0.12, 'square', 0.1, 140);
       if (kind === 'drum') { for (let i = 0; i < 14; i++) tone(90 + (i % 2) * 20, i * 0.06, 0.06, 'triangle', 0.12); }
+      if (kind === 'coin') { tone(1976, 0, 0.08, 'square', 0.06); tone(2637, 0.07, 0.22, 'square', 0.06); }
+      if (kind === 'stomp') { tone(70, 0, 0.25, 'sawtooth', 0.22, 40); tone(140, 0, 0.08, 'square', 0.12, 60); }
+      if (kind === 'trombone') { [294, 277, 262].forEach((f, i) => tone(f, i * 0.35, 0.32, 'sawtooth', 0.08, f - 6)); tone(247, 1.05, 1.1, 'sawtooth', 0.08, 200); }
       if (kind === 'event') { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.3, 'triangle', 0.12)); }
     } catch (e) { /* sin audio */ }
   }
