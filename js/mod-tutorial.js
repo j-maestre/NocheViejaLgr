@@ -27,9 +27,9 @@
       { art: '🃏', title: 'Mesas y apuestas',
         body: `<b>🃏 Mesas</b>: para póker, Dixit o partidas por equipos. Cada uno pone la entrada y el ganador se lleva el bote.<br><br><b>🎰 Apuestas</b>: cuando empieza un duelo ajeno tienes ${s.betWindowMinutes} minutos para apostar por quién gana.` },
       { art: '📅', title: 'Los eventos',
-        body: `Durante la partida hay eventos (en <b>📅 Eventos</b> y en la portada):<ul class="tut-list"><li>☭ <b>Comunista</b>: se expropia al primero.</li><li>🍻 <b>Happy hour</b>: los duelos pagan doble.</li><li>🎟️ <b>Lotería</b>: compra boletos.</li><li>⏱️ <b>Cronómetro</b>: para el reloj en ${s.stopwatchTarget},00 s.</li></ul>Te avisamos 15 minutos antes.` },
+        body: `Durante la partida hay eventos (en <b>📅 Eventos</b> y en la portada):<ul class="tut-list"><li>☭ <b>Comunista</b>: se expropia al primero.</li><li>🍻 <b>Happy hour</b>: los duelos pagan doble.</li><li>🎟️ <b>Lotería</b>: compra boletos.</li><li>⏱️ <b>Cronómetro</b>: para el reloj en ${s.stopwatchTarget},00 s.</li><li>🗳️ <b>Plebiscito</b>: vota (o compra votos) para elegir al Dictador.</li></ul>Te avisamos 15 minutos antes.` },
       { art: '🛒', title: 'Ventajas y piques',
-        body: `En tu <b>perfil</b> está el <b>🛒 mercado negro</b>: inmunidad, retos obligatorios y seguros.<br><br>Gana 3 seguidos y te sale el <b>🔥</b>. Con 5, tu cabeza tiene precio (<b>🎯 cazarrecompensas</b>). Y si pierdes, tienes <b>🔁 revancha</b>.` },
+        body: `En tu <b>perfil</b> (tu foto, arriba a la derecha) está el <b>🛒 mercado negro</b>: inmunidad, retos obligatorios y seguros.<br><br>Gana 3 seguidos y te sale el <b>🔥</b>. Con 5, tu cabeza tiene precio (<b>🎯 cazarrecompensas</b>). Y si pierdes, tienes <b>🔁 revancha</b>.` },
       { art: '📲', title: 'Último paso',
         body: `<b>Instala la app</b> y <b>activa las notificaciones</b> desde tu perfil para enterarte cuando te reten.<br><br>Las normas completas están siempre en <b>📖 Normas</b>. Y recuerda: <b>la Banca siempre gana</b>.`, last: true },
     ];

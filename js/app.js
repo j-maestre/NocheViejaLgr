@@ -220,6 +220,11 @@
   const needsMe = (c, myId) => (c.status === 'pending' && c.to === myId) || (c.status === 'reported' && c.reportedBy !== myId && (c.from === myId || c.to === myId))
     || (c.status === 'accepted' && isSwGame(c) && (c.from === myId || c.to === myId) && c['sw_' + myId] == null);
 
+  // 💣 ALL IN: una vez por jugador en toda la partida, os jugáis todo lo que tiene el más pobre.
+  // Solo se gasta si el reto sigue vivo o se juega (rechazado, cancelado o caducado no cuenta).
+  const allInUsed = (pid) => S.challenges.some((c) => c.allIn && c.from === pid && !['rejected', 'cancelled', 'expired'].includes(c.status));
+  const allInAmount = (a, b, bal = balances()) => Math.max(0, Math.min(bal[a] || 0, bal[b] || 0));
+
   // Retos de cronómetro: se juegan dentro de la app y gana quien se acerque más al objetivo
   const isSwGame = (c) => /cron[oó]metro/i.test(c.game || '');
   const swSecs = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
@@ -326,7 +331,7 @@
   function txLine(t) {
     switch (t.type) {
       case 'duel':
-        return { icon: '⚔️', text: DUEL_LINES[Math.abs(hash(t.id)) % DUEL_LINES.length](who(t.winner), who(t.loser), t.amount),
+        return { icon: t.allIn ? '💣' : '⚔️', text: (t.allIn ? '<b>ALL IN</b> · ' : '') + DUEL_LINES[Math.abs(hash(t.id)) % DUEL_LINES.length](who(t.winner), who(t.loser), t.amount),
           sub: esc(t.game) + (t.tag ? ` · ${esc(t.tag)}` : '') + (t.bank === 'resolved' ? ' · 🏦 decidido por la Banca' : t.bank === 'direct' ? ' · 🏦 registrado por la Banca' : '')
             + (t.dedication ? `<div class="dedication">💬 “${esc(t.dedication)}”</div>` : '') };
       case 'loan':
@@ -416,9 +421,8 @@
     MODULES.forEach((m) => m.onView && m.onView(v));
     if (v !== 'normas' && peekRules) { peekRules = false; if (S) renderWelcome(); }
     $('#rules-btn').classList.toggle('active', v === 'normas');
-    $('#events-btn').classList.toggle('active', v === 'eventos');
     $$('.view').forEach((el) => { el.hidden = el.id !== 'view-' + v; });
-    $$('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+    $$('.tabs button, #me-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
     if (v === 'banca' && isAdmin()) fillSettingsForm();
     if (v === 'perfil') { fillProfileForm(); if (S) renderProfile(); }
     if (v === 'ranking' && S && S.players.length) renderRankChart(balances());
@@ -606,7 +610,7 @@
     const cur = parseInt(bet.value, 10);
     if (max > 0 && (!cur || cur > max)) bet.value = Math.min(max, Number(S.settings.minBet) || 1);
     range.value = bet.value || 1;
-    range.disabled = bet.disabled = max <= 0;
+    range.disabled = bet.disabled = max <= 0 || allBox.checked;
 
     if (winner && winner !== a && winner !== b) winner = null;
     const pick = $('#d-winner');
@@ -689,6 +693,17 @@
       if (max <= 0) msg = bal[mine.id] <= 0 ? 'Estás en bancarrota: pásate por la Banca 🏦' : `<b>${esc(player(rival).name)}</b> está en bancarrota.`;
       else msg = `Máximo <b>${max}</b> fichas <span class="muted">(${currentPct()}% del capital del más pobre)</span><br><span class="muted">Tú: ${bal[mine.id]} · ${esc(player(rival).name)}: ${bal[rival]}</span>`;
     }
+    // ALL IN: disponible si aún no lo has gastado
+    const allWrap = $('#c-allin-wrap'); const allBox = $('#c-allin');
+    const canAll = !ended() && rival && !challengeBlock(mine.id, rival) && !allInUsed(mine.id) && allInAmount(mine.id, rival, bal) > 0;
+    allWrap.hidden = !canAll; if (!canAll) allBox.checked = false;
+    $('#c-allin-label').innerHTML = allInUsed(mine.id) ? '' : '💣 <b>ALL IN</b>: os jugáis todas las fichas. <span class="muted">Solo puedes hacerlo una vez en toda la partida.</span>';
+    if (allBox.checked) {
+      max = allInAmount(mine.id, rival, bal);
+      msg = `💣 <b>ALL IN</b> por <b>${max}</b> fichas <span class="muted">(todo lo que tiene el más pobre de los dos; se recalcula al aceptar)</span>`;
+      bet.value = max;
+    }
+    $('#challenge-form').classList.toggle('allin-on', allBox.checked);
     $('#c-max').innerHTML = msg;
     range.max = Math.max(1, max); bet.max = Math.max(1, max);
     const cur = parseInt(bet.value, 10);
@@ -707,7 +722,7 @@
 
     if (c.status === 'pending') {
       if (mineC && c.to === myId) {
-        status = `🔔 <b class="who">${esc(rival.name)}</b> te reta. ¿Aceptas?`;
+        status = c.allIn ? `💣 <b class="who">${esc(rival.name)}</b> te reta a un <b>ALL IN</b>: os jugáis todas las fichas. ¿Aceptas?` : `🔔 <b class="who">${esc(rival.name)}</b> te reta. ¿Aceptas?`;
         actions = btn('accept', '✅ Aceptar', 'primary') + btn('reject', '🐔 Rechazar', 'ghost');
       } else if (mineC) {
         status = `⏳ Esperando respuesta de <b class="who">${esc(rival.name)}</b>…`;
@@ -749,8 +764,9 @@
       actions += `<div class="admin-actions">🏦 ${[c.from, c.to].map((id) => btn('force', `Gana ${esc(player(id).name)}`, 'mini-btn', `data-winner="${esc(id)}"`)).join('')}${btn('cancel', 'Cancelar', 'mini-btn danger-btn')}</div>`;
     }
 
-    return `<li class="challenge status-${c.status} ${mineC && needsMe(c, myId) ? 'needs-me' : ''}">
-      <div class="ch-head">${from}<span class="ch-vs">VS</span>${to}${c.tag ? `<span class="tag">${esc(c.tag)}</span>` : ''}<span class="ch-amount">${c.amount}</span></div>
+    return `<li class="challenge status-${c.status} ${mineC && needsMe(c, myId) ? 'needs-me' : ''} ${c.allIn ? 'allin' : ''}">
+      ${c.allIn ? '<div class="allin-ribbon">💣 ALL IN</div>' : ''}
+      <div class="ch-head">${from}<span class="ch-vs">VS</span>${to}${c.tag ? `<span class="tag">${esc(c.tag)}</span>` : ''}<span class="ch-amount">${c.allIn && c.status === 'pending' ? allInAmount(c.from, c.to) : c.amount}</span></div>
       <div class="ch-sub">${esc(c.game)} · <time title="${fmtDate(c.createdAt)}">${ago(c.createdAt)}</time></div>
       <div class="ch-status">${status}</div>
       ${actions ? `<div class="ch-actions">${actions}</div>` : ''}
@@ -787,7 +803,7 @@
         const before = prevCh[c.id];
         if (before === c.status || (c.from !== id && c.to !== id)) return;
         const r = esc(player(rivalOf(c, id)).name);
-        if (!before && c.status === 'pending' && c.to === id) msgs.push(`⚔️ ${r} te reta a ${esc(c.game)} por ${c.amount} fichas`);
+        if (!before && c.status === 'pending' && c.to === id) msgs.push(c.allIn ? `💣 ${r} te reta a un ALL IN a ${esc(c.game)}: ¡os jugáis todas las fichas!` : `⚔️ ${r} te reta a ${esc(c.game)} por ${c.amount} fichas`);
         else if (before === 'pending' && c.status === 'accepted' && c.from === id) msgs.push(`✅ ${r} ha aceptado tu reto. ¡A jugar!`);
         else if (c.status === 'rejected' && c.from === id) msgs.push(`🐔 ${r} ha rechazado tu reto`);
         else if (c.status === 'expired' && c.from === id) msgs.push(`⌛ ${r} no contestó a tu reto y ha caducado`);
@@ -802,6 +818,25 @@
     prevCh = now;
   }
 
+  // Avisos a todos cuando la Banca presta fichas y cuando un moroso salda su deuda
+  // (los mismos textos que manda el servidor, para que no salgan repetidos)
+  let prevLoans = null;
+  function notifyLoans() {
+    const mine = me(); const now = {};
+    S.txs.forEach((t) => { if (t.type === 'loan' && !t.voided) now[t.id] = !!t.done; });
+    if (prevLoans && mine && mine.id !== bankId()) {
+      const msgs = [];
+      S.txs.forEach((t) => {
+        if (!(t.id in now)) return;
+        const name = esc(player(t.player).name); const its = t.player === mine.id;
+        if (!(t.id in prevLoans)) msgs.push(its ? `🏦 La Banca te ha prestado ${t.amount} fichas. Tu castigo: ${esc(t.punishment)}` : `🍺 ${name} ha pedido un préstamo de ${t.amount} fichas a la Banca. Castigo: ${esc(t.punishment)}`);
+        else if (!prevLoans[t.id] && now[t.id]) msgs.push(its ? '✅ Has saldado tu deuda con la Banca. Ya no eres moroso' : `✅ ${name} ha cumplido su castigo (${esc(t.punishment)}) y ya no es moroso`);
+      });
+      if (msgs.length) notify(msgs);
+    }
+    prevLoans = now;
+  }
+
   let busy = false;
   async function challengeAction(e) {
     const b = e.target.closest('[data-act]'); if (!b || busy) return;
@@ -814,11 +849,11 @@
       switch (b.dataset.act) {
         case 'accept': {
           if (ended()) return toast('🏁 La partida ha terminado', 'bad');
-          const max = pairMax(c.from, c.to);
+          const max = c.allIn ? allInAmount(c.from, c.to) : pairMax(c.from, c.to);
           if (max <= 0) return toast('Alguno de los dos está en bancarrota', 'bad');
-          const amount = Math.min(c.amount, max);
+          const amount = c.allIn ? max : Math.min(c.amount, max);
           await act(() => Store.updateChallenge(c.id, { status: 'accepted', amount, acceptedAt: now }),
-            amount < c.amount ? `Aceptado, pero la apuesta baja a ${amount} (el máximo actual)` : '✅ Reto aceptado. ¡A jugar!');
+            c.allIn ? `💣 ALL IN aceptado: ¡os jugáis ${amount} fichas!` : amount < c.amount ? `Aceptado, pero la apuesta baja a ${amount} (el máximo actual)` : '✅ Reto aceptado. ¡A jugar!');
           break;
         }
         case 'reject': {
@@ -901,7 +936,7 @@
     const txId = extra.txId || Store.uid(); const now = Date.now();
     await act(async () => {
       await Store.addTx(Object.assign({ id: txId, type: 'duel', ts: now, challengeId: c.id, challenger: c.from, winner: winnerId, loser, amount, game: c.game },
-        byBank ? { bank: 'resolved' } : {}, c.dedication && !byBank ? { dedication: c.dedication } : {}, c.tag ? { tag: c.tag } : {}, extra.tx || {}));
+        byBank ? { bank: 'resolved' } : {}, c.dedication && !byBank ? { dedication: c.dedication } : {}, c.tag ? { tag: c.tag } : {}, c.allIn ? { allIn: true } : {}, extra.tx || {}));
       await Store.updateChallenge(c.id, Object.assign({ status: 'done', winner: winnerId, txId, closedAt: now }, extra.challenge || {}));
     }, msg);
   }
@@ -1032,6 +1067,7 @@
           <li>El rival lo <b>acepta</b> o lo <b>rechaza</b> (ver cobardía 🐔).</li>
           <li>Jugáis en la vida real.</li>
           <li>Uno de los dos registra quién ha ganado y <b>el otro lo confirma</b>. Hasta entonces no se mueve ninguna ficha.</li>
+          <li>💣 <b>ALL IN</b>: una vez en toda la partida, cada uno puede retar a alguien a jugarse <b>todas las fichas</b> (las del más pobre de los dos), sin límite de apuesta. Si te lo rechazan, lo recuperas.</li>
           <li>⏱️ Los retos de <b>cronómetro</b> se juegan dentro de la app: cada uno para el reloj en su móvil (un intento) y gana automáticamente quien más se acerque a ${n(s.stopwatchTarget || 10)},00 s.</li>
         </ol>
         <ul>
@@ -1296,7 +1332,7 @@
   //  EVENTOS
   // ============================================================
   function bindEvents() {
-    $$('.tabs button').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
+    $$('.tabs button, #me-btn').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
     $('#rules-btn').addEventListener('click', () => go('normas'));
     $('#w-rules').addEventListener('click', () => { peekRules = true; renderWelcome(); go('normas'); });
     $('#rules').addEventListener('click', (e) => {
@@ -1317,6 +1353,7 @@
 
     // --- Retos
     $('#c-rival').addEventListener('change', updateChallengeForm);
+    $('#c-allin').addEventListener('change', updateChallengeForm);
     $('#c-game').addEventListener('change', () => { $('#c-game-other').hidden = $('#c-game').value !== '__other'; });
     $('#c-bet-range').addEventListener('input', (e) => { $('#c-bet').value = e.target.value; });
     $('#c-bet').addEventListener('input', (e) => { $('#c-bet-range').value = e.target.value; });
@@ -1340,16 +1377,21 @@
       if (!rival) return toast('Elige a tu rival', 'bad');
       const block = challengeBlock(mine.id, rival);
       if (block) return toast(block, 'bad');
-      const max = pairMax(mine.id, rival);
-      if (!amount || amount < 1 || amount > max) return toast(`La apuesta debe estar entre 1 y ${max}`, 'bad');
+      const allIn = $('#c-allin').checked;
+      if (allIn && allInUsed(mine.id)) return toast('Ya has usado tu ALL IN', 'bad');
+      const max = allIn ? allInAmount(mine.id, rival) : pairMax(mine.id, rival);
+      if (allIn && !max) return toast('Alguno de los dos está en bancarrota', 'bad');
+      if (!allIn && (!amount || amount < 1 || amount > max)) return toast(`La apuesta debe estar entre 1 y ${max}`, 'bad');
       let game = $('#c-game').value;
       if (game === '__other') game = $('#c-game-other').value.trim() || 'Minijuego misterioso';
-      const doc = { id: Store.uid(), from: mine.id, to: rival, game, amount, status: 'pending', createdAt: Date.now() };
+      if (allIn && !await modal(`<div class="modal-icon">💣</div><p class="modal-text">¿ALL IN contra ${who(rival)}?</p>
+        <p class="hint center">Os jugáis <b>${max}</b> fichas a ${esc(game)}. Solo puedes lanzar <b>un ALL IN en toda la partida</b> (si lo rechaza, lo recuperas).</p>`, '💣 ¡Vamos!')) return;
+      const doc = Object.assign({ id: Store.uid(), from: mine.id, to: rival, game, amount: allIn ? max : amount, status: 'pending', createdAt: Date.now() }, allIn ? { allIn: true } : {});
       const done = await act(async () => {
         for (const m of MODULES) if (m.beforeChallenge) await m.beforeChallenge(doc);
         await Store.addChallenge(doc);
-      }, doc.forced ? `🎯 Reto obligatorio enviado: ${esc(player(rival).name)} no puede negarse` : `⚔️ Reto enviado a ${esc(player(rival).name)}`);
-      if (done) { $('#c-rival').value = ''; $('#c-bet').value = ''; $('#c-game-other').value = ''; updateChallengeForm(); window.scrollTo(0, 0); }
+      }, doc.forced ? `🎯 Reto obligatorio enviado: ${esc(player(rival).name)} no puede negarse` : allIn ? `💣 ALL IN enviado a ${esc(player(rival).name)}` : `⚔️ Reto enviado a ${esc(player(rival).name)}`);
+      if (done) { $('#c-allin').checked = false; $('#c-rival').value = ''; $('#c-bet').value = ''; $('#c-game-other').value = ''; updateChallengeForm(); window.scrollTo(0, 0); }
     });
 
     // --- Historial
@@ -1612,7 +1654,7 @@
       // y se olvida que el calendario y la Banca ya estaban creados
       const s = Object.assign({}, S.settings);
       const r = s.eventRehearsal;
-      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
+      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes', 'plebisciteVoteMinutes'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
       ['eventRehearsal', 'eventsSeeded', 'bankPlayerId'].forEach((k) => delete s[k]);
       act(() => Store.replaceAll({ settings: s }), '🧨 Mesa limpia');
     });
@@ -1648,6 +1690,7 @@
         ensureBank();
         renderAll();
         notifyChallenges();
+        notifyLoans();
         MODULES.forEach((m) => { try { if (m.onState) m.onState(first); } catch (e) { console.error(e); } });
         tick();
         setTimeout(sweepAll, 0);

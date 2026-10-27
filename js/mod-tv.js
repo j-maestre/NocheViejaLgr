@@ -195,6 +195,9 @@
     const allGames = {}; [...duels, ...tables].forEach((t) => { if (t.game) allGames[t.game] = (allGames[t.game] || 0) + 1; });
     const fg = favGame(allGames); if (fg) slides.push({ icon: '🃏', title: 'El juego de la partida', body: `<div class="wr-name">${esc(fg[0])}</div><div>se jugó <b>${fg[1]}</b> ${fg[1] === 1 ? 'vez' : 'veces'}</div>` });
 
+    const dict = S.txs.filter((t) => !t.voided && t.kind === 'plebiscite');
+    if (dict.length) { const d = dict[dict.length - 1]; slides.push({ icon: '🎖️', title: 'El Dictador', body: `${big(d.winner)}<div>ganó el plebiscito con <b>${d.votes}</b> votos y cobró <b>${d.pot}</b> fichas de tributo</div><div class="muted">Elecciones limpísimas</div>` }); }
+
     const luck = S.txs.filter((t) => !t.voided && (t.kind === 'lottery' || t.kind === 'stopwatch'))
       .map((t) => `<li>${t.kind === 'lottery' ? '🎟️ Lotería' : '⏱️ Cronómetro'}: ${name(t.winner)} (+${t.pot})</li>`);
     if (luck.length) slides.push({ icon: '🍀', title: 'Tocados por la suerte', body: `<ul class="wr-list">${luck.join('')}</ul>` });

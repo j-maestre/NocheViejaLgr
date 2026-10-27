@@ -1,6 +1,6 @@
 // ============================================================
 //  MÓDULO: EVENTOS Y CALENDARIO
-//  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global
+//  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global · 🗳️ plebiscito
 //
 //  Los eventos se guardan en la colección `events` y los ejecuta el
 //  primer móvil que tenga la web abierta cuando toca. Todo se calcula
@@ -44,6 +44,15 @@
       <g stroke="#0a3" stroke-width="2">${Array.from({ length: 12 }, (_, i) => { const a = (i * Math.PI) / 6; return `<line x1="${80 + 30 * Math.sin(a)}" y1="${56 - 30 * Math.cos(a)}" x2="${80 + 34 * Math.sin(a)}" y2="${56 - 34 * Math.cos(a)}"/>`; }).join('')}</g>
       <line x1="80" y1="56" x2="96" y2="36" stroke="#ff4d6d" stroke-width="3" stroke-linecap="round"/>
       <text x="80" y="76" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="15" fill="#063">10,00</text></svg>`,
+    plebiscite: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><linearGradient id="ge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4f5c"/><stop offset="1" stop-color="#15171c"/></linearGradient></defs>
+      <rect width="160" height="100" fill="url(#ge)"/>
+      <g fill="#c9a227" opacity=".35"><rect x="8" y="10" width="6" height="80"/><rect x="146" y="10" width="6" height="80"/></g>
+      <rect x="50" y="52" width="60" height="38" rx="4" fill="#e8e2d0" stroke="#8a7a50" stroke-width="2"/><rect x="66" y="50" width="28" height="5" rx="2" fill="#333"/>
+      <g transform="rotate(-10 80 40)"><rect x="70" y="22" width="22" height="30" fill="#fff" stroke="#bbb"/><path d="M74 36l5 6 9-12" stroke="#d4183c" stroke-width="3" fill="none"/></g>
+      <ellipse cx="38" cy="30" rx="20" ry="7" fill="#2d3a2a"/><rect x="26" y="20" width="24" height="10" rx="3" fill="#3b4d36"/><rect x="30" y="24" width="16" height="3" fill="#c9a227"/>
+      <path d="M28 46q10-6 20 0q-10 4-20 0z" fill="#222"/>
+      <g fill="#c9a227"><circle cx="122" cy="26" r="6"/><circle cx="134" cy="34" r="5"/><circle cx="122" cy="40" r="4"/></g>
+      <text x="80" y="80" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="12" fill="#5a4a20">VOTO</text></svg>`,
   };
 
   const ART = new Proxy(ART_SRC, { get: (o, k) => (o[k] ? uniq(o[k]) : undefined) });
@@ -66,6 +75,10 @@
       name: 'Cronómetro global', icon: '⏱️',
       desc: (s) => `Apúntate en los ${s.stopwatchSignupMinutes} minutos previos. Cada uno pone el ${s.stopwatchPct}% del capital del más pobre de los apuntados. Para el reloj en ${s.stopwatchTarget},00 s (el número se oculta a los 3 s): el que más se acerque se lleva el bote.`,
     },
+    plebiscite: {
+      name: 'Plebiscito amañado', icon: '🗳️',
+      desc: (s) => `Durante ${s.plebisciteVoteMinutes} minutos se vota a un Dictador. Cada uno tiene un voto gratis, y los votos extra se compran a ${s.plebiscitePrice} fichas (sin límite: democracia de mercado). El más votado cobra ${s.plebisciteTribute} fichas a cada jugador y lleva el título de 🎖️ Dictador hasta el siguiente plebiscito.`,
+    },
   };
 
   // Calendario por defecto (ids fijos)
@@ -76,6 +89,7 @@
     ['ev-d4', 'happyhour', '2026-12-30T23:00'],
     ['ev-d5', 'lottery', '2026-12-31T20:00'],
     ['ev-d6', 'stopwatch', '2026-12-31T21:30'],
+    ['ev-d7', 'plebiscite', '2026-12-31T13:00'],
   ];
 
   // ---------------------------------------------------------- utilidades
@@ -85,6 +99,7 @@
   const happyEnd = (ev) => ev.at + (Number(set().happyMinutes) || 60) * MIN;
   const signupStart = (ev) => ev.at - (Number(set().stopwatchSignupMinutes) || 15) * MIN;
   const playEnd = (ev) => ev.at + (Number(set().stopwatchPlayMinutes) || 10) * MIN;
+  const voteEnd = (ev) => ev.at + (Number(set().plebisciteVoteMinutes) || 10) * MIN;
   const fmtWhen = (ts) => new Date(ts).toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const fmtHour = (ts) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   const secs = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
@@ -96,10 +111,11 @@
       case 'happyhour': return now < ev.at ? 'upcoming' : now < happyEnd(ev) ? 'live' : 'over';
       case 'stopwatch': return now < signupStart(ev) ? 'upcoming' : now < ev.at ? 'signup' : now < playEnd(ev) ? 'playing' : 'over';
       case 'lottery': return now < ev.at ? (MN.started() ? 'selling' : 'upcoming') : 'over';
+      case 'plebiscite': return now < ev.at ? 'upcoming' : now < voteEnd(ev) ? 'voting' : 'over';
       default: return now < ev.at ? 'upcoming' : 'over';
     }
   }
-  const isLive = (ev) => ['live', 'signup', 'playing'].includes(phase(ev));
+  const isLive = (ev) => ['live', 'signup', 'playing', 'voting'].includes(phase(ev));
   const happyActiveAt = (ts) => events().some((e) => e.type === 'happyhour' && ts >= e.at && ts < happyEnd(e));
 
   function countdown(ms) {
@@ -119,6 +135,7 @@
       case 'signup': return `📝 INSCRIPCIÓN ABIERTA · ${cd(ev.at, 'empieza en')}`;
       case 'playing': return `🔴 EN JUEGO · ${cd(playEnd(ev), 'cierra en')}`;
       case 'selling': return `🎟️ Boletos a la venta · ${cd(ev.at, 'sorteo en')}`;
+      case 'voting': return `🗳️ VOTACIÓN ABIERTA · ${cd(voteEnd(ev), 'cierra en')}`;
       case 'over': return '⏳ Calculando resultado…';
       default: return resultLine(ev);
     }
@@ -131,6 +148,7 @@
       case 'communist': return r.from ? `☭ Se expropiaron <b>${r.amount}</b> fichas a ${who(r.from)} para ${r.to.map(who).join(', ')}` : 'No hubo nada que repartir';
       case 'happyhour': return `🍻 Terminó. ${r.bonuses ? `La Banca pagó <b>${r.bonuses}</b> fichas extra` : 'Nadie aprovechó la happy hour'}`;
       case 'lottery': return r.winner ? `🎟️ Ganó ${who(r.winner)}: <b>${r.pot}</b> fichas (${r.tickets} boletos)` : 'No se vendió ningún boleto';
+      case 'plebiscite': return r.winner ? `🗳️ ${who(r.winner)} es el nuevo Dictador con <b>${r.votes[r.winner]}</b> votos y cobró <b>${r.pot}</b> fichas de tributo` : 'Nadie votó: la democracia sobrevive (de momento)';
       case 'stopwatch': return r.winner ? `⏱️ Ganó ${who(r.winner)} con <b>${secs(r.ms)} s</b> y se llevó <b>${r.pot}</b> fichas` : (r.note || 'No hubo partida');
       default: return '';
     }
@@ -148,6 +166,14 @@
       const n = myTickets(ev, mine.id);
       return `<div class="ev-actions">${bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n} ${n === 1 ? 'boleto' : 'boletos'} · bote: <b>${lotteryPot(ev)}</b></span></div>`;
     }
+    if (ev.type === 'plebiscite' && ph === 'voting') {
+      const v = tally(ev); const free = myFreeVote(ev, mine.id);
+      const opts = MN.sortedPlayers(MN.balances()).map((p) => `<option value="${MN.esc(p.id)}" ${(pvChoice[ev.id] || (free && free.for)) === p.id ? 'selected' : ''}>${MN.esc(p.emoji)} ${MN.esc(p.name)}${p.id === mine.id ? ' (tú)' : ''}</option>`).join('');
+      const board = Object.entries(v).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, n]) => `${MN.esc(MN.player(id).name)} <b>${n}</b>`).join(' · ');
+      return `<div class="ev-actions plebiscite-actions"><select class="pv-sel" data-ev="${MN.esc(ev.id)}">${opts}</select>
+        ${b('vote', free ? '🔁 Cambiar mi voto' : '🗳️ Votar gratis')}${bal >= s.plebiscitePrice ? b('buyvote', `💰 Comprar voto (${s.plebiscitePrice})`, 'ghost') : ''}
+        <span class="muted small">${board ? `Recuento: ${board}` : 'Aún no ha votado nadie'}${free ? ` · Tu voto: ${MN.esc(MN.player(free.for).name)}` : ''}</span></div>`;
+    }
     if (ev.type === 'stopwatch') {
       const me = mySignup(ev, mine.id);
       const n = entriesOf(ev, 'signup').length;
@@ -157,6 +183,18 @@
     }
     return '';
   }
+
+  // Plebiscito: recuento de votos (gratis + comprados)
+  function tally(ev) {
+    const v = {};
+    entriesOf(ev, 'vote').forEach((x) => {
+      if (x.extra) { const tx = MN.S.txs.find((t) => t.id === 'vote_' + x.id); if (!tx || tx.voided) return; }
+      v[x.for] = (v[x.for] || 0) + 1;
+    });
+    return v;
+  }
+  const pvChoice = {}; // candidato elegido en el desplegable (sobrevive a los repintados)
+  const myFreeVote = (ev, id) => entriesOf(ev, 'vote').find((x) => x.player === id && !x.extra);
 
   function lotteryPot(ev) { return entriesOf(ev, 'ticket').length * (Number(set().lotteryPrice) || 5) + (Number(set().lotteryBankBonus) || 0); }
 
@@ -187,13 +225,9 @@
     const el = MN.$('#calendar'); if (!el) return;
     const admin = MN.isAdmin();
     const all = (MN.S.events || []).slice().sort((a, b) => a.at - b.at);
-    const byDay = {};
-    all.forEach((e) => { const k = new Date(e.at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); (byDay[k] = byDay[k] || []).push(e); });
-    el.innerHTML = all.length ? Object.entries(byDay).map(([day, list]) => `
-      <h3 class="cal-day">${MN.esc(day)}</h3>
-      <ul class="cal-list">${list.map((ev) => {
-        const T = TYPES[ev.type]; const ph = ev.status === 'cancelled' ? 'cancelled' : phase(ev);
-        return `<li class="cal-item ph-${ph}">
+    const item = (ev) => {
+      const T = TYPES[ev.type]; const ph = ev.status === 'cancelled' ? 'cancelled' : phase(ev);
+      return `<li class="cal-item ph-${ph}">
           <div class="cal-art">${ART[ev.type]}</div>
           <div class="cal-body">
             <div class="cal-top"><b>${fmtHour(ev.at)}</b> · ${T.icon} ${T.name}${ev.surprise ? ' <span class="tag">SORPRESA</span>' : ''}</div>
@@ -204,15 +238,30 @@
               <button type="button" class="mini" data-evadmin="move" data-id="${MN.esc(ev.id)}">Cambiar hora</button>
               <button type="button" class="mini danger" data-evadmin="cancel" data-id="${MN.esc(ev.id)}">Cancelar</button></div>` : ''}
           </div></li>`;
-      }).join('')}</ul>`).join('') : '<p class="empty">No hay eventos programados.</p>';
+    };
+    // Los eventos en marcha van arriba del todo
+    const live = all.filter((ev) => ev.status === 'scheduled' && isLive(ev));
+    const rest = all.filter((ev) => !live.includes(ev));
+    const byDay = {};
+    rest.forEach((e) => { const k = new Date(e.at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); (byDay[k] = byDay[k] || []).push(e); });
+    el.innerHTML = (live.length ? `<div class="cal-live"><h3 class="cal-day cal-live-title">🔴 En marcha ahora</h3><ul class="cal-list">${live.map(item).join('')}</ul></div>` : '')
+      + (rest.length ? Object.entries(byDay).map(([day, list]) => `
+      <h3 class="cal-day">${MN.esc(day)}</h3>
+      <ul class="cal-list">${list.map(item).join('')}</ul>`).join('') : (live.length ? '' : '<p class="empty">No hay eventos programados.</p>'));
 
     MN.$('#cal-admin').hidden = !admin;
     MN.$('#cal-legend').innerHTML = Object.entries(TYPES).map(([k, T]) => `
       <div class="legend-item"><div class="cal-art">${ART[k]}</div><div><b>${T.icon} ${T.name}</b><p class="small muted">${MN.esc(T.desc(set()))}</p></div></div>`).join('');
   }
 
+  // Pestaña de eventos: punto rojo si hay alguno en marcha
+  function renderTab() {
+    const tab = MN.$('#ev-tab-live'); if (!tab) return;
+    tab.hidden = !events().some((ev) => ev.status === 'scheduled' && isLive(ev));
+  }
+
   function render() {
-    renderHero(); renderCalendar();
+    renderHero(); renderCalendar(); renderTab();
     const r = set().eventRehearsal;
     const info = MN.$('#ev-rehearsal-info');
     if (info) {
@@ -236,14 +285,14 @@
     const saved = {
       at: now, startDate: s.startDate,
       happyMinutes: s.happyMinutes, stopwatchSignupMinutes: s.stopwatchSignupMinutes, stopwatchPlayMinutes: s.stopwatchPlayMinutes,
-      communistMaskMinutes: s.communistMaskMinutes,
+      communistMaskMinutes: s.communistMaskMinutes, plebisciteVoteMinutes: s.plebisciteVoteMinutes,
       events: Object.fromEntries(pending.map((e) => [e.id, e.at])),
     };
     const local = (ts) => new Date(ts - new Date().getTimezoneOffset() * MIN).toISOString().slice(0, 16);
     await MN.act(async () => {
       await Store.saveSettings(Object.assign({}, s, {
         eventRehearsal: saved, startDate: local(now - MIN),
-        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30,
+        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30, plebisciteVoteMinutes: 3,
       }));
       await Store.putMany({ events: pending.map((e, i) => Object.assign({}, e, { at: now + (i + 1) * REHEARSAL_GAP })) });
     }, '🧪 Ensayo en marcha: el primer evento empieza en 4 minutos');
@@ -263,6 +312,7 @@
       const next = Object.assign({}, s, {
         startDate: r.startDate, happyMinutes: r.happyMinutes, stopwatchSignupMinutes: r.stopwatchSignupMinutes, stopwatchPlayMinutes: r.stopwatchPlayMinutes,
         communistMaskMinutes: r.communistMaskMinutes == null || r.communistMaskMinutes === 60 ? 30 : r.communistMaskMinutes,
+        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10,
       });
       delete next.eventRehearsal;
       await Store.saveSettings(next);
@@ -300,12 +350,14 @@
       const startTs = ev.type === 'stopwatch' ? signupStart(ev) : ev.at;
       if (ph === 'upcoming' && startTs - now <= 15 * MIN && startTs - now > 0 && !seen(ev.id + ':15')) msgs.push(`⏰ En 15 minutos: ${T.icon} ${T.name}`);
       if (ph === 'live' && !seen(ev.id + ':start')) msgs.push(`🍻 ¡Empieza la happy hour! Los duelos pagan x${set().happyMultiplier} durante ${set().happyMinutes} min`);
+      if (ph === 'voting' && !seen(ev.id + ':voting')) msgs.push(`🗳️ ¡Plebiscito! Vota a tu Dictador en los próximos ${set().plebisciteVoteMinutes} min. Los votos extra se compran 😏`);
       if (ph === 'signup' && !seen(ev.id + ':signup')) msgs.push('⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya');
       if (ph === 'playing' && mine && mySignup(ev, mine.id) && !seen(ev.id + ':play')) msgs.push('⏱️ ¡Te toca! Juega al cronómetro global antes de que cierre');
-      // Si hay animación del resultado y la web está a la vista, el aviso no destripa nada
-      const animated = MN.shows && ev.type !== 'happyhour' && document.visibilityState === 'visible';
-      if (ev.status === 'done' && ev.result && !animated && !seen(ev.id + ':done')) {
-        if (now - (ev.result.at || ev.at) < 30 * MIN) msgs.push(`${T.icon} ${resultLine(ev).replace(/<[^>]+>/g, '')}`);
+      // Los eventos con animación no destripan el resultado en el aviso: se ve al entrar
+      const animated = MN.shows && ev.type !== 'happyhour';
+      if (ev.status === 'done' && ev.result && now - (ev.result.at || ev.at) < 30 * MIN) {
+        if (!animated) { if (!seen(ev.id + ':done')) msgs.push(`${T.icon} ${resultLine(ev).replace(/<[^>]+>/g, '')}`); }
+        else if (document.visibilityState !== 'visible' && !seen(`${ev.id}:done:${ev.result.at || ev.at}`)) msgs.push(`${T.icon} ${T.name}: ¡ya ha terminado! Entra para ver qué ha pasado 👀`);
       }
     });
     if (msgs.length) MN.notify(msgs);
@@ -326,6 +378,7 @@
       if (ev.type === 'communist') await runCommunist(ev);
       if (ev.type === 'lottery') await runLottery(ev);
       if (ev.type === 'stopwatch') await runStopwatch(ev);
+      if (ev.type === 'plebiscite') await runPlebiscite(ev);
       if (ev.type === 'happyhour') await Store.update('events', ev.id, { status: 'done', result: { at: happyEnd(ev), bonuses: happyBonuses(ev).reduce((a, x) => a + x.amount, 0) } });
     }
     // El cronómetro también se resuelve antes si ya han jugado todos los apuntados
@@ -363,6 +416,35 @@
       }
     }
     await Store.update('events', ev.id, { status: 'done', result });
+  }
+
+  // Plebiscito: el más votado es Dictador y cobra el tributo a cada uno (sin dejar a nadie en negativo).
+  // Empate: decide el azar, pero un azar fijo (el mismo en todos los móviles).
+  async function runPlebiscite(ev) {
+    const s = set(); const v = tally(ev); const end = voteEnd(ev);
+    const result = { at: end, votes: v };
+    const ranked = Object.entries(v).sort((a, b) => b[1] - a[1] || MN.hash(ev.id + a[0]) - MN.hash(ev.id + b[0]));
+    if (ranked.length) {
+      const winner = ranked[0][0]; const bal = MN.balancesAt(end);
+      const tribute = Number(s.plebisciteTribute) || 2;
+      const payouts = {}; let pot = 0;
+      MN.S.players.filter((p) => p.id !== winner && p.createdAt <= end).forEach((p) => {
+        const paid = Math.min(tribute, Math.max(0, bal[p.id] || 0));
+        if (paid) { payouts[p.id] = -paid; pot += paid; }
+      });
+      if (pot) {
+        payouts[winner] = pot;
+        await Store.put('txs', { id: 'ev_' + ev.id, type: 'payout', kind: 'plebiscite', ts: end, eventId: ev.id, winner, votes: v[winner], pot, payouts });
+      }
+      Object.assign(result, { winner, pot, tribute });
+    }
+    await Store.update('events', ev.id, { status: 'done', result });
+  }
+
+  // El último Dictador elegido lleva el título hasta el siguiente plebiscito
+  function dictator() {
+    const done = events().filter((e) => e.type === 'plebiscite' && e.status === 'done' && e.result && e.result.winner).sort((a, b) => b.at - a.at)[0];
+    return done ? done.result.winner : null;
   }
 
   async function runLottery(ev) {
@@ -515,6 +597,21 @@
         if (en && phase(ev) === 'signup') await MN.act(() => Store.update('entries', en.id, { withdrawn: true }), 'Te has borrado');
       }
       if (b.dataset.evact === 'play') openStopwatch(ev);
+      if (b.dataset.evact === 'vote' || b.dataset.evact === 'buyvote') {
+        if (phase(ev) !== 'voting') return;
+        const sel = b.closest('.ev-actions').querySelector('.pv-sel'); const cand = sel && sel.value; if (!cand) return;
+        const name = MN.esc(MN.player(cand).name);
+        if (b.dataset.evact === 'vote') {
+          await MN.act(() => Store.put('entries', { id: `pv_${ev.id}_${mine.id}`, eventId: ev.id, kind: 'vote', player: mine.id, for: cand, ts: now }), `🗳️ Has votado a ${name}`);
+        } else {
+          if ((MN.balances()[mine.id] || 0) < s.plebiscitePrice) return MN.toast('No te llega para comprar un voto', 'bad');
+          const id = Store.uid();
+          await MN.act(() => Store.putMany({
+            entries: [{ id, eventId: ev.id, kind: 'vote', extra: true, player: mine.id, for: cand, ts: now }],
+            txs: [{ id: 'vote_' + id, type: 'charge', kind: 'vote', ts: now, player: mine.id, amount: s.plebiscitePrice, eventId: ev.id, for: cand }],
+          }), `💰 Voto comprado para ${name}. La democracia agradece tu aportación`);
+        }
+      }
       return;
     }
     const a = e.target.closest('[data-evadmin]');
@@ -541,10 +638,12 @@
       MN.registerTx('happy', { line: (t) => ({ icon: '🍻', text: `Happy hour: la Banca paga <b>${t.amount}</b> fichas extra a ${MN.who(t.player)}`, sub: 'Premio doble' }) });
       MN.registerTx('ticket', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.player)} compra un boleto de lotería`, sub: `${t.amount} fichas` }) });
       MN.registerTx('lottery', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.winner)} gana la lotería y se lleva <b>${t.pot}</b> fichas`, sub: `${t.tickets} boletos vendidos` }) });
+      MN.registerTx('vote', { line: (t) => ({ icon: '🗳️', text: `${MN.who(t.player)} compra un voto en el plebiscito`, sub: `${t.amount} fichas a la Banca` }) });
+      MN.registerTx('plebiscite', { line: (t) => ({ icon: '🎖️', text: `${MN.who(t.winner)} gana el plebiscito y cobra <b>${t.pot}</b> fichas de tributo`, sub: `${t.votes} votos` }) });
       MN.registerTx('stopwatch', { line: (t) => ({ icon: '⏱️', text: `${MN.who(t.winner)} gana el cronómetro global con ${secs(t.ms)} s y se lleva <b>${t.pot}</b> fichas`, sub: `Entrada: ${t.buyIn} fichas por cabeza` }) });
 
       document.addEventListener('click', onClick);
-      MN.$('#events-btn').addEventListener('click', () => MN.go('eventos'));
+      document.addEventListener('change', (e) => { const sl = e.target.closest('.pv-sel'); if (sl) pvChoice[sl.dataset.ev] = sl.value; });
 
       // Banca: programar y lanzar eventos
       MN.$('#ev-type').innerHTML = Object.entries(TYPES).map(([k, T]) => `<option value="${k}">${T.icon} ${T.name}</option>`).join('');
@@ -592,8 +691,9 @@
         chart: '☭<br><b>Censurado por el Partido</b><br><span class="muted small">La gráfica vuelve tras la expropiación</span>',
       };
     },
+    rankExtra(id) { return id === dictator() ? '<span class="bounty-tag dictator-tag" title="Elegido en el plebiscito">🎖️ DICTADOR</span>' : ''; },
     // Para otros módulos y las normas
-    api: () => ({ events, phase, happyActiveAt, TYPES, ART }),
+    api: () => ({ events, phase, happyActiveAt, TYPES, ART, dictator }),
     rules(section) {
       const s = set();
       return section('🎉', 'Eventos', `

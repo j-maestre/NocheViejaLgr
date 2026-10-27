@@ -64,6 +64,9 @@
     stopwatchTarget: 10,     // segundos objetivo
     stopwatchSignupMinutes: 15,
     stopwatchPlayMinutes: 10,
+    plebisciteVoteMinutes: 10, // 🗳️ plebiscito: minutos de votación
+    plebiscitePrice: 3,        // precio de cada voto extra (va a la Banca)
+    plebisciteTribute: 2,      // lo que paga cada jugador al Dictador
 
     // Extras
     bountyPerWin: 3,         // cazarrecompensas: fichas por cada victoria de la racha cortada (racha 5+)

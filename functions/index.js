@@ -27,12 +27,13 @@ async function names(gameId) {
   return out;
 }
 
-// Envía `body` a los jugadores `pids` (o a todos si es null), menos `except`
+// Envía `body` a los jugadores `pids` (o a todos si es null), menos `except` (uno o varios)
 async function send(gameId, pids, body, except) {
+  const skip = [].concat(except || []);
   const snap = await game(gameId).collection('push').get();
   const docs = snap.docs.filter((d) => {
     const pid = d.data().pid;
-    return pid && pid !== except && (!pids || pids.includes(pid));
+    return pid && !skip.includes(pid) && (!pids || pids.includes(pid));
   });
   if (!docs.length) return;
   const tokens = docs.map((d) => d.id);
@@ -61,7 +62,7 @@ exports.retos = onDocumentWritten('games/{gameId}/challenges/{id}', async (e) =>
   const to = (pid, msg) => jobs.push(send(e.params.gameId, [pid], msg));
   const rival = (pid) => n[pid === c.from ? c.to : c.from] || '¿?';
 
-  if (!b && c.status === 'pending') to(c.to, `⚔️ ${rival(c.to)} te reta a ${c.game} por ${c.amount} fichas`);
+  if (!b && c.status === 'pending') to(c.to, c.allIn ? `💣 ${rival(c.to)} te reta a un ALL IN a ${c.game}: ¡os jugáis todas las fichas!` : `⚔️ ${rival(c.to)} te reta a ${c.game} por ${c.amount} fichas`);
   else if (b === 'pending' && c.status === 'accepted') to(c.from, `✅ ${rival(c.from)} ha aceptado tu reto. ¡A jugar!`);
   else if (c.status === 'rejected') to(c.from, `🐔 ${rival(c.from)} ha rechazado tu reto`);
   else if (c.status === 'expired') to(c.from, `⌛ ${rival(c.from)} no contestó a tu reto y ha caducado`);
@@ -99,11 +100,37 @@ exports.mesas = onDocumentWritten('games/{gameId}/tables/{id}', async (e) => {
   return null;
 });
 
+// ---------------------------------------------------------- préstamos
+// A todos: cuando la Banca presta fichas y cuando el moroso cumple su castigo
+exports.prestamos = onDocumentWritten('games/{gameId}/txs/{id}', async (e) => {
+  const before = e.data.before.exists ? e.data.before.data() : null;
+  const t = e.data.after.exists ? e.data.after.data() : null;
+  if (!t || t.type !== 'loan' || t.voided) return null;
+  const created = !before;
+  const paid = before && !before.done && t.done;
+  if (!created && !paid) return null;
+  const g = e.params.gameId;
+  const [n, set] = await Promise.all([names(g), game(g).collection('meta').doc('settings').get()]);
+  const bank = set.exists ? set.data().bankPlayerId : null;
+  const name = n[t.player] || 'Alguien';
+  if (created) {
+    return Promise.all([
+      send(g, [t.player], `🏦 La Banca te ha prestado ${t.amount} fichas. Tu castigo: ${t.punishment}`, bank),
+      send(g, null, `🍺 ${name} ha pedido un préstamo de ${t.amount} fichas a la Banca. Castigo: ${t.punishment}`, [t.player, bank]),
+    ]);
+  }
+  return Promise.all([
+    send(g, [t.player], '✅ Has saldado tu deuda con la Banca. Ya no eres moroso', bank),
+    send(g, null, `✅ ${name} ha cumplido su castigo (${t.punishment}) y ya no es moroso`, [t.player, bank]),
+  ]);
+});
+
 // ---------------------------------------------------------- eventos
 const EVENTS = {
-  communist: ['☭', 'Evento comunista', '☭ ¡Empieza el evento comunista! El Partido reparte la riqueza'],
+  communist: ['☭', 'Evento comunista', '☭ ¡Empieza el evento comunista! Entra a ver a quién expropia el Partido 👀'],
   happyhour: ['🍻', 'Happy hour', '🍻 ¡Empieza la happy hour! Los duelos pagan el doble'],
-  lottery: ['🎟️', 'Lotería', '🎟️ ¡Se sortea la lotería! Mira si te ha tocado'],
+  lottery: ['🎟️', 'Lotería', '🎟️ ¡Se sortea la lotería! Entra a ver quién se lleva el bote 👀'],
+  plebiscite: ['🗳️', 'Plebiscito amañado', '🗳️ ¡Plebiscito! Vota a tu Dictador. Los votos extra se compran 😏'],
   stopwatch: ['⏱️', 'Cronómetro global', '⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya'],
 };
 
@@ -124,7 +151,7 @@ exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Ma
         await send(g.id, null, msg);
       };
       if (start - now <= 15 * MIN && start - now > 2 * MIN) await fire('15', `⏰ En 15 minutos: ${T[0]} ${T[1]}`);
-      const msg = ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
+      const msg = ev.type === 'plebiscite' ? `🗳️ ¡Plebiscito! Vota a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
       if (now >= start && now - start < 5 * MIN) await fire('start', msg);
     }
   }

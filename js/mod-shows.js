@@ -178,6 +178,35 @@
     boom({ colors: ['#ff4d4d', '#ffd400', '#ffffff'], count: 150 });
   }
 
+  // ---------------------------------------------------------- 🗳️ plebiscito
+  async function plebisciteShow(box, ev) {
+    const r = ev.result || {};
+    if (!r.winner) return;
+    const rows = Object.entries(r.votes || {}).sort((a, b) => a[1] - b[1]); // de menos a más votos
+    const max = Math.max(...rows.map(([, n]) => n));
+    box.innerHTML = `<div class="show-inner plebiscite-show">
+      <div class="show-title">🗳️ PLEBISCITO AMAÑADO</div>
+      <div class="show-kicker">Escrutinio oficial (100% limpio, palabra de la Banca)…</div>
+      <ul class="pv-bars" id="pv-bars">${rows.map(([id]) => `<li data-id="${MN.esc(id)}"><span class="pv-name">${MN.esc(name(id))}</span><span class="pv-bar"><i style="width:0"></i></span><b>0</b></li>`).join('')}</ul>
+      <div class="pv-winner" id="pv-winner"></div>${closeBtn}</div>`;
+    sfx('drum'); await sleep(1000);
+    // Las barras suben voto a voto
+    for (let v = 1; v <= max; v++) {
+      rows.forEach(([id, n]) => {
+        if (n < v) return;
+        const li = box.querySelector(`li[data-id="${CSS.escape(id)}"]`);
+        li.querySelector('i').style.width = `${(v / max) * 100}%`; li.querySelector('b').textContent = v;
+      });
+      sfx('tick'); await sleep(Math.max(120, 600 - v * 40));
+    }
+    await sleep(600); sfx('drum'); await sleep(900);
+    box.querySelector(`li[data-id="${CSS.escape(r.winner)}"]`).classList.add('win');
+    MN.$('#pv-winner').innerHTML = `<div class="pv-medal">🎖️</div><div class="pv-who">${MN.esc(name(r.winner))}</div>
+      <div>es el nuevo <b>Dictador</b>${r.pot ? ` y cobra <b>${r.pot}</b> fichas de tributo` : ''}</div>`;
+    MN.$('#pv-winner').classList.add('shown');
+    sfx('win'); boom({ colors: ['#c9a227', '#ffffff', '#4a4f5c'], count: 160 });
+  }
+
   // ---------------------------------------------------------- ⏱️ cronómetro
   async function stopwatchShow(box, ev) {
     const r = ev.result || {};
@@ -233,7 +262,7 @@
     res.classList.add('shown');
   }
 
-  const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow };
+  const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow, plebiscite: plebisciteShow };
 
   // ---------------------------------------------------------- qué enseñar a quién
   // "Ya visto" se guarda por jugador (no por móvil): si en un mismo móvil se
@@ -324,6 +353,13 @@
     // Eventos resueltos: salen solos a todos (una vez por móvil y resultado; si
     // ensayas otra vez, el evento tiene un resultado nuevo y vuelve a salir).
     // Si no tenías la app abierta, sale al abrirla durante las 6 horas siguientes.
+    queueEventShows();
+  }
+
+  // Con la app en segundo plano no se gasta la animación: espera a que entres
+  function queueEventShows() {
+    if (!MN.S || document.visibilityState !== 'visible') return;
+    const now = Date.now();
     (MN.S.events || []).filter((e) => e.status === 'done' && EVENT_SHOWS[e.type] && e.result && now - (e.result.at || e.at) < 6 * 3600000).forEach((e) => {
       if (!seen(`ev:${e.id}:${e.result.at || e.at}`)) enqueue((box) => EVENT_SHOWS[e.type](box, e));
     });
@@ -332,6 +368,7 @@
   return {
     init(api) {
       MN = api;
+      document.addEventListener('visibilitychange', queueEventShows);
       MN.shows = { replay: (ev) => EVENT_SHOWS[ev.type] && enqueue((box) => EVENT_SHOWS[ev.type](box, ev)) };
       MN.registerTx('slot', {
         line: (t) => {
