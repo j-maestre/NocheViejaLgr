@@ -7,6 +7,10 @@
 //  Los saldos NO se guardan: se calculan a partir del historial de
 //  movimientos (txs). Así anular un movimiento es trivial y el
 //  historial siempre cuadra con el ranking.
+//
+//  `put` sustituye el documento si ya existe ese id. Los movimientos
+//  automáticos (eventos, recompensas…) usan ids deterministas, así que
+//  aunque dos móviles los ejecuten a la vez solo queda uno.
 // ============================================================
 (function () {
   'use strict';
@@ -47,23 +51,57 @@
     rejectCooldownHours: 6,  // tras un rechazo, el retador no puede repetir con esa persona
     maxPendingOut: 2,        // retos enviados sin contestar a la vez
     challengeExpiryHours: 12, // los retos sin respuesta caducan (sin multa)
+
+    // Eventos
+    communistPct: 25,        // % que se expropia al primero
+    communistLast: 3,        // entre cuántos de los últimos se reparte
+    communistMaskMinutes: 60, // antes del comunista el ranking se oculta (☭ Camarada)
+    happyMultiplier: 2,      // en happy hour el ganador cobra x2 (el extra lo pone la Banca)
+    happyMinutes: 60,
+    lotteryPrice: 5,
+    lotteryMaxTickets: 3,
+    lotteryBankBonus: 20,    // la Banca añade esto al bote
+    stopwatchPct: 5,         // cada uno pone el 5% del capital del más pobre de los apuntados
+    stopwatchTarget: 10,     // segundos objetivo
+    stopwatchSignupMinutes: 15,
+    stopwatchPlayMinutes: 10,
+
+    // Extras
+    bountyPerWin: 3,         // cazarrecompensas: fichas por cada victoria de la racha cortada (racha 5+)
+    betWindowMinutes: 10,    // apuestas de espectadores abiertas X min desde que empieza el duelo
+    betMaxPct: 10,           // apuesta máxima de un espectador: % de su capital
+    marketPrices: { immunity: 15, forced: 20, insurance: 10 },
+    immunityHours: 6,
   };
+
+  // Colecciones de la partida y campo por el que se ordenan
+  const COLLECTIONS = {
+    players: 'createdAt',
+    txs: 'ts',
+    challenges: 'createdAt',
+    tables: 'createdAt',   // mesas multijugador
+    events: 'at',          // calendario de eventos
+    entries: 'ts',         // boletos de lotería, inscripciones al cronómetro…
+    bets: 'ts',            // apuestas de espectadores
+  };
+  const NAMES = Object.keys(COLLECTIONS);
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
   function normalize(raw) {
-    return {
-      players: (raw.players || []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)),
-      txs: (raw.txs || []).slice().sort((a, b) => (a.ts || 0) - (b.ts || 0)),
-      challenges: (raw.challenges || []).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)),
-      settings: Object.assign({}, DEFAULTS, raw.settings || {}),
-    };
+    const out = { settings: Object.assign({}, DEFAULTS, raw.settings || {}) };
+    out.settings.marketPrices = Object.assign({}, DEFAULTS.marketPrices, (raw.settings || {}).marketPrices || {});
+    NAMES.forEach((n) => {
+      const k = COLLECTIONS[n];
+      out[n] = (raw[n] || []).slice().sort((a, b) => (a[k] || 0) - (b[k] || 0));
+    });
+    return out;
   }
 
   // ---------------------------------------------------------- local
   function localBackend(gameId) {
     const KEY = 'mn_data_' + gameId;
-    const empty = () => ({ players: [], txs: [], challenges: [], settings: {} });
+    const empty = () => { const e = { settings: {} }; NAMES.forEach((n) => { e[n] = []; }); return e; };
     const read = () => {
       try { return Object.assign(empty(), JSON.parse(localStorage.getItem(KEY))); } catch (e) { return empty(); }
     };
@@ -74,6 +112,10 @@
       listener(normalize(data));
       return Promise.resolve();
     };
+    const upsert = (col, doc) => {
+      const list = data[col]; const i = list.findIndex((x) => x.id === doc.id);
+      if (i >= 0) list[i] = doc; else list.push(doc);
+    };
     // Sincroniza entre pestañas del mismo navegador
     window.addEventListener('storage', (e) => {
       if (e.key === KEY) { data = read(); listener(normalize(data)); }
@@ -82,16 +124,14 @@
     return {
       mode: 'local',
       start(cb) { listener = cb; cb(normalize(data)); },
-      addPlayer(p) { data.players.push(p); return write(); },
-      updatePlayer(id, patch) { Object.assign(data.players.find((p) => p.id === id) || {}, patch); return write(); },
-      addTx(t) { data.txs.push(t); return write(); },
-      addMany({ players = [], txs = [] }) { data.players.push(...players); data.txs.push(...txs); return write(); },
-      updateTx(id, patch) { Object.assign(data.txs.find((t) => t.id === id) || {}, patch); return write(); },
-      addChallenge(c) { data.challenges.push(c); return write(); },
-      updateChallenge(id, patch) { Object.assign(data.challenges.find((c) => c.id === id) || {}, patch); return write(); },
+      put(col, doc) { upsert(col, doc); return write(); },
+      update(col, id, patch) { Object.assign(data[col].find((x) => x.id === id) || {}, patch); return write(); },
+      putMany(map) { Object.entries(map).forEach(([col, docs]) => docs.forEach((d) => upsert(col, d))); return write(); },
       saveSettings(s) { data.settings = s; return write(); },
       replaceAll(d) {
-        data = { players: d.players || [], txs: d.txs || [], challenges: d.challenges || [], settings: d.settings || {} };
+        data = empty();
+        NAMES.forEach((n) => { data[n] = d[n] || []; });
+        data.settings = d.settings || {};
         return write();
       },
     };
@@ -115,9 +155,7 @@
     firebase.initializeApp(cfg);
     const db = firebase.firestore();
     const root = db.collection('games').doc(gameId);
-    const players = root.collection('players');
-    const txs = root.collection('txs');
-    const challenges = root.collection('challenges');
+    const col = (n) => root.collection(n);
     const settingsRef = root.collection('meta').doc('settings');
 
     async function commitInChunks(ops) {
@@ -131,34 +169,24 @@
     return {
       mode: 'firebase',
       start(cb, onError) {
-        const raw = { players: null, txs: null, challenges: null, settings: null };
-        const emit = () => { if (raw.players && raw.txs && raw.challenges && raw.settings) cb(normalize(raw)); };
+        const raw = { settings: null };
+        NAMES.forEach((n) => { raw[n] = null; });
+        const emit = () => { if (raw.settings && NAMES.every((n) => raw[n])) cb(normalize(raw)); };
         const docs = (snap) => snap.docs.map((d) => Object.assign({}, d.data(), { id: d.id }));
-        players.onSnapshot((s) => { raw.players = docs(s); emit(); }, onError);
-        txs.onSnapshot((s) => { raw.txs = docs(s); emit(); }, onError);
-        challenges.onSnapshot((s) => { raw.challenges = docs(s); emit(); }, onError);
+        NAMES.forEach((n) => col(n).onSnapshot((s) => { raw[n] = docs(s); emit(); }, onError));
         settingsRef.onSnapshot((d) => { raw.settings = d.exists ? d.data() : {}; emit(); }, onError);
       },
-      addPlayer: (p) => players.doc(p.id).set(p),
-      updatePlayer: (id, patch) => players.doc(id).update(patch),
-      addTx: (t) => txs.doc(t.id).set(t),
-      addMany: (d) => commitInChunks([
-        ...(d.players || []).map((p) => (b) => b.set(players.doc(p.id), p)),
-        ...(d.txs || []).map((t) => (b) => b.set(txs.doc(t.id), t)),
-      ]),
-      updateTx: (id, patch) => txs.doc(id).update(patch),
-      addChallenge: (c) => challenges.doc(c.id).set(c),
-      updateChallenge: (id, patch) => challenges.doc(id).update(patch),
+      put: (c, doc) => col(c).doc(doc.id).set(doc),
+      update: (c, id, patch) => col(c).doc(id).update(patch),
+      putMany: (map) => commitInChunks(Object.entries(map).flatMap(([c, list]) => list.map((d) => (b) => b.set(col(c).doc(d.id), d)))),
       saveSettings: (s) => settingsRef.set(s),
       async replaceAll(d) {
-        const snaps = await Promise.all([players.get(), txs.get(), challenges.get()]);
+        const snaps = await Promise.all(NAMES.map((n) => col(n).get()));
         const ops = [];
         snaps.forEach((snap) => snap.docs.forEach((doc) => ops.push((b) => b.delete(doc.ref))));
         await commitInChunks(ops);
         const writes = [];
-        (d.players || []).forEach((p) => writes.push((b) => b.set(players.doc(p.id), p)));
-        (d.txs || []).forEach((t) => writes.push((b) => b.set(txs.doc(t.id), t)));
-        (d.challenges || []).forEach((c) => writes.push((b) => b.set(challenges.doc(c.id), c)));
+        NAMES.forEach((n) => (d[n] || []).forEach((x) => writes.push((b) => b.set(col(n).doc(x.id), x))));
         writes.push((b) => b.set(settingsRef, d.settings || {}));
         await commitInChunks(writes);
       },
@@ -167,10 +195,10 @@
 
   // ------------------------------------------------------- fachada
   let backend = null;
-  const call = (name) => (...args) => backend[name](...args);
 
   window.Store = {
     DEFAULTS,
+    COLLECTIONS: NAMES,
     uid,
     get mode() { return backend ? backend.mode : null; },
     async init(onChange, onError) {
@@ -180,14 +208,19 @@
       backend.start(onChange, onError);
       return backend.mode;
     },
-    addPlayer: call('addPlayer'),
-    updatePlayer: call('updatePlayer'),
-    addTx: call('addTx'),
-    addMany: call('addMany'),
-    updateTx: call('updateTx'),
-    addChallenge: call('addChallenge'),
-    updateChallenge: call('updateChallenge'),
-    saveSettings: call('saveSettings'),
-    replaceAll: call('replaceAll'),
+    put: (c, doc) => backend.put(c, doc),
+    update: (c, id, patch) => backend.update(c, id, patch),
+    putMany: (map) => backend.putMany(map),
+    saveSettings: (s) => backend.saveSettings(s),
+    replaceAll: (d) => backend.replaceAll(d),
+
+    // Atajos (nombres antiguos)
+    addPlayer: (p) => backend.put('players', p),
+    updatePlayer: (id, patch) => backend.update('players', id, patch),
+    addTx: (t) => backend.put('txs', t),
+    addMany: (d) => backend.putMany(d),
+    updateTx: (id, patch) => backend.update('txs', id, patch),
+    addChallenge: (c) => backend.put('challenges', c),
+    updateChallenge: (id, patch) => backend.update('challenges', id, patch),
   };
 })();

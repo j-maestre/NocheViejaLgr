@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07090a">
   <title>Mercado Negro</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎰</text></svg>">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mercado Negro">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -13,6 +19,7 @@
 </head>
 <body>
   <div id="mode-banner" class="banner" hidden></div>
+  <div id="imp-banner" class="banner imp" hidden></div>
 
   <header class="top">
     <div class="brand">
@@ -21,6 +28,7 @@
         <h1>Mercado Negro</h1>
         <small>Casino clandestino · Nochevieja 2026</small>
         <button type="button" id="rules-btn" class="rules-btn">📖 Normas</button>
+        <button type="button" id="events-btn" class="rules-btn">📅 Eventos</button>
       </div>
     </div>
     <div class="countdown" id="countdown"></div>
@@ -31,6 +39,7 @@
 
     <!-- ============ RANKING ============ -->
     <section id="view-ranking" class="view" hidden>
+      <div id="next-event"></div>
       <div id="limit-info" class="limit-info"></div>
       <div id="final-banner"></div>
       <ol id="ranking-list" class="ranking"></ol>
@@ -42,6 +51,11 @@
         <p class="hint">Toca un nombre para destacarlo (máx. 3).</p>
         <div id="rank-chart-legend" class="chart-legend"></div>
       </div>
+
+      <div class="card">
+        <h3>🎮 Minijuegos</h3>
+        <div id="games-stats"></div>
+      </div>
     </section>
 
     <!-- ============ DUELO ============ -->
@@ -51,6 +65,11 @@
         <ul id="my-challenges" class="challenges"></ul>
       </div>
 
+      <div id="rematches" hidden>
+        <h2 class="section-title">🔁 Revanchas</h2>
+        <ul id="rematch-list" class="challenges"></ul>
+      </div>
+
       <h2 class="section-title">⚔️ Retar a alguien</h2>
       <div id="challenge-noreg" class="empty" hidden>
         Para retar a alguien tienes que sentarte a la mesa.<br><br>
@@ -58,7 +77,8 @@
       </div>
       <form id="challenge-form" class="card" autocomplete="off">
         <label>Rival<select id="c-rival"></select></label>
-        <label>Minijuego<select id="c-game"></select></label>
+        <label>Minijuego</label>
+        <div class="row select-row"><select id="c-game"></select><button type="button" class="btn ghost" data-roulette="c-game" title="Ruleta de minijuegos">🎲</button></div>
         <input id="c-game-other" placeholder="¿Qué minijuego?" maxlength="60" hidden>
         <label>Apuesta</label>
         <div class="bet">
@@ -66,11 +86,36 @@
           <input type="number" id="c-bet" min="1" inputmode="numeric">
         </div>
         <p id="c-max" class="hint"></p>
+        <label class="check-row" id="c-forced-wrap" hidden><input type="checkbox" id="c-forced"> <span id="c-forced-label"></span></label>
         <button id="c-submit" class="btn primary" type="submit">Enviar reto ⚔️</button>
       </form>
 
       <h2 class="section-title">🔥 En la mesa ahora</h2>
       <ul id="live-challenges" class="challenges"></ul>
+
+      <div id="bets-wrap" hidden>
+        <h2 class="section-title">🎰 Apuestas</h2>
+        <p class="hint">Apuesta por quién gana un duelo ajeno. Si aciertas, te repartes lo que pusieron los que fallaron.</p>
+        <ul id="bets-list" class="challenges"></ul>
+      </div>
+
+      <h2 class="section-title">🃏 Mesas de varios jugadores</h2>
+      <p class="hint">Para póker, Dixit, Fallera calavera o partidas por equipos: cada uno pone la entrada y el ganador (o el equipo ganador) se lleva el bote.</p>
+      <ul id="tables-list" class="challenges"></ul>
+      <details id="table-new" class="card direct">
+        <summary>➕ Abrir una mesa</summary>
+        <form id="table-form" autocomplete="off">
+          <label>Juego</label>
+          <div class="row select-row"><select id="t-game"></select><button type="button" class="btn ghost" data-roulette="t-game" title="Ruleta de minijuegos">🎲</button></div>
+          <input id="t-game-other" placeholder="¿Qué juego?" maxlength="60" hidden>
+          <div class="grid-2">
+            <label>Entrada por cabeza<input type="number" id="t-buyin" min="1" inputmode="numeric"></label>
+            <label>Modo<select id="t-mode"><option value="solo">Todos contra todos</option><option value="teams">Por equipos (A vs B)</option></select></label>
+          </div>
+          <p id="t-max" class="hint"></p>
+          <button class="btn primary" type="submit">🃏 Abrir mesa</button>
+        </form>
+      </details>
 
       <details id="direct-duel" class="card direct" hidden>
         <summary>🏦 Registro directo (solo Banca)</summary>
@@ -110,6 +155,38 @@
       <ul id="history-list" class="feed"></ul>
     </section>
 
+    <!-- ============ EVENTOS ============ -->
+    <section id="view-eventos" class="view" hidden>
+      <h2 class="section-title">📅 Calendario de eventos</h2>
+      <div id="calendar"></div>
+
+      <div id="cal-admin" class="card bank-card" hidden>
+        <h3>🏦 Gestionar eventos</h3>
+        <form id="ev-form" autocomplete="off">
+          <div class="grid-2">
+            <label>Evento<select id="ev-type"></select></label>
+            <label>Fecha y hora<input type="datetime-local" id="ev-at"></label>
+          </div>
+          <div class="row wrap">
+            <button class="btn primary" type="submit">📅 Programar</button>
+            <button type="button" class="btn ghost" id="ev-surprise">⚡ Lanzar por sorpresa ahora</button>
+            <button type="button" class="btn ghost" id="ev-reset">↺ Calendario por defecto</button>
+          </div>
+        </form>
+        <div class="rehearsal">
+          <h3>🧪 Ensayo</h3>
+          <p class="hint" id="ev-rehearsal-info"></p>
+          <div class="row wrap">
+            <button type="button" class="btn ghost" id="ev-rehearse">🧪 Ensayar: todos los eventos en los próximos minutos</button>
+            <button type="button" class="btn ghost" id="ev-restore" hidden>↺ Restaurar fechas reales</button>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="section-title">ℹ️ Tipos de evento</h2>
+      <div id="cal-legend" class="cal-legend"></div>
+    </section>
+
     <!-- ============ NORMAS ============ -->
     <section id="view-normas" class="view" hidden>
       <h2 class="section-title">📖 Normas de la casa</h2>
@@ -130,11 +207,23 @@
           <div class="info">
             <div class="profile-name" id="pf-name"></div>
             <div class="sub" id="pf-pos"></div>
+            <div class="sub" id="pf-games"></div>
           </div>
           <div class="chips"><div class="amount" id="pf-chips"></div><div class="delta">fichas</div></div>
         </div>
 
         <div id="pf-stats" class="stats stats-grid"></div>
+
+        <div class="card">
+          <h3>🛒 Mercado negro</h3>
+          <ul id="market" class="market"></ul>
+        </div>
+
+        <div class="card" id="app-card"></div>
+
+        <div class="card">
+          <label class="check-row"><input type="checkbox" id="sound-toggle" checked> 🔊 Sonidos y confeti al ganar</label>
+        </div>
 
         <div class="card">
           <h3>🏅 Insignias</h3>
@@ -180,6 +269,7 @@
 
       <div id="admin-locked" class="card">
         <h3>🔒 Zona de la Banca</h3>
+        <p class="hint" id="bank-who"></p>
         <p class="hint">Solo la Banca puede dar préstamos, sentar jugadores, anular movimientos y cambiar las reglas.</p>
         <form id="unlock-form" class="row" autocomplete="off">
           <input type="password" id="pin" inputmode="numeric" placeholder="PIN de la Banca">
@@ -188,6 +278,11 @@
       </div>
 
       <div id="admin-panel" hidden>
+        <div class="card bank-card">
+          <h3>🎩 La Banca</h3>
+          <div id="bank-info"></div>
+        </div>
+
         <div class="card">
           <h3>💸 Conceder préstamo</h3>
           <p class="hint">Solo para quien está en la ruina (menos fichas que la apuesta mínima).</p>
@@ -235,7 +330,7 @@
               <label>Fichas iniciales<input type="number" id="s-start" min="1"></label>
               <label>Apuesta mínima<input type="number" id="s-min" min="1"></label>
               <label>Préstamo por defecto<input type="number" id="s-loan" min="1"></label>
-              <label>PIN de la Banca<input id="s-pin" maxlength="12"></label>
+              <label>PIN de arranque<input id="s-pin" maxlength="12"></label>
               <label>Multa de cobardía<input type="number" id="s-fine" min="0"></label>
               <label>Espera tras rechazo (h)<input type="number" id="s-cooldown" min="0" step="0.5"></label>
               <label>Retos pendientes máx.<input type="number" id="s-maxpend" min="1"></label>
@@ -268,8 +363,11 @@
           <p class="hint">Herramientas para probar antes de la partida de verdad.</p>
           <div class="row wrap">
             <button type="button" id="seed-btn" class="btn ghost">➕ 6 jugadores de prueba</button>
-            <button type="button" id="fake-challenge-btn" class="btn ghost">📨 Recibir un reto de prueba</button>
-            <button type="button" id="impersonate-btn" class="btn ghost">🎭 Ser otro jugador</button>
+            <button type="button" id="fake-challenge-btn" class="btn ghost local-only">📨 Recibir un reto de prueba</button>
+            <button type="button" id="impersonate-btn" class="btn ghost local-only">🎭 Ser otro jugador</button>
+            <button type="button" class="btn ghost" data-tv>📺 Modo TV</button>
+            <button type="button" class="btn ghost" data-ceremony>🏆 Probar ceremonia</button>
+            <button type="button" class="btn ghost" data-wrapped>🎁 Probar resumen</button>
             <button type="button" id="wipe-btn" class="btn ghost danger-btn">🧨 Borrar todo</button>
           </div>
         </div>
@@ -332,10 +430,24 @@
     </form>
   </div>
   <div id="toast" class="toast"></div>
+  <div id="sw-game" class="sw-game" hidden></div>
+  <div id="tv" class="tv" hidden></div>
+  <div id="ceremony" class="ceremony" hidden></div>
+  <div id="wrapped" class="wrapped" hidden></div>
+  <div id="show" class="show" hidden></div>
 
   <script src="js/config.js"></script>
   <script src="js/store.js"></script>
   <script src="js/chart.js"></script>
+  <script src="js/mod-app.js"></script>
+  <script src="js/mod-tables.js"></script>
+  <script src="js/mod-events.js"></script>
+  <script src="js/mod-extras.js"></script>
+  <script src="js/mod-bets.js"></script>
+  <script src="js/mod-market.js"></script>
+  <script src="js/mod-fx.js"></script>
+  <script src="js/mod-tv.js"></script>
+  <script src="js/mod-shows.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

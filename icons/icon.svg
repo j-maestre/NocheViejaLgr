@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="felt" cx="50%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#1c5c3c"/><stop offset="1" stop-color="#07140d"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#c8961c"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#felt)"/>
+  <circle cx="256" cy="256" r="170" fill="url(#gold)"/>
+  <g fill="#7a1020"><polygon points="241.0,86.0 271.0,86.0 271.0,138.0 241.0,138.0"/><polygon points="365.6,125.2 386.8,146.4 350.0,183.2 328.8,162.0"/><polygon points="426.0,241.0 426.0,271.0 374.0,271.0 374.0,241.0"/><polygon points="386.8,365.6 365.6,386.8 328.8,350.0 350.0,328.8"/><polygon points="271.0,426.0 241.0,426.0 241.0,374.0 271.0,374.0"/><polygon points="146.4,386.8 125.2,365.6 162.0,328.8 183.2,350.0"/><polygon points="86.0,271.0 86.0,241.0 138.0,241.0 138.0,271.0"/><polygon points="125.2,146.4 146.4,125.2 183.2,162.0 162.0,183.2"/></g>
+  <circle cx="256" cy="256" r="112" fill="#0d2a1c" stroke="#ffe08a" stroke-width="8"/>
+  <text x="256" y="300" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="120" fill="#f5c542">MN</text>
+</svg>

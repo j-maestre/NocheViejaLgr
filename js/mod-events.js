@@ -1,0 +1,584 @@
+// ============================================================
+//  MÓDULO: EVENTOS Y CALENDARIO
+//  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global
+//
+//  Los eventos se guardan en la colección `events` y los ejecuta el
+//  primer móvil que tenga la web abierta cuando toca. Todo se calcula
+//  de forma determinista (saldos en el instante del evento, sorteo a
+//  partir de los boletos) y con ids fijos: si lo ejecutan varios
+//  móviles a la vez, el resultado es el mismo y no se duplica.
+// ============================================================
+(window.MNModules = window.MNModules || []).push((function () {
+  'use strict';
+  let MN;
+  const MIN = 60000;
+
+  // ---------------------------------------------------------- ilustraciones
+  // Cada ilustración se pinta con ids de degradado únicos: si dos SVG comparten id y el
+  // primero está en una pestaña oculta, el navegador no pinta el degradado en el segundo.
+  let artSeq = 0;
+  const uniq = (svg) => { const k = 'a' + (++artSeq); return svg.replace(/id="(\w+)"/g, `id="$1${k}"`).replace(/url\(#(\w+)\)/g, `url(#$1${k})`); };
+  const ART_SRC = {
+    communist: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><radialGradient id="ga" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#ff4d4d"/><stop offset="1" stop-color="#7a0010"/></radialGradient></defs>
+      <rect width="160" height="100" fill="url(#ga)"/>
+      <g fill="#ffd400" opacity=".9"><circle cx="22" cy="78" r="6"/><circle cx="138" cy="74" r="5"/><circle cx="128" cy="22" r="4"/><circle cx="30" cy="26" r="4"/></g>
+      <polygon points="80,14 89,40 117,40 94,56 103,83 80,66 57,83 66,56 43,40 71,40" fill="#ffd400" stroke="#ffef8a" stroke-width="2"/>
+      <text x="80" y="57" text-anchor="middle" font-size="18" fill="#a00018">☭</text></svg>`,
+    happyhour: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#8a3a00"/></linearGradient><linearGradient id="beer" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd54a"/><stop offset="1" stop-color="#e08a00"/></linearGradient></defs>
+      <rect width="160" height="100" fill="url(#gb)"/>
+      <g transform="rotate(-14 58 60)"><rect x="38" y="36" width="36" height="50" rx="5" fill="url(#beer)" stroke="#fff6" stroke-width="2"/><path d="M74 46h8a8 8 0 0 1 0 22h-8" fill="none" stroke="#fff8" stroke-width="5"/><ellipse cx="56" cy="36" rx="22" ry="9" fill="#fffbe8"/><circle cx="44" cy="31" r="7" fill="#fffbe8"/><circle cx="66" cy="30" r="8" fill="#fffbe8"/></g>
+      <g transform="rotate(14 104 60)"><rect x="86" y="36" width="36" height="50" rx="5" fill="url(#beer)" stroke="#fff6" stroke-width="2"/><path d="M86 46h-8a8 8 0 0 0 0 22h8" fill="none" stroke="#fff8" stroke-width="5"/><ellipse cx="104" cy="36" rx="22" ry="9" fill="#fffbe8"/><circle cx="94" cy="30" r="8" fill="#fffbe8"/><circle cx="116" cy="31" r="7" fill="#fffbe8"/></g>
+      <g fill="#fff" opacity=".85"><circle cx="80" cy="18" r="3"/><circle cx="72" cy="12" r="2"/><circle cx="90" cy="10" r="2"/></g>
+      <text x="80" y="96" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="16" fill="#fff">x2</text></svg>`,
+    lottery: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><linearGradient id="gc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7b2ff7"/><stop offset="1" stop-color="#2a0a5e"/></linearGradient></defs>
+      <rect width="160" height="100" fill="url(#gc)"/>
+      <g transform="rotate(-8 64 54)"><path d="M24 32h80v12a8 8 0 0 0 0 16v12H24V60a8 8 0 0 0 0-16z" fill="#f5c542"/><path d="M84 34v36" stroke="#7a4a00" stroke-dasharray="3 3"/><text x="52" y="58" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="16" fill="#5a2a00">LOTO</text></g>
+      <circle cx="118" cy="34" r="14" fill="#ff4d6d"/><text x="118" y="39" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">7</text>
+      <circle cx="134" cy="62" r="12" fill="#39ff88"/><text x="134" y="66" text-anchor="middle" font-size="11" font-weight="bold" fill="#063">23</text>
+      <circle cx="110" cy="76" r="11" fill="#5cc8ff"/><text x="110" y="80" text-anchor="middle" font-size="10" font-weight="bold" fill="#034">4</text>
+      <g fill="#fff" opacity=".7"><circle cx="20" cy="14" r="1.5"/><circle cx="146" cy="12" r="1.5"/><circle cx="60" cy="90" r="1.5"/></g></svg>`,
+    stopwatch: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f6b5a"/><stop offset="1" stop-color="#04201b"/></linearGradient></defs>
+      <rect width="160" height="100" fill="url(#gd)"/>
+      <rect x="73" y="8" width="14" height="8" rx="2" fill="#cfe"/><rect x="77" y="14" width="6" height="6" fill="#cfe"/>
+      <circle cx="80" cy="56" r="36" fill="#eaffff" stroke="#39ff88" stroke-width="4"/>
+      <g stroke="#0a3" stroke-width="2">${Array.from({ length: 12 }, (_, i) => { const a = (i * Math.PI) / 6; return `<line x1="${80 + 30 * Math.sin(a)}" y1="${56 - 30 * Math.cos(a)}" x2="${80 + 34 * Math.sin(a)}" y2="${56 - 34 * Math.cos(a)}"/>`; }).join('')}</g>
+      <line x1="80" y1="56" x2="96" y2="36" stroke="#ff4d6d" stroke-width="3" stroke-linecap="round"/>
+      <text x="80" y="76" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="15" fill="#063">10,00</text></svg>`,
+  };
+
+  const ART = new Proxy(ART_SRC, { get: (o, k) => (o[k] ? uniq(o[k]) : undefined) });
+
+  // ---------------------------------------------------------- tipos
+  const TYPES = {
+    communist: {
+      name: 'Evento comunista', icon: '☭',
+      desc: (s) => `La Banca expropia el ${s.communistPct}% de las fichas al que va primero y lo reparte a partes iguales entre los ${s.communistLast} últimos.${Number(s.communistMaskMinutes) ? ` Durante los ${s.communistMaskMinutes} minutos previos, el ranking se oculta: nadie sabe quién va primero.` : ''}`,
+    },
+    happyhour: {
+      name: 'Happy hour', icon: '🍻',
+      desc: (s) => `Durante ${s.happyMinutes} minutos, quien gane un duelo o una mesa cobra x${s.happyMultiplier}. El extra lo pone la Banca.`,
+    },
+    lottery: {
+      name: 'Lotería', icon: '🎟️',
+      desc: (s) => `Boletos a ${s.lotteryPrice} fichas (máx. ${s.lotteryMaxTickets} por persona). La Banca añade ${s.lotteryBankBonus} fichas al bote y un boleto al azar se lo lleva todo.`,
+    },
+    stopwatch: {
+      name: 'Cronómetro global', icon: '⏱️',
+      desc: (s) => `Apúntate en los ${s.stopwatchSignupMinutes} minutos previos. Cada uno pone el ${s.stopwatchPct}% del capital del más pobre de los apuntados. Para el reloj en ${s.stopwatchTarget},00 s (el número se oculta a los 3 s): el que más se acerque se lleva el bote.`,
+    },
+  };
+
+  // Calendario por defecto (ids fijos)
+  const DEFAULT_CALENDAR = [
+    ['ev-d1', 'happyhour', '2026-12-29T22:00'],
+    ['ev-d2', 'stopwatch', '2026-12-30T13:00'],
+    ['ev-d3', 'communist', '2026-12-30T19:00'],
+    ['ev-d4', 'happyhour', '2026-12-30T23:00'],
+    ['ev-d5', 'lottery', '2026-12-31T20:00'],
+    ['ev-d6', 'stopwatch', '2026-12-31T21:30'],
+  ];
+
+  // ---------------------------------------------------------- utilidades
+  const set = () => MN.S.settings;
+  const events = () => (MN.S.events || []).filter((e) => e.status !== 'cancelled');
+  const entriesOf = (ev, kind) => (MN.S.entries || []).filter((x) => x.eventId === ev.id && x.kind === kind && !x.withdrawn);
+  const happyEnd = (ev) => ev.at + (Number(set().happyMinutes) || 60) * MIN;
+  const signupStart = (ev) => ev.at - (Number(set().stopwatchSignupMinutes) || 15) * MIN;
+  const playEnd = (ev) => ev.at + (Number(set().stopwatchPlayMinutes) || 10) * MIN;
+  const fmtWhen = (ts) => new Date(ts).toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const fmtHour = (ts) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const secs = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
+
+  // Fase actual de un evento
+  function phase(ev, now = Date.now()) {
+    if (ev.status === 'done') return 'done';
+    switch (ev.type) {
+      case 'happyhour': return now < ev.at ? 'upcoming' : now < happyEnd(ev) ? 'live' : 'over';
+      case 'stopwatch': return now < signupStart(ev) ? 'upcoming' : now < ev.at ? 'signup' : now < playEnd(ev) ? 'playing' : 'over';
+      case 'lottery': return now < ev.at ? (MN.started() ? 'selling' : 'upcoming') : 'over';
+      default: return now < ev.at ? 'upcoming' : 'over';
+    }
+  }
+  const isLive = (ev) => ['live', 'signup', 'playing'].includes(phase(ev));
+  const happyActiveAt = (ts) => events().some((e) => e.type === 'happyhour' && ts >= e.at && ts < happyEnd(e));
+
+  function countdown(ms) {
+    if (ms <= 0) return '00:00';
+    const d = Math.floor(ms / 86400000); const h = Math.floor(ms / 3600000) % 24;
+    const m = Math.floor(ms / 60000) % 60; const s = Math.floor(ms / 1000) % 60;
+    return `${d ? d + 'd ' : ''}${MN.pad(h)}:${MN.pad(m)}:${MN.pad(s)}`;
+  }
+
+  // Texto de estado + cuenta atrás de un evento
+  function statusLine(ev) {
+    const now = Date.now(); const ph = phase(ev);
+    const cd = (ts, label) => `${label} <b class="ev-cd" data-to="${ts}">${countdown(ts - now)}</b>`;
+    switch (ph) {
+      case 'upcoming': return ev.type === 'stopwatch' ? cd(signupStart(ev), 'Inscripción en') : cd(ev.at, 'Empieza en');
+      case 'live': return `🔴 EN CURSO · ${cd(happyEnd(ev), 'termina en')}`;
+      case 'signup': return `📝 INSCRIPCIÓN ABIERTA · ${cd(ev.at, 'empieza en')}`;
+      case 'playing': return `🔴 EN JUEGO · ${cd(playEnd(ev), 'cierra en')}`;
+      case 'selling': return `🎟️ Boletos a la venta · ${cd(ev.at, 'sorteo en')}`;
+      case 'over': return '⏳ Calculando resultado…';
+      default: return resultLine(ev);
+    }
+  }
+
+  function resultLine(ev) {
+    const r = ev.result || {};
+    const who = MN.who;
+    switch (ev.type) {
+      case 'communist': return r.from ? `☭ Se expropiaron <b>${r.amount}</b> fichas a ${who(r.from)} para ${r.to.map(who).join(', ')}` : 'No hubo nada que repartir';
+      case 'happyhour': return `🍻 Terminó. ${r.bonuses ? `La Banca pagó <b>${r.bonuses}</b> fichas extra` : 'Nadie aprovechó la happy hour'}`;
+      case 'lottery': return r.winner ? `🎟️ Ganó ${who(r.winner)}: <b>${r.pot}</b> fichas (${r.tickets} boletos)` : 'No se vendió ningún boleto';
+      case 'stopwatch': return r.winner ? `⏱️ Ganó ${who(r.winner)} con <b>${secs(r.ms)} s</b> y se llevó <b>${r.pot}</b> fichas` : (r.note || 'No hubo partida');
+      default: return '';
+    }
+  }
+
+  // ---------------------------------------------------------- acciones de los jugadores
+  function myTickets(ev, id) { return entriesOf(ev, 'ticket').filter((x) => x.player === id).length; }
+  function mySignup(ev, id) { return entriesOf(ev, 'signup').find((x) => x.player === id); }
+
+  function actionsHtml(ev) {
+    const mine = MN.me(); if (!mine) return '';
+    const ph = phase(ev); const s = set(); const bal = MN.balances()[mine.id] || 0;
+    const b = (act, label, cls = 'primary') => `<button type="button" class="btn ${cls}" data-evact="${act}" data-id="${MN.esc(ev.id)}">${label}</button>`;
+    if (ev.type === 'lottery' && ph === 'selling') {
+      const n = myTickets(ev, mine.id); const max = Number(s.lotteryMaxTickets) || 3;
+      return `<div class="ev-actions">${n < max && bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n}/${max} boletos · bote: <b>${lotteryPot(ev)}</b></span></div>`;
+    }
+    if (ev.type === 'stopwatch') {
+      const me = mySignup(ev, mine.id);
+      const n = entriesOf(ev, 'signup').length;
+      if (ph === 'signup') return `<div class="ev-actions">${me ? b('unsign', 'Borrarme', 'ghost') + '<span class="muted small">✅ Estás apuntado</span>' : (bal > 0 ? b('sign', '📝 Apuntarme') : '')}<span class="muted small">${n} apuntados</span></div>`;
+      if (ph === 'playing' && me) return `<div class="ev-actions">${me.attemptMs == null ? b('play', '⏱️ ¡JUGAR!') : `<span>Tu marca: <b>${secs(me.attemptMs)} s</b> · esperando al resto…</span>`}</div>`;
+      if (ph === 'playing') return `<div class="ev-actions"><span class="muted small">${n} jugadores en liza. Te lo perdiste…</span></div>`;
+    }
+    return '';
+  }
+
+  function lotteryPot(ev) { return entriesOf(ev, 'ticket').length * (Number(set().lotteryPrice) || 5) + (Number(set().lotteryBankBonus) || 0); }
+
+  // ---------------------------------------------------------- render
+  function heroEvent() {
+    const list = events().filter((e) => e.status !== 'done');
+    return list.find((e) => isLive(e)) || list.filter((e) => phase(e) !== 'over').sort((a, b) => a.at - b.at)[0];
+  }
+
+  function renderHero() {
+    const el = MN.$('#next-event'); if (!el) return;
+    const ev = heroEvent();
+    if (!ev) { el.innerHTML = ''; return; }
+    const T = TYPES[ev.type];
+    el.innerHTML = `<div class="ev-hero ev-${ev.type} ${isLive(ev) ? 'live' : ''}">
+      <div class="ev-art">${ART[ev.type]}</div>
+      <div class="ev-body">
+        <div class="ev-kicker">${isLive(ev) ? '🔴 Ahora' : 'Próximo evento'} · ${MN.esc(fmtWhen(ev.at))}</div>
+        <div class="ev-name">${T.icon} ${T.name}</div>
+        <div class="ev-desc">${MN.esc(T.desc(set()))}</div>
+        <div class="ev-status">${statusLine(ev)}</div>
+        ${actionsHtml(ev)}
+        <button type="button" class="link small" data-goto="eventos">📅 Ver calendario completo</button>
+      </div></div>`;
+  }
+
+  function renderCalendar() {
+    const el = MN.$('#calendar'); if (!el) return;
+    const admin = MN.isAdmin();
+    const all = (MN.S.events || []).slice().sort((a, b) => a.at - b.at);
+    const byDay = {};
+    all.forEach((e) => { const k = new Date(e.at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); (byDay[k] = byDay[k] || []).push(e); });
+    el.innerHTML = all.length ? Object.entries(byDay).map(([day, list]) => `
+      <h3 class="cal-day">${MN.esc(day)}</h3>
+      <ul class="cal-list">${list.map((ev) => {
+        const T = TYPES[ev.type]; const ph = ev.status === 'cancelled' ? 'cancelled' : phase(ev);
+        return `<li class="cal-item ph-${ph}">
+          <div class="cal-art">${ART[ev.type]}</div>
+          <div class="cal-body">
+            <div class="cal-top"><b>${fmtHour(ev.at)}</b> · ${T.icon} ${T.name}${ev.surprise ? ' <span class="tag">SORPRESA</span>' : ''}</div>
+            <div class="small">${ph === 'cancelled' ? '<span class="muted">Cancelado</span>' : statusLine(ev)}</div>
+            ${ph !== 'cancelled' && ph !== 'done' ? actionsHtml(ev) : ''}
+            ${ph === 'done' && MN.shows && ev.type !== 'happyhour' && ev.result && (ev.result.winner || ev.result.from) ? `<button type="button" class="mini" data-replay="${MN.esc(ev.id)}">▶ Ver ${ev.type === 'lottery' ? 'el sorteo' : 'la animación'}</button>` : ''}
+            ${admin && ev.status === 'scheduled' ? `<div class="admin-actions">🏦
+              <button type="button" class="mini" data-evadmin="move" data-id="${MN.esc(ev.id)}">Cambiar hora</button>
+              <button type="button" class="mini danger" data-evadmin="cancel" data-id="${MN.esc(ev.id)}">Cancelar</button></div>` : ''}
+          </div></li>`;
+      }).join('')}</ul>`).join('') : '<p class="empty">No hay eventos programados.</p>';
+
+    MN.$('#cal-admin').hidden = !admin;
+    MN.$('#cal-legend').innerHTML = Object.entries(TYPES).map(([k, T]) => `
+      <div class="legend-item"><div class="cal-art">${ART[k]}</div><div><b>${T.icon} ${T.name}</b><p class="small muted">${MN.esc(T.desc(set()))}</p></div></div>`).join('');
+  }
+
+  function render() {
+    renderHero(); renderCalendar();
+    const r = set().eventRehearsal;
+    const info = MN.$('#ev-rehearsal-info');
+    if (info) {
+      info.innerHTML = r
+        ? `🧪 <b>Ensayo en marcha</b> desde las ${fmtHour(r.at)}. Cuando acabes, pulsa <b>Restaurar</b> para volver a las fechas reales y anular lo que hayan hecho los eventos.`
+        : 'Pone todos los eventos pendientes cada 4 minutos (con happy hour y cronómetro más cortos) para probarlos desde el móvil. Luego se restauran las fechas reales.';
+      MN.$('#ev-rehearse').hidden = !!r; MN.$('#ev-restore').hidden = !r;
+    }
+  }
+
+  // ---------------------------------------------------------- ensayo
+  const REHEARSAL_GAP = 4 * MIN;
+  async function rehearse() {
+    const s = set(); if (s.eventRehearsal) return;
+    const pending = (MN.S.events || []).filter((e) => e.status === 'scheduled').sort((a, b) => a.at - b.at);
+    if (!pending.length) return MN.toast('No hay eventos pendientes que ensayar', 'bad');
+    const ok = await MN.modal(`<div class="modal-icon">🧪</div><p class="modal-text">¿Ensayar los <b>${pending.length}</b> eventos pendientes?</p>
+      <p class="hint center">Empiezan dentro de 4 minutos, uno cada 4 minutos. La partida se abre ya para que funcionen la lotería y el mercado.</p>`, 'Ensayar');
+    if (!ok) return;
+    const now = Date.now();
+    const saved = {
+      at: now, startDate: s.startDate,
+      happyMinutes: s.happyMinutes, stopwatchSignupMinutes: s.stopwatchSignupMinutes, stopwatchPlayMinutes: s.stopwatchPlayMinutes,
+      communistMaskMinutes: s.communistMaskMinutes,
+      events: Object.fromEntries(pending.map((e) => [e.id, e.at])),
+    };
+    const local = (ts) => new Date(ts - new Date().getTimezoneOffset() * MIN).toISOString().slice(0, 16);
+    await MN.act(async () => {
+      await Store.saveSettings(Object.assign({}, s, {
+        eventRehearsal: saved, startDate: local(now - MIN),
+        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 3,
+      }));
+      await Store.putMany({ events: pending.map((e, i) => Object.assign({}, e, { at: now + (i + 1) * REHEARSAL_GAP })) });
+    }, '🧪 Ensayo en marcha: el primer evento empieza en 4 minutos');
+  }
+
+  async function restore() {
+    const s = set(); const r = s.eventRehearsal; if (!r) return;
+    const ok = await MN.modal(`<div class="modal-icon">↺</div><p class="modal-text">¿Terminar el ensayo y volver a las fechas reales?</p>
+      <p class="hint center">Se anulan los repartos, boletos y bonus de los eventos ensayados y vuelven a quedar pendientes. Los duelos que hayáis jugado se quedan (bórralos con "Borrar todo" antes de la partida de verdad).</p>`, 'Restaurar');
+    if (!ok) return;
+    const ids = new Set(Object.keys(r.events));
+    await MN.act(async () => {
+      const txs = MN.S.txs.filter((t) => !t.voided && t.eventId && ids.has(t.eventId)).map((t) => Object.assign({}, t, { voided: true }));
+      const entries = (MN.S.entries || []).filter((x) => ids.has(x.eventId) && !x.withdrawn).map((x) => Object.assign({}, x, { withdrawn: true }));
+      const evs = (MN.S.events || []).filter((e) => ids.has(e.id)).map((e) => Object.assign({}, e, { at: r.events[e.id], status: 'scheduled', result: null }));
+      await Store.putMany({ txs, entries, events: evs });
+      const next = Object.assign({}, s, {
+        startDate: r.startDate, happyMinutes: r.happyMinutes, stopwatchSignupMinutes: r.stopwatchSignupMinutes, stopwatchPlayMinutes: r.stopwatchPlayMinutes,
+        communistMaskMinutes: r.communistMaskMinutes == null ? 60 : r.communistMaskMinutes,
+      });
+      delete next.eventRehearsal;
+      await Store.saveSettings(next);
+    }, '↺ Fechas reales restauradas');
+  }
+
+  // Solo actualiza los números de las cuentas atrás (cada segundo)
+  function tick() {
+    const now = Date.now();
+    MN.$$('.ev-cd').forEach((el) => { el.textContent = countdown(Number(el.dataset.to) - now); });
+    // Si un evento cambia de fase, se vuelve a pintar todo
+    const key = events().map((e) => e.id + phase(e, now)).join('|');
+    if (key !== lastPhases) { lastPhases = key; if (MN.S) { render(); remind(); sweepSoon(); } }
+    // Al empezar o acabar la censura del ranking hay que repintarlo todo
+    const masked = !!(MN.S && MN.rankMask());
+    if (masked !== lastMasked) { const first = lastMasked === null; lastMasked = masked; if (!first) MN.renderAll(); }
+  }
+  let lastPhases = ''; let lastMasked = null;
+
+  // ---------------------------------------------------------- avisos
+  function seen(key) {
+    try {
+      const s = JSON.parse(localStorage.getItem('mn_ev_seen') || '{}');
+      if (s[key]) return true;
+      s[key] = Date.now(); localStorage.setItem('mn_ev_seen', JSON.stringify(s));
+    } catch (e) { /* nada */ }
+    return false;
+  }
+
+  function remind() {
+    if (!MN.S || MN.ended()) return;
+    const now = Date.now(); const msgs = []; const mine = MN.me();
+    events().forEach((ev) => {
+      const T = TYPES[ev.type]; const ph = phase(ev, now);
+      const startTs = ev.type === 'stopwatch' ? signupStart(ev) : ev.at;
+      if (ph === 'upcoming' && startTs - now <= 15 * MIN && startTs - now > 0 && !seen(ev.id + ':15')) msgs.push(`⏰ En 15 minutos: ${T.icon} ${T.name}`);
+      if (ph === 'live' && !seen(ev.id + ':start')) msgs.push(`🍻 ¡Empieza la happy hour! Los duelos pagan x${set().happyMultiplier} durante ${set().happyMinutes} min`);
+      if (ph === 'signup' && !seen(ev.id + ':signup')) msgs.push('⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya');
+      if (ph === 'playing' && mine && mySignup(ev, mine.id) && !seen(ev.id + ':play')) msgs.push('⏱️ ¡Te toca! Juega al cronómetro global antes de que cierre');
+      // Si hay animación del resultado y la web está a la vista, el aviso no destripa nada
+      const animated = MN.shows && ev.type !== 'happyhour' && document.visibilityState === 'visible';
+      if (ev.status === 'done' && ev.result && !animated && !seen(ev.id + ':done')) {
+        if (now - (ev.result.at || ev.at) < 30 * MIN) msgs.push(`${T.icon} ${resultLine(ev).replace(/<[^>]+>/g, '')}`);
+      }
+    });
+    if (msgs.length) MN.notify(msgs);
+  }
+
+  // ---------------------------------------------------------- ejecución (barrido)
+  let sweepTimer = null;
+  function sweepSoon() { if (!sweepTimer) sweepTimer = setTimeout(() => { sweepTimer = null; MN.sweepAll(); }, 1500); }
+
+  async function sweep() {
+    const S = MN.S; if (!S) return;
+    const now = Date.now();
+    await seedCalendar();
+    for (const ev of events()) {
+      if (ev.status !== 'scheduled') continue;
+      const ph = phase(ev, now);
+      if (ph !== 'over') continue;
+      if (ev.type === 'communist') await runCommunist(ev);
+      if (ev.type === 'lottery') await runLottery(ev);
+      if (ev.type === 'stopwatch') await runStopwatch(ev);
+      if (ev.type === 'happyhour') await Store.update('events', ev.id, { status: 'done', result: { at: happyEnd(ev), bonuses: happyBonuses(ev).reduce((a, x) => a + x.amount, 0) } });
+    }
+    // El cronómetro también se resuelve antes si ya han jugado todos los apuntados
+    for (const ev of events()) {
+      if (ev.type === 'stopwatch' && ev.status === 'scheduled' && phase(ev, now) === 'playing') {
+        const signed = entriesOf(ev, 'signup');
+        if (signed.length && signed.every((x) => x.attemptMs != null)) await runStopwatch(ev);
+      }
+    }
+    await syncHappyBonuses();
+  }
+
+  async function seedCalendar() {
+    const S = MN.S;
+    if (S.settings.eventsSeeded || !MN.isAdmin() || (S.events || []).length) return;
+    const list = DEFAULT_CALENDAR.map(([id, type, at]) => ({ id, type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }));
+    await Store.putMany({ events: list });
+    await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded: true }));
+  }
+
+  async function runCommunist(ev) {
+    const s = set(); const bal = MN.balancesAt(ev.at);
+    const sorted = MN.S.players.filter((p) => p.createdAt <= ev.at).map((p) => p.id).sort((a, b) => bal[b] - bal[a]);
+    const result = { at: ev.at };
+    if (sorted.length >= 2) {
+      const from = sorted[0];
+      const to = sorted.slice(1).reverse().slice(0, Number(s.communistLast) || 3);
+      const take = Math.floor((bal[from] * (Number(s.communistPct) || 25)) / 100);
+      const share = Math.floor(take / to.length);
+      if (share > 0) {
+        const payouts = { [from]: -share * to.length };
+        to.forEach((id) => { payouts[id] = (payouts[id] || 0) + share; });
+        await Store.put('txs', { id: 'ev_' + ev.id, type: 'payout', kind: 'communist', ts: ev.at, eventId: ev.id, from, to, share, payouts });
+        Object.assign(result, { from, to, amount: share * to.length, share });
+      }
+    }
+    await Store.update('events', ev.id, { status: 'done', result });
+  }
+
+  async function runLottery(ev) {
+    const s = set();
+    const tickets = entriesOf(ev, 'ticket').filter((t) => { const tx = MN.S.txs.find((x) => x.id === 'tkt_' + t.id); return tx && !tx.voided; })
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    const result = { at: ev.at, tickets: tickets.length };
+    if (tickets.length) {
+      const idx = Math.abs(MN.hash(ev.id + tickets.map((t) => t.id).join(''))) % tickets.length;
+      const winner = tickets[idx].player;
+      const pot = tickets.length * (Number(s.lotteryPrice) || 5) + (Number(s.lotteryBankBonus) || 0);
+      await Store.put('txs', { id: 'ev_' + ev.id, type: 'payout', kind: 'lottery', ts: ev.at, eventId: ev.id, winner, pot, tickets: tickets.length, payouts: { [winner]: pot } });
+      Object.assign(result, { winner, pot, ticket: tickets[idx].id });
+    }
+    await Store.update('events', ev.id, { status: 'done', result });
+  }
+
+  async function runStopwatch(ev) {
+    const s = set(); const target = (Number(s.stopwatchTarget) || 10) * 1000;
+    const signed = entriesOf(ev, 'signup');
+    const result = { at: Date.now() };
+    if (signed.length < 2) {
+      result.note = signed.length ? 'Solo se apuntó una persona: no hubo partida' : 'No se apuntó nadie';
+      return Store.update('events', ev.id, { status: 'done', result });
+    }
+    const bal = MN.balancesAt(ev.at);
+    const poorest = Math.min(...signed.map((x) => bal[x.player] || 0));
+    const buyIn = Math.max(1, Math.floor((poorest * (Number(s.stopwatchPct) || 5)) / 100));
+    const played = signed.filter((x) => x.attemptMs != null)
+      .map((x) => ({ player: x.player, ms: x.attemptMs, diff: Math.abs(x.attemptMs - target), at: x.playedAt }))
+      .sort((a, b) => a.diff - b.diff || a.at - b.at);
+    if (!played.length) {
+      result.note = 'Nadie llegó a jugar: no se cobra nada';
+      return Store.update('events', ev.id, { status: 'done', result });
+    }
+    const payouts = {}; let pot = 0;
+    signed.forEach((x) => { const paid = Math.min(buyIn, Math.max(0, bal[x.player] || 0)); payouts[x.player] = -paid; pot += paid; });
+    payouts[played[0].player] += pot;
+    await Store.put('txs', { id: 'ev_' + ev.id, type: 'payout', kind: 'stopwatch', ts: Math.min(Date.now(), playEnd(ev)), eventId: ev.id, winner: played[0].player, ms: played[0].ms, buyIn, pot, payouts });
+    Object.assign(result, { winner: played[0].player, ms: played[0].ms, buyIn, pot, ranking: played });
+    await Store.update('events', ev.id, { status: 'done', result });
+  }
+
+  // Happy hour: por cada duelo o mesa ganado durante la happy hour, la Banca paga el extra
+  function happyBonuses(ev) {
+    const mult = Number(set().happyMultiplier) || 2;
+    const end = happyEnd(ev); const out = [];
+    MN.S.txs.forEach((t) => {
+      if (t.ts < ev.at || t.ts >= end) return;
+      if (t.type === 'duel') out.push({ src: t, player: t.winner, amount: t.amount * (mult - 1) });
+      if (t.type === 'payout' && t.kind === 'table') Object.entries(t.payouts).forEach(([pid, d]) => { if (d > 0) out.push({ src: t, player: pid, amount: d * (mult - 1) }); });
+    });
+    return out.filter((x) => x.amount > 0);
+  }
+
+  async function syncHappyBonuses() {
+    const txs = MN.S.txs; const byId = {};
+    txs.forEach((t) => { byId[t.id] = t; });
+    const writes = []; const updates = [];
+    events().filter((e) => e.type === 'happyhour' && Date.now() >= e.at).forEach((ev) => {
+      happyBonuses(ev).forEach((b) => {
+        const id = `hh_${b.src.id}_${b.player}`;
+        const cur = byId[id];
+        if (!cur && !b.src.voided) writes.push({ id, type: 'bonus', kind: 'happy', ts: b.src.ts + 1, player: b.player, amount: b.amount, srcId: b.src.id, eventId: ev.id });
+        else if (cur && !!cur.voided !== !!b.src.voided) updates.push([id, { voided: !!b.src.voided }]);
+      });
+    });
+    if (writes.length) await Store.putMany({ txs: writes });
+    for (const [id, patch] of updates) await Store.updateTx(id, patch);
+  }
+
+  // ---------------------------------------------------------- juego del cronómetro
+  function openStopwatch(ev) {
+    const mine = MN.me(); const entry = mySignup(ev, mine.id);
+    if (!entry || entry.attemptMs != null) return;
+    const target = Number(set().stopwatchTarget) || 10;
+    const box = MN.$('#sw-game');
+    box.hidden = false; document.body.classList.add('no-scroll');
+    box.innerHTML = `<div class="sw-inner">
+      <div class="sw-title">⏱️ Cronómetro global</div>
+      <p class="sw-help">Pulsa <b>EMPEZAR</b> y para el reloj cuando creas que han pasado <b>${target},00 segundos</b>.<br>A los 3 segundos el número se oculta. <b>Solo tienes un intento.</b></p>
+      <div class="sw-display" id="sw-display">0,00</div>
+      <button type="button" class="sw-btn" id="sw-btn">EMPEZAR</button>
+      <button type="button" class="link" id="sw-close">Ahora no</button></div>`;
+    let t0 = null; let timer = null;
+    const disp = MN.$('#sw-display'); const btn = MN.$('#sw-btn');
+    const loop = () => {
+      const ms = performance.now() - t0;
+      disp.textContent = ms < 3000 ? secs(ms) : '??,??';
+      disp.classList.toggle('hidden-time', ms >= 3000);
+    };
+    btn.onclick = async () => {
+      if (t0 === null) {
+        t0 = performance.now(); btn.textContent = 'PARAR'; btn.classList.add('stop');
+        MN.$('#sw-close').hidden = true; timer = setInterval(loop, 30);
+        return;
+      }
+      const ms = Math.round(performance.now() - t0);
+      clearInterval(timer);
+      btn.disabled = true;
+      disp.classList.remove('hidden-time'); disp.textContent = secs(ms);
+      const diff = Math.abs(ms - target * 1000);
+      MN.$('.sw-help').innerHTML = `Has parado en <b>${secs(ms)} s</b> (a ${secs(diff)} s del objetivo).<br>${diff < 100 ? '🎯 ¡Brutal!' : diff < 300 ? '👏 Muy bien' : diff < 1000 ? '😬 Regular…' : '🙈 Uf…'} Los resultados salen cuando acabe el evento.`;
+      await MN.act(() => Store.update('entries', entry.id, { attemptMs: ms, playedAt: Date.now() }));
+      btn.hidden = true; MN.$('#sw-close').hidden = false; MN.$('#sw-close').textContent = 'Cerrar';
+    };
+    MN.$('#sw-close').onclick = () => { clearInterval(timer); box.hidden = true; document.body.classList.remove('no-scroll'); };
+  }
+
+  // ---------------------------------------------------------- clicks
+  async function onClick(e) {
+    const go = e.target.closest('[data-goto]');
+    if (go) return MN.go(go.dataset.goto);
+    const b = e.target.closest('[data-evact]');
+    if (b) {
+      const ev = events().find((x) => x.id === b.dataset.id); const mine = MN.me();
+      if (!ev || !mine) return;
+      const s = set(); const now = Date.now();
+      if (b.dataset.evact === 'ticket') {
+        if (phase(ev) !== 'selling') return;
+        if (myTickets(ev, mine.id) >= s.lotteryMaxTickets) return MN.toast('Ya tienes el máximo de boletos', 'bad');
+        if ((MN.balances()[mine.id] || 0) < s.lotteryPrice) return MN.toast('No te llega para un boleto', 'bad');
+        const id = Store.uid();
+        await MN.act(() => Store.putMany({
+          entries: [{ id, eventId: ev.id, kind: 'ticket', player: mine.id, ts: now }],
+          txs: [{ id: 'tkt_' + id, type: 'charge', kind: 'ticket', ts: now, player: mine.id, amount: s.lotteryPrice, eventId: ev.id }],
+        }), '🎟️ Boleto comprado. ¡Suerte!');
+      }
+      if (b.dataset.evact === 'sign') {
+        if (phase(ev) !== 'signup') return;
+        await MN.act(() => Store.put('entries', { id: `sw_${ev.id}_${mine.id}`, eventId: ev.id, kind: 'signup', player: mine.id, ts: now }), '📝 Apuntado. Cuando empiece, te tocará jugar.');
+      }
+      if (b.dataset.evact === 'unsign') {
+        const en = mySignup(ev, mine.id);
+        if (en && phase(ev) === 'signup') await MN.act(() => Store.update('entries', en.id, { withdrawn: true }), 'Te has borrado');
+      }
+      if (b.dataset.evact === 'play') openStopwatch(ev);
+      return;
+    }
+    const a = e.target.closest('[data-evadmin]');
+    if (a && MN.isAdmin()) {
+      const ev = (MN.S.events || []).find((x) => x.id === a.dataset.id); if (!ev) return;
+      if (a.dataset.evadmin === 'cancel') {
+        if (await MN.modal(`<div class="modal-icon">🗑️</div><p class="modal-text">¿Cancelar ${TYPES[ev.type].icon} ${TYPES[ev.type].name} de las ${fmtHour(ev.at)}?</p>`, 'Cancelar evento')) {
+          MN.act(() => Store.update('events', ev.id, { status: 'cancelled' }), 'Evento cancelado');
+        }
+      }
+      if (a.dataset.evadmin === 'move') {
+        const local = new Date(ev.at - new Date().getTimezoneOffset() * MIN).toISOString().slice(0, 16);
+        const res = await MN.modal(`<h3>Cambiar hora</h3><label>${TYPES[ev.type].icon} ${TYPES[ev.type].name}<input type="datetime-local" name="at" value="${local}"></label>`, 'Guardar');
+        if (res && res.at) MN.act(() => Store.update('events', ev.id, { at: new Date(res.at).getTime() }), 'Hora cambiada');
+      }
+    }
+  }
+
+  return {
+    init(api) {
+      MN = api;
+      MN.registerTx('communist', { line: (t) => ({ icon: '☭', text: `Evento comunista: la Banca expropia <b>${t.share * t.to.length}</b> fichas a ${MN.who(t.from)} y las reparte entre ${t.to.map(MN.who).join(', ')}`, sub: `${t.share} para cada uno` }) });
+      MN.registerTx('happy', { line: (t) => ({ icon: '🍻', text: `Happy hour: la Banca paga <b>${t.amount}</b> fichas extra a ${MN.who(t.player)}`, sub: 'Premio doble' }) });
+      MN.registerTx('ticket', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.player)} compra un boleto de lotería`, sub: `${t.amount} fichas` }) });
+      MN.registerTx('lottery', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.winner)} gana la lotería y se lleva <b>${t.pot}</b> fichas`, sub: `${t.tickets} boletos vendidos` }) });
+      MN.registerTx('stopwatch', { line: (t) => ({ icon: '⏱️', text: `${MN.who(t.winner)} gana el cronómetro global con ${secs(t.ms)} s y se lleva <b>${t.pot}</b> fichas`, sub: `Entrada: ${t.buyIn} fichas por cabeza` }) });
+
+      document.addEventListener('click', onClick);
+      MN.$('#events-btn').addEventListener('click', () => MN.go('eventos'));
+
+      // Banca: programar y lanzar eventos
+      MN.$('#ev-type').innerHTML = Object.entries(TYPES).map(([k, T]) => `<option value="${k}">${T.icon} ${T.name}</option>`).join('');
+      MN.$('#ev-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const type = MN.$('#ev-type').value; const at = MN.$('#ev-at').value;
+        if (!at) return MN.toast('Pon fecha y hora', 'bad');
+        MN.act(() => Store.put('events', { id: Store.uid(), type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }), '📅 Evento programado');
+      });
+      MN.$('#ev-surprise').addEventListener('click', async () => {
+        const type = MN.$('#ev-type').value; const s = set();
+        // Lotería: 30 min de venta. Cronómetro: la inscripción abre ya.
+        const lead = type === 'lottery' ? 30 * MIN : type === 'stopwatch' ? (Number(s.stopwatchSignupMinutes) || 15) * MIN : 0;
+        const ok = await MN.modal(`<div class="modal-icon">⚡</div><p class="modal-text">¿Lanzar ${TYPES[type].icon} <b>${TYPES[type].name}</b> por sorpresa ahora mismo?</p>`, 'Lanzar');
+        if (ok) MN.act(() => Store.put('events', { id: Store.uid(), type, at: Date.now() + lead, status: 'scheduled', surprise: true, createdAt: Date.now() }), '⚡ ¡Evento sorpresa lanzado!');
+      });
+      MN.$('#ev-rehearse').addEventListener('click', rehearse);
+      MN.$('#ev-restore').addEventListener('click', restore);
+      MN.$('#ev-reset').addEventListener('click', async () => {
+        if (!await MN.modal('<div class="modal-icon">📅</div><p class="modal-text">¿Volver a cargar el calendario por defecto?</p><p class="hint center">Se reprograman los 6 eventos originales (los ya celebrados no se repiten).</p>', 'Cargar')) return;
+        const list = DEFAULT_CALENDAR.filter(([id]) => { const ex = (MN.S.events || []).find((e) => e.id === id); return !ex || ex.status !== 'done'; })
+          .map(([id, type, at]) => ({ id, type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }));
+        MN.act(() => Store.putMany({ events: list }), 'Calendario cargado');
+      });
+    },
+    render,
+    tick,
+    sweep,
+    onState() { remind(); },
+    // Antes del comunista se censura el ranking: nadie sabe quién va primero
+    rankMask() {
+      if (!MN.S || !MN.started()) return null;
+      const win = (Number(set().communistMaskMinutes) || 0) * MIN; if (!win) return null;
+      const now = Date.now();
+      const ev = events().filter((e) => e.type === 'communist' && e.status === 'scheduled' && e.at > now && e.at - now <= win).sort((a, b) => a.at - b.at)[0];
+      if (!ev) return null;
+      return {
+        icon: '☭', name: 'Camarada',
+        banner: `☭ <b>El Partido ha ocultado el ranking.</b> Expropiación al primero en <b class="ev-cd" data-to="${ev.at}">${countdown(ev.at - now)}</b>`,
+        chart: '☭<br><b>Censurado por el Partido</b><br><span class="muted small">La gráfica vuelve tras la expropiación</span>',
+      };
+    },
+    // Para otros módulos y las normas
+    api: () => ({ events, phase, happyActiveAt, TYPES, ART }),
+    rules(section) {
+      const s = set();
+      return section('🎉', 'Eventos', `
+        <p>Durante la partida hay eventos programados (los ves en <b>📅 Eventos</b> y en la portada). La Banca puede añadir alguno <b>sorpresa</b>.</p>
+        <ul>${Object.values(TYPES).map((T) => `<li><b>${T.icon} ${T.name}</b>: ${MN.esc(T.desc(s))}</li>`).join('')}</ul>
+        <p class="hint">Recibirás un aviso 15 minutos antes de cada evento.</p>`);
+    },
+  };
+})());

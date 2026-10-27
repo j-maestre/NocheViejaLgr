@@ -62,8 +62,40 @@
     el.innerHTML = list.map((e) => `<button type="button" data-emoji="${esc(e)}" class="${e === selected ? 'selected' : ''}">${esc(e)}</button>`).join('');
   }
 
+  // ------------------------------------------------------------
+  //  La Banca
+  //  Es un jugador (settings.bankPlayerId): tiene los poderes en
+  //  cualquier dispositivo vinculado a él. El PIN solo sirve mientras
+  //  no haya Banca asignada (arranque).
+  // ------------------------------------------------------------
+  const bankId = () => {
+    const id = S && S.settings.bankPlayerId;
+    return id && S.players.some((p) => p.id === id) ? id : null;
+  };
+  // Pruebas en modo local: la Banca puede "ser otro jugador" sin perder los poderes
+  function impersonating() {
+    if (Store.mode !== 'local' || !bankId()) return false;
+    try { return localStorage.getItem('mn_impersonator') === bankId(); } catch (e) { return false; }
+  }
   function isAdmin() {
+    if (!S) return false;
+    const b = bankId();
+    if (b) { const m = me(); return (!!m && m.id === b) || impersonating(); }
     try { return sessionStorage.getItem('mn_admin') === '1' || adminMem; } catch (e) { return adminMem; }
+  }
+
+  // El primer jugador que se registre con el nombre de config.js se convierte en la Banca
+  let claimingBank = false;
+  function ensureBank() {
+    if (bankId() || claimingBank) return;
+    const name = String((window.MN_CONFIG || {}).bankName || '').trim().toLowerCase();
+    const m = me();
+    if (!name || !m || m.name.toLowerCase() !== name) return;
+    claimingBank = true;
+    Store.saveSettings(Object.assign({}, S.settings, { bankPlayerId: m.id }))
+      .then(() => toast('🎩 Eres la Banca. La Banca siempre gana.', 'ok'))
+      .catch((e) => console.error(e))
+      .finally(() => { claimingBank = false; });
   }
   function setAdmin(v) {
     adminMem = v;
@@ -85,11 +117,16 @@
   const player = (id) => S.players.find((p) => p.id === id) || { name: '¿?', emoji: '❓' };
   const who = (id) => { const p = player(id); return `<b class="who">${esc(p.emoji)} ${esc(p.name)}</b>`; };
 
+  // Tipos de movimiento que añaden los módulos: { tipo: { line(t) } }
+  // `payout` es genérico: t.payouts = { jugador: +/- fichas } (repartos, eventos…)
+  // `bonus` es un pago de la Banca a un jugador; `charge`, un cobro.
+  const TX = {};
   function effects(t) {
     switch (t.type) {
-      case 'init': case 'loan': case 'adjust': return [[t.player, t.amount]];
+      case 'init': case 'loan': case 'adjust': case 'bonus': return [[t.player, t.amount]];
+      case 'charge': case 'fine': return [[t.player, -t.amount]];
       case 'duel': return [[t.winner, t.amount], [t.loser, -t.amount]];
-      case 'fine': return [[t.player, -t.amount]];
+      case 'payout': return Object.entries(t.payouts || {}).filter(([, d]) => d);
       default: return [];
     }
   }
@@ -98,6 +135,14 @@
     const b = {};
     S.players.forEach((p) => { b[p.id] = 0; });
     S.txs.forEach((t) => { if (!t.voided) effects(t).forEach(([id, d]) => { b[id] = (b[id] || 0) + d; }); });
+    return b;
+  }
+
+  // Saldos tal y como estaban en el instante `ts` (cálculo determinista para los eventos)
+  function balancesAt(ts) {
+    const b = {};
+    S.players.forEach((p) => { b[p.id] = 0; });
+    S.txs.forEach((t) => { if (!t.voided && t.ts <= ts) effects(t).forEach(([id, d]) => { b[id] = (b[id] || 0) + d; }); });
     return b;
   }
 
@@ -151,6 +196,7 @@
 
   // Anti-spam: ¿puede `from` retar ahora a `to`? Devuelve el motivo si no.
   function challengeBlock(from, to) {
+    for (const m of MODULES) { const r = m.challengeBlock && m.challengeBlock(from, to); if (r) return r; }
     if (activeBetween(from, to)) return `Ya tienes un reto abierto con <b>${esc(player(to).name)}</b>. Terminadlo primero.`;
     const maxOut = Number(S.settings.maxPendingOut) || 2;
     const out = activeChallenges().filter((c) => c.from === from && c.status === 'pending').length;
@@ -264,7 +310,9 @@
   function txLine(t) {
     switch (t.type) {
       case 'duel':
-        return { icon: '⚔️', text: DUEL_LINES[Math.abs(hash(t.id)) % DUEL_LINES.length](who(t.winner), who(t.loser), t.amount), sub: esc(t.game) };
+        return { icon: '⚔️', text: DUEL_LINES[Math.abs(hash(t.id)) % DUEL_LINES.length](who(t.winner), who(t.loser), t.amount),
+          sub: esc(t.game) + (t.tag ? ` · ${esc(t.tag)}` : '') + (t.bank === 'resolved' ? ' · 🏦 decidido por la Banca' : t.bank === 'direct' ? ' · 🏦 registrado por la Banca' : '')
+            + (t.dedication ? `<div class="dedication">💬 “${esc(t.dedication)}”</div>` : '') };
       case 'loan':
         return { icon: '🏦', text: `La Banca presta <b>${t.amount}</b> fichas a ${who(t.player)}`, sub: `Castigo: ${esc(t.punishment)} · ${t.done ? '✅ cumplido' : '⏳ pendiente'}` };
       case 'adjust':
@@ -273,8 +321,13 @@
         return { icon: '🐔', text: `${who(t.player)} paga <b>${t.amount}</b> fichas de multa por cobarde`, sub: esc(t.reason || '') };
       case 'init':
         return { icon: '🪑', text: `${who(t.player)} se sienta a la mesa con <b>${t.amount}</b> fichas`, sub: '' };
-      default:
+      default: {
+        const def = TX[t.kind] || TX[t.type];
+        if (def) return def.line(t);
+        if (t.type === 'bonus') return { icon: '🎁', text: `La Banca le da <b>${t.amount}</b> fichas a ${who(t.player)}`, sub: esc(t.reason || '') };
+        if (t.type === 'charge') return { icon: '💸', text: `${who(t.player)} paga <b>${t.amount}</b> fichas`, sub: esc(t.reason || '') };
         return { icon: '❔', text: 'Movimiento desconocido', sub: '' };
+      }
     }
   }
 
@@ -291,7 +344,8 @@
     return new Promise((resolve) => {
       const close = (val) => {
         m.hidden = true;
-        $('#modal-form').onsubmit = null; $('#modal-cancel').onclick = null; m.onclick = null;
+        // Nunca dejar el formulario sin manejador: se enviaría y recargaría la página
+        $('#modal-form').onsubmit = (ev) => ev.preventDefault(); $('#modal-cancel').onclick = null; m.onclick = null;
         resolve(val);
       };
       $('#modal-form').onsubmit = (e) => {
@@ -313,6 +367,19 @@
     toastTimer = setTimeout(() => { t.className = 'toast'; }, 3200);
   }
 
+  // Aviso al jugador: mensaje emergente + vibración, y notificación del sistema
+  // si la web está en segundo plano (los módulos pueden engancharse a `onNotify`)
+  function notify(msgs) {
+    const list = [].concat(msgs);
+    if (!list.length) return;
+    toast(list.join('<br>'), 'ok');
+    try {
+      const touched = !navigator.userActivation || navigator.userActivation.hasBeenActive;
+      if (navigator.vibrate && touched) navigator.vibrate([120, 60, 120]);
+    } catch (e) { /* nada */ }
+    MODULES.forEach((m) => m.onNotify && m.onNotify(list));
+  }
+
   async function act(fn, okMsg) {
     try { await fn(); if (okMsg) toast(okMsg, 'ok'); return true; } catch (e) {
       console.error(e); toast('❌ Error al guardar: ' + esc(e.message || e), 'bad'); return false;
@@ -321,8 +388,10 @@
 
   function go(v) {
     view = v;
+    MODULES.forEach((m) => m.onView && m.onView(v));
     if (v !== 'normas' && peekRules) { peekRules = false; if (S) renderWelcome(); }
     $('#rules-btn').classList.toggle('active', v === 'normas');
+    $('#events-btn').classList.toggle('active', v === 'eventos');
     $$('.view').forEach((el) => { el.hidden = el.id !== 'view-' + v; });
     $$('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
     if (v === 'banca' && isAdmin()) fillSettingsForm();
@@ -335,8 +404,12 @@
   // ============================================================
   //  RENDER: RANKING
   // ============================================================
+  // Ranking censurado (p. ej. antes del evento comunista): { icon, name, banner, chart }
+  const rankMask = () => { for (const m of MODULES) { const r = m.rankMask && m.rankMask(); if (r) return r; } return null; };
+
   function renderRanking() {
     const bal = balances();
+    const mask = rankMask();
     const today = todayDeltas();
     const morosos = new Set(pendingPunishments().map((t) => t.player));
     const sorted = sortedPlayers(bal);
@@ -344,10 +417,10 @@
     const mine = me();
 
     const next = nextChange();
-    $('#limit-info').innerHTML = isEnd ? '' : !started()
+    $('#limit-info').innerHTML = (mask ? `<div class="mask-banner">${mask.banner}</div>` : '') + (isEnd ? '' : !started()
       ? `🗓️ La partida empieza el <b>${esc(new Date(startTs()).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</b> · apuesta máxima al empezar: <b>${currentPct()}%</b>`
       : `🎯 Apuesta máxima: <b>${currentPct()}%</b> del capital <span class="muted">(mín. ${esc(S.settings.minBet)})</span>` +
-      (next ? ` · <span class="muted">sube al ${esc(next.pct)}% el ${esc(fmtFrom(next.from))}</span>` : '');
+      (next ? ` · <span class="muted">sube al ${esc(next.pct)}% el ${esc(fmtFrom(next.from))}</span>` : ''));
 
     $('#final-banner').innerHTML = isEnd && sorted.length ?
       `<div class="final"><div class="final-crown">👑</div><div>La mesa está cerrada.<br>Gana <b>${esc(sorted[0].emoji)} ${esc(sorted[0].name)}</b> con <b>${bal[sorted[0].id]}</b> fichas</div></div>` : '';
@@ -369,16 +442,17 @@
       const prev = prevBal[p.id];
       const flash = prev === undefined || prev === bal[p.id] ? '' : (bal[p.id] > prev ? 'flash-up' : 'flash-down');
       return `
-        <li class="rank-row pos-${pos + 1} ${bal[p.id] <= 0 ? 'broke' : ''} ${mine && mine.id === p.id ? 'is-me' : ''} ${onFire ? 'on-fire' : ''}">
+        <li class="rank-row pos-${pos + 1} ${bal[p.id] <= 0 ? 'broke' : ''} ${mine && mine.id === p.id ? 'is-me' : ''} ${onFire && !mask ? 'on-fire' : ''} ${mask ? 'masked' : ''}">
           <div class="pos">${pos < 3 ? MEDALS[pos] : '#' + (pos + 1)}</div>
-          <div class="avatar">${esc(p.emoji)}</div>
+          <div class="avatar">${mask ? mask.icon : esc(p.emoji)}</div>
+          ${mask ? `<div class="info"><div class="name">${mask.name} ${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}</div><div class="sub">Identidad protegida por el Partido</div></div>` : `
           <div class="info">
-            <div class="name">${esc(p.name)} ${fireHtml(st)}${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}${morosos.has(p.id) ? '<span class="tag moroso">MOROSO</span>' : ''}${bal[p.id] <= 0 ? '<span class="tag broke-tag">EN BANCARROTA</span>' : ''}</div>
-            <div class="sub">${isEnd ? '' : `Apuesta máx.: ${maxBetFor(bal[p.id])}`}${badges ? ` <span class="badges-inline">${badges}</span>` : ''}</div>
-          </div>
+            <div class="name">${esc(p.name)} ${fireHtml(st)}${p.id === bankId() ? '<span class="tag bank-tag">🎩 BANCA</span>' : ''}${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}${morosos.has(p.id) ? '<span class="tag moroso">MOROSO</span>' : ''}${bal[p.id] <= 0 ? '<span class="tag broke-tag">EN BANCARROTA</span>' : ''}</div>
+            <div class="sub">${isEnd ? '' : `Apuesta máx.: ${maxBetFor(bal[p.id])}`}${badges ? ` <span class="badges-inline">${badges}</span>` : ''}${MODULES.map((m) => (m.rankExtra ? m.rankExtra(p.id, st) : '')).join('')}</div>
+          </div>`}
           <div class="chips ${flash}">
             <div class="amount">${bal[p.id]}</div>
-            <div class="delta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d > 0 ? '▲ ' + d : d < 0 ? '▼ ' + -d : '—'} <span>hoy</span></div>
+            ${mask ? '<div class="delta">☭</div>' : `<div class="delta ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d > 0 ? '▲ ' + d : d < 0 ? '▼ ' + -d : '—'} <span>hoy</span></div>`}
           </div>
         </li>`;
     }).join('');
@@ -437,6 +511,8 @@
 
   function renderRankChart(bal) {
     if (!S.players.length) { $('#rank-chart').innerHTML = ''; $('#rank-chart-legend').innerHTML = ''; return; }
+    const mask = rankMask();
+    if (mask) { $('#rank-chart').innerHTML = `<div class="censored">${mask.chart}</div>`; $('#rank-chart-legend').innerHTML = ''; return; }
     const sel = chartSelection(bal);
     const series = balanceSeries();
     const list = sortedPlayers(bal).map((p) => ({
@@ -543,7 +619,7 @@
     if (!ok) return;
 
     const done = await act(() => Store.addTx({
-      id: Store.uid(), type: 'duel', ts: Date.now(), challenger: a, winner, loser, amount, game,
+      id: Store.uid(), type: 'duel', ts: Date.now(), challenger: a, winner, loser, amount, game, bank: 'direct',
     }), `💰 ${esc(player(winner).name)} se lleva ${amount} fichas`);
     if (done) {
       winner = null;
@@ -639,7 +715,7 @@
     }
 
     return `<li class="challenge status-${c.status} ${mineC && needsMe(c, myId) ? 'needs-me' : ''}">
-      <div class="ch-head">${from}<span class="ch-vs">VS</span>${to}<span class="ch-amount">${c.amount}</span></div>
+      <div class="ch-head">${from}<span class="ch-vs">VS</span>${to}${c.tag ? `<span class="tag">${esc(c.tag)}</span>` : ''}<span class="ch-amount">${c.amount}</span></div>
       <div class="ch-sub">${esc(c.game)} · <time title="${fmtDate(c.createdAt)}">${ago(c.createdAt)}</time></div>
       <div class="ch-status">${status}</div>
       ${actions ? `<div class="ch-actions">${actions}</div>` : ''}
@@ -658,7 +734,8 @@
     $('#live-challenges').innerHTML = others.length ? others.map((c) => challengeCard(c, myId, admin)).join('')
       : '<li class="empty">Nadie se está jugando nada ahora mismo. Qué aburrimiento…</li>';
 
-    const n = myId ? list.filter((c) => needsMe(c, myId)).length : 0;
+    const n = (myId ? list.filter((c) => needsMe(c, myId)).length : 0)
+      + MODULES.reduce((a, m) => a + (m.duelBadge ? m.duelBadge() : 0), 0);
     $('#duel-badge').hidden = !n;
     $('#duel-badge').textContent = n;
   }
@@ -684,10 +761,7 @@
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
         else if (before === 'reported' && c.status === 'accepted' && c.disputedBy && c.disputedBy !== id) msgs.push(`❌ ${r} no está de acuerdo con el resultado`);
       });
-      if (msgs.length) {
-        toast(msgs.join('<br>'), 'ok');
-        try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch (e) { /* nada */ }
-      }
+      if (msgs.length) notify(msgs);
     }
     prevCh = now;
   }
@@ -733,9 +807,10 @@
           break;
         case 'report': {
           const ok = await modal(`<div class="modal-icon">👑</div><p class="modal-text">¿Ha ganado ${who(winnerId)}?</p>
-            <p class="hint center">${esc(player(rivalOf(c, myId)).name)} tendrá que confirmarlo.</p>`, 'Sí');
+            <p class="hint center">${esc(player(rivalOf(c, myId)).name)} tendrá que confirmarlo.</p>
+            ${winnerId === myId ? '<input name="dedication" maxlength="80" placeholder="💬 Dedicatoria para tu rival (opcional)">' : ''}`, 'Sí');
           if (!ok) return;
-          await act(() => Store.updateChallenge(c.id, { status: 'reported', winner: winnerId, reportedBy: myId, reportedAt: now }), 'Resultado enviado. Falta que lo confirme tu rival.');
+          await act(() => Store.updateChallenge(c.id, { status: 'reported', winner: winnerId, reportedBy: myId, reportedAt: now, dedication: (ok.dedication || '').trim() || null }), 'Resultado enviado. Falta que lo confirme tu rival.');
           break;
         }
         case 'unreport':
@@ -745,12 +820,20 @@
           await act(() => Store.updateChallenge(c.id, { status: 'accepted', winner: null, reportedBy: null, disputes: (c.disputes || 0) + 1, disputedBy: myId }),
             (c.disputes || 0) >= 1 ? '⚠️ Otro desacuerdo… que decida la Banca' : 'Resultado rechazado. Volved a registrarlo.');
           break;
-        case 'confirm':
-          await finishChallenge(c, c.winner, '💰 Resultado confirmado');
+        case 'confirm': {
+          let dedication = c.dedication || null;
+          if (c.winner === myId) {
+            const res = await modal(`<div class="modal-icon">🏆</div><p class="modal-text">¡Has ganado <b>${c.amount}</b> fichas!</p>
+              <input name="dedication" maxlength="80" placeholder="💬 Dedicatoria para ${esc(player(rivalOf(c, myId)).name)} (opcional)">`, 'Cobrar');
+            if (!res) return;
+            dedication = (res.dedication || '').trim() || null;
+          }
+          await finishChallenge(Object.assign({}, c, { dedication }), c.winner, '💰 Resultado confirmado');
           break;
+        }
         case 'force': {
           const ok = await modal(`<div class="modal-icon">🏦</div><p class="modal-text">La Banca decide: gana ${who(winnerId)}</p>`, 'Resolver');
-          if (ok) await finishChallenge(c, winnerId, '🏦 La Banca ha resuelto el duelo');
+          if (ok) await finishChallenge(c, winnerId, '🏦 La Banca ha resuelto el duelo', true);
           break;
         }
       }
@@ -759,12 +842,13 @@
     }
   }
 
-  async function finishChallenge(c, winnerId, msg) {
+  async function finishChallenge(c, winnerId, msg, byBank = false) {
     const loser = rivalOf(c, winnerId);
     const amount = Math.max(0, Math.min(c.amount, balances()[loser])); // nunca deja a nadie en negativo
     const txId = Store.uid(); const now = Date.now();
     await act(async () => {
-      await Store.addTx({ id: txId, type: 'duel', ts: now, challengeId: c.id, challenger: c.from, winner: winnerId, loser, amount, game: c.game });
+      await Store.addTx(Object.assign({ id: txId, type: 'duel', ts: now, challengeId: c.id, challenger: c.from, winner: winnerId, loser, amount, game: c.game },
+        byBank ? { bank: 'resolved' } : {}, c.dedication && !byBank ? { dedication: c.dedication } : {}, c.tag ? { tag: c.tag } : {}));
       await Store.updateChallenge(c.id, { status: 'done', winner: winnerId, txId, closedAt: now });
     }, msg);
   }
@@ -925,9 +1009,12 @@
         </ul>`),
       section('🎩', 'La Banca', `
         <ul>
+          ${bankId() ? `<li>La Banca es ${who(bankId())}.</li>` : ''}
           <li>La Banca puede corregir errores, anular movimientos, resolver disputas y cambiar estas reglas.</li>
+          <li>Todo lo que hace queda en el historial: los duelos que decide o registra salen marcados con 🏦.</li>
           <li>Sus decisiones son <b>inapelables</b>. La Banca siempre gana.</li>
         </ul>`),
+      ...MODULES.filter((m) => m.rules).map((m) => m.rules(section)),
     ].join('') + (!me() ? '<button type="button" id="rules-back" class="btn primary wide">🪑 Sentarme a la mesa</button>' : '');
   }
 
@@ -935,7 +1022,7 @@
   //  RENDER: BIENVENIDA
   // ============================================================
   function renderWelcome() {
-    const show = !me() && !isSpectator() && !peekRules;
+    const show = !me() && !isSpectator() && !peekRules && !MODULES.some((m) => m.hidesWelcome && m.hidesWelcome());
     const w = $('#welcome');
     if (show && w.hidden) {
       // Se abre: estado inicial limpio
@@ -966,9 +1053,26 @@
         ${admin ? `<button class="mini ok" data-done="${esc(t.id)}">Cumplido ✓</button>` : ''}
       </li>`).join('') : '<li class="empty">Nadie debe nada… de momento 😇</li>';
 
+    const bank = bankId();
     $('#admin-locked').hidden = admin;
     $('#admin-panel').hidden = !admin;
+    $('#unlock-form').hidden = !!bank;
+    $('#bank-who').innerHTML = bank ? `🎩 La Banca es ${who(bank)}.` : 'Todavía no hay Banca asignada. Entra con el PIN de arranque.';
+    $('#lock-btn').hidden = !!bank;
+    $$('.local-only').forEach((el) => { el.hidden = Store.mode !== 'local'; });
     if (!admin) return;
+
+    const mine = me();
+    $('#bank-info').innerHTML = bank ? `
+      <p>La Banca es ${who(bank)}. Tiene los poderes en cualquier móvil vinculado a ese jugador, sin PIN.</p>
+      <div class="row">
+        <select id="bank-transfer"><option value="">Traspasar la Banca a…</option>${S.players.filter((p) => p.id !== bank)
+          .map((p) => `<option value="${esc(p.id)}">${esc(p.emoji)} ${esc(p.name)}</option>`).join('')}</select>
+        <button type="button" class="btn ghost" id="bank-transfer-btn">Traspasar</button>
+      </div>` : `
+      <p>No hay Banca asignada: ahora mismo cualquiera con el PIN tiene los poderes.</p>
+      ${mine ? `<button type="button" class="btn primary" id="bank-claim-btn">🎩 Hacerme la Banca (${esc(mine.name)})</button>`
+        : '<p class="hint">Regístrate como jugador para poder ser la Banca.</p>'}`;
 
     const bal = balances();
     fillPlayerSelect($('#l-player'), 'Elegir jugador…', bal);
@@ -1015,9 +1119,16 @@
     });
   }
 
+  function renderImpBanner() {
+    const imp = impersonating() && me() && me().id !== bankId();
+    $('#imp-banner').hidden = !imp;
+    if (imp) $('#imp-banner').innerHTML = `🎭 Estás haciendo de <b>${esc(me().name)}</b> (pruebas) <button type="button" class="mini" id="imp-back">Volver a ser ${esc(player(bankId()).name)}</button>`;
+  }
+
   function renderAll() {
     if (!S) return;
     sweepExpired();
+    renderImpBanner();
     renderRanking();
     renderChallengeForm();
     renderChallenges();
@@ -1026,7 +1137,19 @@
     renderProfile();
     renderBanca();
     renderRules();
+    MODULES.forEach((m) => { try { if (m.render) m.render(); } catch (e) { console.error(e); } });
     renderWelcome();
+  }
+
+  // Barrido: cada módulo genera los movimientos automáticos que falten (premios,
+  // eventos vencidos…). Los ids son deterministas, así que repetirlo no duplica nada.
+  let sweeping = false;
+  async function sweepAll() {
+    if (sweeping || !S) return;
+    sweeping = true;
+    try {
+      for (const m of MODULES) if (m.sweep) await m.sweep();
+    } catch (e) { console.error(e); } finally { sweeping = false; }
   }
 
   // ============================================================
@@ -1093,6 +1216,7 @@
       el.innerHTML = `<div class="cd-label">${pre ? 'La mesa abre en' : 'Cierre de la mesa'}</div><div class="cd-time">${d > 0 ? d + '<small>d</small> ' : ''}${pad(h)}:${pad(m)}:${pad(s)}</div>`;
       el.classList.toggle('urgent', !pre && ms < 3600000);
     }
+    MODULES.forEach((mod) => { try { if (mod.tick) mod.tick(); } catch (err) { console.error(err); } });
     const e = (pre ? 'pre' : ms <= 0 ? 'end' : 'live');
     if (wasEnded !== null && e !== wasEnded) renderAll();
     wasEnded = e;
@@ -1150,9 +1274,11 @@
       if (!amount || amount < 1 || amount > max) return toast(`La apuesta debe estar entre 1 y ${max}`, 'bad');
       let game = $('#c-game').value;
       if (game === '__other') game = $('#c-game-other').value.trim() || 'Minijuego misterioso';
-      const now = Date.now();
-      const done = await act(() => Store.addChallenge({ id: Store.uid(), from: mine.id, to: rival, game, amount, status: 'pending', createdAt: now }),
-        `⚔️ Reto enviado a ${esc(player(rival).name)}`);
+      const doc = { id: Store.uid(), from: mine.id, to: rival, game, amount, status: 'pending', createdAt: Date.now() };
+      const done = await act(async () => {
+        for (const m of MODULES) if (m.beforeChallenge) await m.beforeChallenge(doc);
+        await Store.addChallenge(doc);
+      }, doc.forced ? `🎯 Reto obligatorio enviado: ${esc(player(rival).name)} no puede negarse` : `⚔️ Reto enviado a ${esc(player(rival).name)}`);
       if (done) { $('#c-rival').value = ''; $('#c-bet').value = ''; $('#c-game-other').value = ''; updateChallengeForm(); window.scrollTo(0, 0); }
     });
 
@@ -1169,6 +1295,7 @@
     // --- Banca: acceso
     $('#unlock-form').addEventListener('submit', (e) => {
       e.preventDefault();
+      if (bankId()) return toast('Ya hay Banca: el PIN ya no sirve', 'bad');
       if ($('#pin').value === String(S.settings.adminPin)) {
         setAdmin(true); $('#pin').value = '';
         fillSettingsForm(); renderAll(); toast('🏦 Bienvenido, señor Banquero', 'ok');
@@ -1275,7 +1402,7 @@
         games: lines($('#s-games').value),
         punishments: lines($('#s-punish').value),
       };
-      act(() => Store.saveSettings(s), '⚙️ Reglas guardadas');
+      act(() => Store.saveSettings(Object.assign({}, S.settings, s)), '⚙️ Reglas guardadas');
     });
 
     // --- Copia de seguridad
@@ -1376,10 +1503,35 @@
         <select name="pid">${S.players.filter((p) => !mine || p.id !== mine.id).map((p) => `<option value="${esc(p.id)}">${esc(p.emoji)} ${esc(p.name)}</option>`).join('')}</select>`, 'Cambiar');
       if (!res || !res.pid) return;
       const target = player(res.pid); const dev = deviceId();
+      try {
+        if (target.id === bankId()) localStorage.removeItem('mn_impersonator');
+        else if (mine && mine.id === bankId()) localStorage.setItem('mn_impersonator', mine.id);
+      } catch (e) { /* nada */ }
       act(async () => {
         if (mine) await Store.updatePlayer(mine.id, { deviceIds: (mine.deviceIds || []).filter((d) => d !== dev) });
         await Store.updatePlayer(target.id, { deviceIds: [...new Set([...(target.deviceIds || []), dev])] });
       }, `🎭 Ahora eres ${esc(target.name)}`);
+    });
+    $('#imp-banner').addEventListener('click', async (e) => {
+      if (!e.target.closest('#imp-back')) return;
+      const mine = me(); const bank = player(bankId()); const dev = deviceId();
+      try { localStorage.removeItem('mn_impersonator'); } catch (err) { /* nada */ }
+      act(async () => {
+        if (mine) await Store.updatePlayer(mine.id, { deviceIds: (mine.deviceIds || []).filter((d) => d !== dev) });
+        await Store.updatePlayer(bank.id, { deviceIds: [...new Set([...(bank.deviceIds || []), dev])] });
+      }, `🎩 Vuelves a ser ${esc(bank.name)}`);
+    });
+    $('#bank-info').addEventListener('click', async (e) => {
+      if (e.target.closest('#bank-claim-btn')) {
+        const mine = me(); if (!mine) return;
+        act(() => Store.saveSettings(Object.assign({}, S.settings, { bankPlayerId: mine.id })), `🎩 ${esc(mine.name)} es ahora la Banca`);
+      }
+      if (e.target.closest('#bank-transfer-btn')) {
+        const pid = $('#bank-transfer').value; if (!pid) return toast('Elige a quién', 'bad');
+        const ok = await modal(`<div class="modal-icon">🎩</div><p class="modal-text">¿Traspasar la Banca a ${who(pid)}?</p>
+          <p class="hint center">Perderás todos los poderes de la Banca.</p>`, 'Traspasar');
+        if (ok) act(() => Store.saveSettings(Object.assign({}, S.settings, { bankPlayerId: pid })), 'Banca traspasada');
+      }
     });
     $('#wipe-btn').addEventListener('click', async () => {
       const ok = await modal(`<div class="modal-icon">🧨</div>
@@ -1391,13 +1543,16 @@
     // Refresca textos relativos ("hace 5 min") y límites por fecha
     setInterval(() => { if (S) { sweepExpired(); renderRanking(); renderChallenges(); renderHistory(); renderProfile(); renderBanca(); } }, 60000);
     setInterval(tick, 1000);
+    setInterval(sweepAll, 15000);
   }
 
   // ============================================================
   //  ARRANQUE
   // ============================================================
   async function boot() {
+    $('#modal-form').onsubmit = (ev) => ev.preventDefault();
     bindEvents();
+    MODULES.forEach((m) => { try { if (m.init) m.init(MN); } catch (e) { console.error(e); } });
     let initial = 'ranking';
     try { initial = localStorage.getItem('mn_view') || 'ranking'; } catch (e) { /* nada */ }
 
@@ -1413,9 +1568,12 @@
         const first = !S;
         S = state;
         if (first) { $('#loading').hidden = true; go(initial); if (isAdmin()) fillSettingsForm(); }
+        ensureBank();
         renderAll();
         notifyChallenges();
+        MODULES.forEach((m) => { try { if (m.onState) m.onState(first); } catch (e) { console.error(e); } });
         tick();
+        setTimeout(sweepAll, 0);
         // Modo local y mesa vacía: sienta jugadores de prueba (solo una vez por navegador)
         if (first && Store.mode === 'local' && !S.players.length) {
           let seeded = false;
@@ -1433,6 +1591,22 @@
       $('#loading').textContent = '💥 No se pudo arrancar la mesa.';
     }
   }
+
+  // ============================================================
+  //  API PARA LOS MÓDULOS (js/mod-*.js)
+  // ============================================================
+  const MODULES = window.MNModules || [];
+  const MN = {
+    get S() { return S; }, get view() { return view; },
+    $, $$, esc, pad, hash, shuffle, lines, HOUR, MEDALS,
+    toast, modal, act, notify, go, renderAll, sweepAll,
+    me, player, who, deviceId, isAdmin, bankId, isSpectator, setSpectator,
+    balances, balancesAt, effects, sortedPlayers, playerStats, achievements, txItem, txLine,
+    maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago,
+    activeChallenges, challengeBlock, fillPlayerSelect, rankMask,
+    registerTx: (type, def) => { TX[type] = def; },
+  };
+  window.MN = MN;
 
   boot();
 })();

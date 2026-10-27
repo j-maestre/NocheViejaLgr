@@ -22,4 +22,9 @@ window.MN_CONFIG = {
   // Identificador de la partida. Cámbialo para empezar una partida nueva
   // sin borrar la anterior (p. ej. 'nochevieja-2027').
   gameId: 'nochevieja-2026',
+
+  // Nombre del jugador que será la Banca. El primero que se registre con
+  // este nombre recibe los poderes de la Banca (regístrate tú antes de
+  // pasar el enlace). Déjalo vacío para usar solo el PIN.
+  bankName: 'Xema',
 };
