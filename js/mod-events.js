@@ -60,7 +60,7 @@
     },
     lottery: {
       name: 'Lotería', icon: '🎟️',
-      desc: (s) => `Boletos a ${s.lotteryPrice} fichas (máx. ${s.lotteryMaxTickets} por persona). La Banca añade ${s.lotteryBankBonus} fichas al bote y un boleto al azar se lo lleva todo.`,
+      desc: (s) => `Boletos a ${s.lotteryPrice} fichas (sin límite: cuantos más compres, más papeletas). La Banca añade ${s.lotteryBankBonus} fichas al bote y un boleto al azar se lo lleva todo.`,
     },
     stopwatch: {
       name: 'Cronómetro global', icon: '⏱️',
@@ -145,8 +145,8 @@
     const ph = phase(ev); const s = set(); const bal = MN.balances()[mine.id] || 0;
     const b = (act, label, cls = 'primary') => `<button type="button" class="btn ${cls}" data-evact="${act}" data-id="${MN.esc(ev.id)}">${label}</button>`;
     if (ev.type === 'lottery' && ph === 'selling') {
-      const n = myTickets(ev, mine.id); const max = Number(s.lotteryMaxTickets) || 3;
-      return `<div class="ev-actions">${n < max && bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n}/${max} boletos · bote: <b>${lotteryPot(ev)}</b></span></div>`;
+      const n = myTickets(ev, mine.id);
+      return `<div class="ev-actions">${bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n} ${n === 1 ? 'boleto' : 'boletos'} · bote: <b>${lotteryPot(ev)}</b></span></div>`;
     }
     if (ev.type === 'stopwatch') {
       const me = mySignup(ev, mine.id);
@@ -243,7 +243,7 @@
     await MN.act(async () => {
       await Store.saveSettings(Object.assign({}, s, {
         eventRehearsal: saved, startDate: local(now - MIN),
-        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 3,
+        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30,
       }));
       await Store.putMany({ events: pending.map((e, i) => Object.assign({}, e, { at: now + (i + 1) * REHEARSAL_GAP })) });
     }, '🧪 Ensayo en marcha: el primer evento empieza en 4 minutos');
@@ -262,7 +262,7 @@
       await Store.putMany({ txs, entries, events: evs });
       const next = Object.assign({}, s, {
         startDate: r.startDate, happyMinutes: r.happyMinutes, stopwatchSignupMinutes: r.stopwatchSignupMinutes, stopwatchPlayMinutes: r.stopwatchPlayMinutes,
-        communistMaskMinutes: r.communistMaskMinutes == null ? 60 : r.communistMaskMinutes,
+        communistMaskMinutes: r.communistMaskMinutes == null || r.communistMaskMinutes === 60 ? 30 : r.communistMaskMinutes,
       });
       delete next.eventRehearsal;
       await Store.saveSettings(next);
@@ -313,7 +313,7 @@
 
   // ---------------------------------------------------------- ejecución (barrido)
   let sweepTimer = null;
-  function sweepSoon() { if (!sweepTimer) sweepTimer = setTimeout(() => { sweepTimer = null; MN.sweepAll(); }, 1500); }
+  function sweepSoon() { if (!sweepTimer) sweepTimer = setTimeout(() => { sweepTimer = null; MN.sweepAll(); }, 600); }
 
   async function sweep() {
     const S = MN.S; if (!S) return;
@@ -438,11 +438,19 @@
   function openStopwatch(ev) {
     const mine = MN.me(); const entry = mySignup(ev, mine.id);
     if (!entry || entry.attemptMs != null) return;
+    stopwatchGame({
+      title: '⏱️ Cronómetro global', after: 'Los resultados salen cuando acabe el evento.',
+      save: (ms) => MN.act(() => Store.update('entries', entry.id, { attemptMs: ms, playedAt: Date.now() })),
+    });
+  }
+
+  // Juego del cronómetro (un intento). Lo usan el evento y los retos de cronómetro.
+  function stopwatchGame({ title, sub = '', after, save }) {
     const target = Number(set().stopwatchTarget) || 10;
     const box = MN.$('#sw-game');
     box.hidden = false; document.body.classList.add('no-scroll');
     box.innerHTML = `<div class="sw-inner">
-      <div class="sw-title">⏱️ Cronómetro global</div>
+      <div class="sw-title">${title}</div>${sub ? `<div class="sw-sub">${sub}</div>` : ''}
       <p class="sw-help">Pulsa <b>EMPEZAR</b> y para el reloj cuando creas que han pasado <b>${target},00 segundos</b>.<br>A los 3 segundos el número se oculta. <b>Solo tienes un intento.</b></p>
       <div class="sw-display" id="sw-display">0,00</div>
       <button type="button" class="sw-btn" id="sw-btn">EMPEZAR</button>
@@ -451,8 +459,16 @@
     const disp = MN.$('#sw-display'); const btn = MN.$('#sw-btn');
     const loop = () => {
       const ms = performance.now() - t0;
-      disp.textContent = ms < 3000 ? secs(ms) : '??,??';
-      disp.classList.toggle('hidden-time', ms >= 3000);
+      // Entre 1,5 y 3 s el número se va desvaneciendo; luego aparece "??,??" poco a poco
+      if (ms < 3000) {
+        const k = Math.max(0, Math.min(1, (ms - 1500) / 1500));
+        disp.textContent = secs(ms);
+        disp.style.opacity = String(1 - k * k * 0.95); disp.style.filter = `blur(${(k * 6).toFixed(1)}px)`;
+      } else {
+        const k = Math.min(1, (ms - 3000) / 700);
+        disp.textContent = '??,??'; disp.classList.add('hidden-time');
+        disp.style.opacity = String(0.05 + k * 0.95); disp.style.filter = `blur(${(6 - k * 3).toFixed(1)}px)`;
+      }
     };
     btn.onclick = async () => {
       if (t0 === null) {
@@ -463,10 +479,10 @@
       const ms = Math.round(performance.now() - t0);
       clearInterval(timer);
       btn.disabled = true;
-      disp.classList.remove('hidden-time'); disp.textContent = secs(ms);
+      disp.classList.remove('hidden-time'); disp.style.opacity = ''; disp.style.filter = ''; disp.textContent = secs(ms);
       const diff = Math.abs(ms - target * 1000);
-      MN.$('.sw-help').innerHTML = `Has parado en <b>${secs(ms)} s</b> (a ${secs(diff)} s del objetivo).<br>${diff < 100 ? '🎯 ¡Brutal!' : diff < 300 ? '👏 Muy bien' : diff < 1000 ? '😬 Regular…' : '🙈 Uf…'} Los resultados salen cuando acabe el evento.`;
-      await MN.act(() => Store.update('entries', entry.id, { attemptMs: ms, playedAt: Date.now() }));
+      MN.$('.sw-help').innerHTML = `Has parado en <b>${secs(ms)} s</b> (a ${secs(diff)} s del objetivo).<br>${diff < 100 ? '🎯 ¡Brutal!' : diff < 300 ? '👏 Muy bien' : diff < 1000 ? '😬 Regular…' : '🙈 Uf…'} ${after}`;
+      await save(ms);
       btn.hidden = true; MN.$('#sw-close').hidden = false; MN.$('#sw-close').textContent = 'Cerrar';
     };
     MN.$('#sw-close').onclick = () => { clearInterval(timer); box.hidden = true; document.body.classList.remove('no-scroll'); };
@@ -483,7 +499,6 @@
       const s = set(); const now = Date.now();
       if (b.dataset.evact === 'ticket') {
         if (phase(ev) !== 'selling') return;
-        if (myTickets(ev, mine.id) >= s.lotteryMaxTickets) return MN.toast('Ya tienes el máximo de boletos', 'bad');
         if ((MN.balances()[mine.id] || 0) < s.lotteryPrice) return MN.toast('No te llega para un boleto', 'bad');
         const id = Store.uid();
         await MN.act(() => Store.putMany({
@@ -521,6 +536,7 @@
   return {
     init(api) {
       MN = api;
+      MN.stopwatchGame = stopwatchGame;
       MN.registerTx('communist', { line: (t) => ({ icon: '☭', text: `Evento comunista: la Banca expropia <b>${t.share * t.to.length}</b> fichas a ${MN.who(t.from)} y las reparte entre ${t.to.map(MN.who).join(', ')}`, sub: `${t.share} para cada uno` }) });
       MN.registerTx('happy', { line: (t) => ({ icon: '🍻', text: `Happy hour: la Banca paga <b>${t.amount}</b> fichas extra a ${MN.who(t.player)}`, sub: 'Premio doble' }) });
       MN.registerTx('ticket', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.player)} compra un boleto de lotería`, sub: `${t.amount} fichas` }) });
@@ -557,7 +573,12 @@
     render,
     tick,
     sweep,
-    onState() { remind(); },
+    onState() {
+      remind();
+      // Si ya ha jugado el último apuntado al cronómetro, se resuelve al momento
+      if (events().some((ev) => ev.type === 'stopwatch' && ev.status === 'scheduled' && phase(ev) === 'playing'
+        && entriesOf(ev, 'signup').length && entriesOf(ev, 'signup').every((x) => x.attemptMs != null))) sweepSoon();
+    },
     // Antes del comunista se censura el ranking: nadie sabe quién va primero
     rankMask() {
       if (!MN.S || !MN.started()) return null;

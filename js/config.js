@@ -26,6 +26,11 @@ window.MN_CONFIG = {
     appId: '1:286238050587:web:bd16c3ad61715f7972ebbe',
   },
 
+  // Clave pública para las notificaciones push (Firebase → ⚙️ Configuración
+  // del proyecto → Cloud Messaging → Certificados push web → Generar par de
+  // claves). Sin ella solo hay avisos con la app abierta o en segundo plano.
+  vapidKey: '',
+
   // Identificador de la partida. Cámbialo para empezar una partida nueva
   // sin borrar la anterior (p. ej. 'nochevieja-2027').
   gameId: 'nochevieja-2026',

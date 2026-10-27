@@ -35,9 +35,9 @@ con Firebase Firestore como base de datos compartida en tiempo real.
 - **🎬 Animaciones de los eventos**: sorteo de la lotería, expropiación comunista y revelación del cronómetro
   (se pueden repetir desde el calendario). Antes del comunista, el **ranking se censura** (☭ Camarada).
 - **🎉 Confeti y sonido** al ganar (se puede silenciar en el perfil).
-- **📺 Modo TV** (`#tv` al final de la dirección), **🏆 ceremonia final** con podio y **🎁 resumen** de la partida.
-- **📲 App instalable** (PWA) con notificaciones del sistema cuando la web está en segundo plano.
-  Las push con el móvil bloqueado necesitan Firebase Cloud Messaging (pendiente).
+- **📺 Modo TV** (`#tv` al final de la dirección), **🏆 ceremonia final** con podio y **🎁 resumen** personal y del grupo,
+  que salen solos al cerrar la mesa (y se pueden volver a ver desde el cartel final).
+- **📲 App instalable** (PWA) con notificaciones del sistema, y **push con la app cerrada** (ver abajo).
 
 ### Reglas que aplica
 
@@ -103,6 +103,22 @@ de la partida real.
 > Con esas reglas cualquiera que tenga el enlace podría modificar los datos; para una partida entre amigos
 > es suficiente, y para eso está el historial y las copias de seguridad.
 > El PIN de la Banca es una barrera "de amigos", no seguridad real.
+
+## Notificaciones push (con la app cerrada)
+
+Las envían las Cloud Functions de `functions/` (retos, mesas y eventos). Necesitan el **plan Blaze**
+(de pago por uso; para un grupo de amigos el consumo queda dentro de la cuota gratuita).
+
+1. Firebase → **Actualizar a Blaze** (pon una alerta de presupuesto de 1 €).
+2. ⚙️ Configuración del proyecto → **Cloud Messaging → Certificados push web → Generar par de claves**,
+   y pega la clave en `vapidKey` de `js/config.js`.
+3. Despliega las funciones:
+   ```bash
+   npx firebase-tools login
+   cd functions && npm install && cd ..
+   npx firebase-tools deploy --only functions
+   ```
+4. Cada uno abre la web, toca **🔔 Activar notificaciones** (en iPhone, desde la app instalada).
 
 ## Publicar en GitHub Pages
 

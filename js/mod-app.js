@@ -5,8 +5,10 @@
 //  - iPhone: instrucciones para "Añadir a pantalla de inicio" (Apple
 //    solo permite notificaciones a webs instaladas así).
 //  - Notificaciones: cuando la web está en segundo plano, los avisos
-//    salen como notificación del sistema. Las push con el móvil
-//    bloqueado llegarán cuando se configure Firebase (ver README).
+//    salen como notificación del sistema.
+//  - Push (app cerrada o móvil bloqueado): con Firebase y `vapidKey` en
+//    config.js, cada móvil guarda su token y las Cloud Functions
+//    (carpeta functions/) le envían los avisos.
 // ============================================================
 (window.MNModules = window.MNModules || []).push((function () {
   'use strict';
@@ -19,9 +21,12 @@
   const canNotify = () => 'Notification' in window && 'serviceWorker' in navigator;
   const permission = () => (canNotify() ? Notification.permission : 'unsupported');
 
+  // Misma etiqueta que la push del servidor: si llegan las dos, se ve una sola
+  const tagFor = (body) => 'mn-' + MN.hash(body);
+
   async function showSystemNotification(body) {
     if (permission() !== 'granted') return;
-    const opts = { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', vibrate: [120, 60, 120], tag: 'mn-' + Date.now() };
+    const opts = { body, icon: 'icons/icon-192.png', badge: 'icons/badge-96.png', vibrate: [120, 60, 120], tag: tagFor(body) };
     try {
       const reg = swReg || (await navigator.serviceWorker.ready);
       await reg.showNotification('Mercado Negro', opts);
@@ -30,11 +35,31 @@
     }
   }
 
+  // ---------------------------------------------------------- push
+  // Guarda el token de este móvil asociado al jugador para recibir push
+  let pushFor = null; let pushBusy = false;
+  async function registerPush() {
+    const cfg = window.MN_CONFIG || {};
+    const mine = MN.me();
+    if (!cfg.firebase || !cfg.vapidKey || !window.firebase || !mine || permission() !== 'granted' || pushBusy || pushFor === mine.id) return;
+    pushBusy = true;
+    try {
+      if (!firebase.messaging) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js'; sc.onload = ok; sc.onerror = ko; document.head.appendChild(sc); });
+      if (!(await firebase.messaging.isSupported())) return;
+      const reg = swReg || (await navigator.serviceWorker.ready);
+      const token = await firebase.messaging().getToken({ vapidKey: cfg.vapidKey, serviceWorkerRegistration: reg });
+      if (!token) return;
+      await firebase.firestore().collection('games').doc(cfg.gameId).collection('push').doc(token)
+        .set({ pid: mine.id, ua: navigator.userAgent.slice(0, 120), at: Date.now() });
+      pushFor = mine.id;
+    } catch (e) { console.warn('push', e); } finally { pushBusy = false; }
+  }
+
   function render() {
     const el = MN.$('#app-card'); if (!el) return;
     const perm = permission();
     let notifyHtml;
-    if (perm === 'granted') notifyHtml = '<p>🔔 <b>Notificaciones activadas.</b> Te avisaremos de retos, resultados y eventos.</p>';
+    if (perm === 'granted') notifyHtml = '<p>🔔 <b>Notificaciones activadas.</b> Te avisaremos de retos, resultados y eventos${(window.MN_CONFIG || {}).vapidKey ? ', aunque tengas la app cerrada' : ''}.</p>';
     else if (perm === 'denied') notifyHtml = '<p>🔕 Has bloqueado las notificaciones. Actívalas en los ajustes del navegador para esta web.</p>';
     else if (perm === 'unsupported' || (isIOS() && !isStandalone())) notifyHtml = '';
     else notifyHtml = '<button type="button" class="btn primary" id="notify-btn">🔔 Activar notificaciones</button>';
@@ -70,7 +95,7 @@
       document.addEventListener('click', async (e) => {
         if (e.target.closest('#notify-btn')) {
           const res = await Notification.requestPermission();
-          if (res === 'granted') { MN.toast('🔔 Notificaciones activadas', 'ok'); showSystemNotification('¡Así te avisaremos cuando alguien te rete! ⚔️'); }
+          if (res === 'granted') { MN.toast('🔔 Notificaciones activadas', 'ok'); showSystemNotification('¡Así te avisaremos cuando alguien te rete! ⚔️'); registerPush(); }
           render();
         }
         if (e.target.closest('#install-btn') && installPrompt) {
@@ -81,6 +106,7 @@
       });
     },
     render,
+    onState() { registerPush(); },
     // Los avisos salen como notificación del sistema si la web no está a la vista
     onNotify(list) {
       if (document.visibilityState === 'hidden') list.forEach((m) => showSystemNotification(m.replace(/<[^>]+>/g, '')));

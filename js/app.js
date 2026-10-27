@@ -217,7 +217,20 @@
   const activeBetween = (a, b) => activeChallenges().find((c) => (c.from === a && c.to === b) || (c.from === b && c.to === a));
   const rivalOf = (c, id) => (c.from === id ? c.to : c.from);
   // ¿Este reto espera una acción mía?
-  const needsMe = (c, myId) => (c.status === 'pending' && c.to === myId) || (c.status === 'reported' && c.reportedBy !== myId && (c.from === myId || c.to === myId));
+  const needsMe = (c, myId) => (c.status === 'pending' && c.to === myId) || (c.status === 'reported' && c.reportedBy !== myId && (c.from === myId || c.to === myId))
+    || (c.status === 'accepted' && isSwGame(c) && (c.from === myId || c.to === myId) && c['sw_' + myId] == null);
+
+  // Retos de cronómetro: se juegan dentro de la app y gana quien se acerque más al objetivo
+  const isSwGame = (c) => /cron[oó]metro/i.test(c.game || '');
+  const swSecs = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
+  function swWinner(c) {
+    const target = (Number(S.settings.stopwatchTarget) || 10) * 1000;
+    const [a, b] = [c.from, c.to];
+    const da = Math.abs(c['sw_' + a] - target); const db = Math.abs(c['sw_' + b] - target);
+    if (da !== db) return da < db ? a : b;
+    return (c['swAt_' + a] || 0) <= (c['swAt_' + b] || 0) ? a : b; // empate: gana quien jugó antes
+  }
+  const swDone = (c) => c.status === 'accepted' && isSwGame(c) && c['sw_' + c.from] != null && c['sw_' + c.to] != null;
 
   // Fuego animado para rachas de 3+ victorias (crece con la racha)
   function fireHtml(st, big) {
@@ -702,6 +715,16 @@
       } else {
         status = '⏳ Pendiente de respuesta… ¿se acobardará?';
       }
+    } else if (c.status === 'accepted' && isSwGame(c)) {
+      const played = [c.from, c.to].filter((id) => c['sw_' + id] != null).length;
+      if (mineC && c['sw_' + myId] == null) {
+        status = `⏱️ ¡A jugar! Para el reloj lo más cerca posible de <b>${esc(S.settings.stopwatchTarget || 10)},00 s</b>. Gana quien más se acerque.`;
+        actions = btn('swplay', '⏱️ Jugar mi turno', 'primary');
+      } else if (mineC) {
+        status = `⏱️ Tu marca: <b>${swSecs(c['sw_' + myId])} s</b>. Esperando a que juegue <b class="who">${esc(rival.name)}</b>…`;
+      } else {
+        status = `⏱️ Duelo de cronómetro · ${played}/2 han jugado`;
+      }
     } else if (c.status === 'accepted') {
       status = mineC ? '🎲 ¡A jugar! Cuando terminéis, ¿quién ha ganado?' : '🎲 Jugando ahora mismo';
       if (c.disputes) status += ` <span class="tag moroso">${c.disputes} DESACUERDO${c.disputes > 1 ? 'S' : ''}</span>`;
@@ -770,6 +793,7 @@
         else if (c.status === 'expired' && c.from === id) msgs.push(`⌛ ${r} no contestó a tu reto y ha caducado`);
         else if (c.status === 'cancelled' && c.cancelledBy !== id) msgs.push(`🚫 Se ha cancelado el reto con ${r}`);
         else if (c.status === 'reported' && c.reportedBy !== id) msgs.push(`⚖️ ${r} ha registrado el resultado. Confírmalo.`);
+        else if (c.status === 'done' && c.swAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `⏱️ ¡Ganas el cronómetro contra ${r}! ${swSecs(c['sw_' + id])} s contra ${swSecs(c['sw_' + rivalOf(c, id)])} s` : `⏱️ ${r} te gana al cronómetro: ${swSecs(c['sw_' + rivalOf(c, id)])} s contra tus ${swSecs(c['sw_' + id])} s`);
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
         else if (before === 'reported' && c.status === 'accepted' && c.disputedBy && c.disputedBy !== id) msgs.push(`❌ ${r} no está de acuerdo con el resultado`);
       });
@@ -843,6 +867,23 @@
           await finishChallenge(Object.assign({}, c, { dedication }), c.winner, '💰 Resultado confirmado');
           break;
         }
+        case 'swplay': {
+          if (!isSwGame(c) || c.status !== 'accepted' || c['sw_' + myId] != null || !MN.stopwatchGame) return;
+          if (ended()) return toast('🏁 La partida ha terminado', 'bad');
+          MN.stopwatchGame({
+            title: '⏱️ Duelo de cronómetro',
+            sub: `contra ${who(rivalOf(c, myId))} · ${c.amount} fichas`,
+            after: c['sw_' + rivalOf(c, myId)] != null ? `${esc(player(rivalOf(c, myId)).name)} ya ha jugado: ¡ahora sale el resultado!` : `El resultado sale cuando juegue ${esc(player(rivalOf(c, myId)).name)}.`,
+            save: async (ms) => {
+              const at = Date.now();
+              await act(() => Store.updateChallenge(c.id, { ['sw_' + myId]: ms, ['swAt_' + myId]: at }));
+              const cur = S.challenges.find((x) => x.id === c.id);
+              const next = Object.assign({}, cur, { ['sw_' + myId]: ms, ['swAt_' + myId]: at });
+              if (swDone(next)) await finishSw(next);
+            },
+          });
+          break;
+        }
         case 'force': {
           const ok = await modal(`<div class="modal-icon">🏦</div><p class="modal-text">La Banca decide: gana ${who(winnerId)}</p>`, 'Resolver');
           if (ok) await finishChallenge(c, winnerId, '🏦 La Banca ha resuelto el duelo', true);
@@ -854,15 +895,30 @@
     }
   }
 
-  async function finishChallenge(c, winnerId, msg, byBank = false) {
+  async function finishChallenge(c, winnerId, msg, byBank = false, extra = {}) {
     const loser = rivalOf(c, winnerId);
     const amount = Math.max(0, Math.min(c.amount, balances()[loser])); // nunca deja a nadie en negativo
-    const txId = Store.uid(); const now = Date.now();
+    const txId = extra.txId || Store.uid(); const now = Date.now();
     await act(async () => {
       await Store.addTx(Object.assign({ id: txId, type: 'duel', ts: now, challengeId: c.id, challenger: c.from, winner: winnerId, loser, amount, game: c.game },
-        byBank ? { bank: 'resolved' } : {}, c.dedication && !byBank ? { dedication: c.dedication } : {}, c.tag ? { tag: c.tag } : {}));
-      await Store.updateChallenge(c.id, { status: 'done', winner: winnerId, txId, closedAt: now });
+        byBank ? { bank: 'resolved' } : {}, c.dedication && !byBank ? { dedication: c.dedication } : {}, c.tag ? { tag: c.tag } : {}, extra.tx || {}));
+      await Store.updateChallenge(c.id, Object.assign({ status: 'done', winner: winnerId, txId, closedAt: now }, extra.challenge || {}));
     }, msg);
+  }
+
+  // Duelo de cronómetro con las dos marcas: se resuelve solo. El id del
+  // movimiento es fijo, así que si dos móviles lo cierran a la vez no se duplica.
+  const finishingSw = new Set();
+  async function finishSw(c) {
+    if (finishingSw.has(c.id) || S.txs.some((t) => t.id === 'swduel_' + c.id)) return;
+    finishingSw.add(c.id);
+    const w = swWinner(c); const l = rivalOf(c, w);
+    const marks = { [c.from]: c['sw_' + c.from], [c.to]: c['sw_' + c.to] };
+    await finishChallenge(c, w, null, false, { txId: 'swduel_' + c.id, tx: { sw: marks }, challenge: { swAuto: true, finishedBy: (me() || {}).id || null } });
+    const mine = me();
+    if (mine && (mine.id === w || mine.id === l)) {
+      toast(mine.id === w ? `⏱️ ¡Ganas el duelo! ${swSecs(marks[w])} s contra ${swSecs(marks[l])} s` : `⏱️ Pierdes: ${swSecs(marks[l])} s contra ${swSecs(marks[w])} s de ${esc(player(w).name)}`, mine.id === w ? 'ok' : 'bad');
+    }
   }
 
   // ============================================================
@@ -976,6 +1032,7 @@
           <li>El rival lo <b>acepta</b> o lo <b>rechaza</b> (ver cobardía 🐔).</li>
           <li>Jugáis en la vida real.</li>
           <li>Uno de los dos registra quién ha ganado y <b>el otro lo confirma</b>. Hasta entonces no se mueve ninguna ficha.</li>
+          <li>⏱️ Los retos de <b>cronómetro</b> se juegan dentro de la app: cada uno para el reloj en su móvil (un intento) y gana automáticamente quien más se acerque a ${n(s.stopwatchTarget || 10)},00 s.</li>
         </ol>
         <ul>
           <li>Si no estáis de acuerdo con el resultado, se vuelve a registrar. Si seguís sin poneros de acuerdo, <b>decide la Banca</b>.</li>
@@ -1140,6 +1197,7 @@
   function renderAll() {
     if (!S) return;
     sweepExpired();
+    S.challenges.filter(swDone).forEach((c) => { if (c.from === (me() || {}).id || c.to === (me() || {}).id || isAdmin()) finishSw(c); });
     renderImpBanner();
     renderRanking();
     renderChallengeForm();

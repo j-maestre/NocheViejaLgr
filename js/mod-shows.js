@@ -321,9 +321,11 @@
     }
     if (known) pendingBets().filter((x) => !known.has(x.pay.id)).forEach(playBet);
     known = ids;
-    // Eventos recién resueltos (todos los ven, una vez por móvil)
-    (MN.S.events || []).filter((e) => e.status === 'done' && EVENT_SHOWS[e.type] && e.result && now - (e.result.at || e.at) < 10 * 60000).forEach((e) => {
-      if (!seen('ev:' + e.id)) enqueue((box) => EVENT_SHOWS[e.type](box, e));
+    // Eventos resueltos: salen solos a todos (una vez por móvil y resultado; si
+    // ensayas otra vez, el evento tiene un resultado nuevo y vuelve a salir).
+    // Si no tenías la app abierta, sale al abrirla durante las 6 horas siguientes.
+    (MN.S.events || []).filter((e) => e.status === 'done' && EVENT_SHOWS[e.type] && e.result && now - (e.result.at || e.at) < 6 * 3600000).forEach((e) => {
+      if (!seen(`ev:${e.id}:${e.result.at || e.at}`)) enqueue((box) => EVENT_SHOWS[e.type](box, e));
     });
   }
 

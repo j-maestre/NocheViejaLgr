@@ -55,11 +55,10 @@
     // Eventos
     communistPct: 25,        // % que se expropia al primero
     communistLast: 3,        // entre cuántos de los últimos se reparte
-    communistMaskMinutes: 60, // antes del comunista el ranking se oculta (☭ Camarada)
+    communistMaskMinutes: 30, // antes del comunista el ranking se oculta (☭ Camarada)
     happyMultiplier: 2,      // en happy hour el ganador cobra x2 (el extra lo pone la Banca)
     happyMinutes: 60,
     lotteryPrice: 5,
-    lotteryMaxTickets: 3,
     lotteryBankBonus: 20,    // la Banca añade esto al bote
     stopwatchPct: 5,         // cada uno pone el 5% del capital del más pobre de los apuntados
     stopwatchTarget: 10,     // segundos objetivo
@@ -90,6 +89,8 @@
 
   function normalize(raw) {
     const out = { settings: Object.assign({}, DEFAULTS, raw.settings || {}) };
+    // La censura antes del comunista pasó de 60 (o 3 en el ensayo) a 30 minutos
+    if ([60, 3].includes(Number(out.settings.communistMaskMinutes))) out.settings.communistMaskMinutes = 30;
     out.settings.marketPrices = Object.assign({}, DEFAULTS.marketPrices, (raw.settings || {}).marketPrices || {});
     NAMES.forEach((n) => {
       const k = COLLECTIONS[n];
