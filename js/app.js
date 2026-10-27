@@ -164,7 +164,12 @@
   const fmtFrom = (str) => new Date(dayStart(str)).toLocaleString('es-ES', str.includes('T')
     ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' });
   const schedule = () => (S.settings.limitSchedule || []).slice().sort((a, b) => (a.from < b.from ? -1 : 1));
+  // ⚡ Última ronda: la última hora antes del cierre se apuesta sin límite y hay un ALL IN extra
+  const lastRoundTs = () => endTs() - (Number(S.settings.lastRoundMinutes) || 0) * 60000;
+  const lastRound = () => !!Number(S.settings.lastRoundMinutes) && Date.now() >= lastRoundTs() && !ended();
+
   function currentPct() {
+    if (lastRound()) return 100;
     const sc = schedule(); const now = Date.now();
     let pct = sc.length ? sc[0].pct : 10;
     sc.forEach((s) => { if (dayStart(s.from) <= now) pct = s.pct; });
@@ -222,7 +227,9 @@
 
   // 💣 ALL IN: una vez por jugador en toda la partida, os jugáis todo lo que tiene el más pobre.
   // Solo se gasta si el reto sigue vivo o se juega (rechazado, cancelado o caducado no cuenta).
-  const allInUsed = (pid) => S.challenges.some((c) => c.allIn && c.from === pid && !['rejected', 'cancelled', 'expired'].includes(c.status));
+  // En la última ronda cada uno recupera un ALL IN (solo cuentan los lanzados desde entonces)
+  const allInUsed = (pid) => S.challenges.some((c) => c.allIn && c.from === pid && !['rejected', 'cancelled', 'expired'].includes(c.status)
+    && (!lastRound() || (c.createdAt || 0) >= lastRoundTs()));
   const allInAmount = (a, b, bal = balances()) => Math.max(0, Math.min(bal[a] || 0, bal[b] || 0));
 
   // Retos de cronómetro: se juegan dentro de la app y gana quien se acerque más al objetivo
@@ -446,7 +453,8 @@
     const mine = me();
 
     const next = nextChange();
-    $('#limit-info').innerHTML = (mask ? `<div class="mask-banner">${mask.banner}</div>` : '') + (isEnd ? '' : !started()
+    $('#limit-info').innerHTML = (mask ? `<div class="mask-banner">${mask.banner}</div>` : '')
+      + (lastRound() ? '<div class="last-round-banner">⚡ <b>ÚLTIMA RONDA</b> · apuesta sin límite y un 💣 ALL IN extra para cada uno</div>' : '') + (isEnd ? '' : !started()
       ? `🗓️ La partida empieza el <b>${esc(new Date(startTs()).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</b> · apuesta máxima al empezar: <b>${currentPct()}%</b>`
       : `🎯 Apuesta máxima: <b>${currentPct()}%</b> del capital <span class="muted">(mín. ${esc(S.settings.minBet)})</span>` +
       (next ? ` · <span class="muted">sube al ${esc(next.pct)}% el ${esc(fmtFrom(next.from))}</span>` : ''));
@@ -816,6 +824,18 @@
       if (msgs.length) notify(msgs);
     }
     prevCh = now;
+  }
+
+  // Aviso a todos cuando alguien nuevo se sienta a la mesa (mismo texto que la push del servidor)
+  let prevPlayers = null;
+  function notifyPlayers() {
+    const mine = me(); const ids = new Set(S.players.map((p) => p.id));
+    if (prevPlayers && mine) {
+      const msgs = S.players.filter((p) => !prevPlayers.has(p.id) && p.id !== mine.id && !p.demo)
+        .map((p) => `🎰 ${esc(p.name)} se ha sentado a la mesa. ¡Ya sois ${S.players.length}!`);
+      if (msgs.length) notify(msgs);
+    }
+    prevPlayers = ids;
   }
 
   // Avisos a todos cuando la Banca presta fichas y cuando un moroso salda su deuda
@@ -1210,6 +1230,9 @@
     $('#s-expiry').value = s.challengeExpiryHours;
     $('#s-bounty').value = s.bountyPerWin;
     $('#s-bountymin').value = s.bountyMinStreak;
+    $('#s-mission').value = s.missionReward; $('#s-porra').value = s.porraStake; $('#s-lastround').value = s.lastRoundMinutes;
+    $('#s-kingmin').value = s.kingMinutes; $('#s-kingevery').value = s.kingEveryMinutes; $('#s-kingtrib').value = s.kingTribute;
+    $('#s-porraclose').value = s.porraCloseDate || '';
     $('#s-startdate').value = s.startDate;
     $('#s-end').value = s.endDate;
     $('#s-schedule').value = schedule().map((x) => `${x.from.replace('T', ' ')} = ${x.pct}`).join('\n');
@@ -1512,6 +1535,13 @@
         challengeExpiryHours: Math.max(1, parseFloat($('#s-expiry').value) || Store.DEFAULTS.challengeExpiryHours),
         bountyPerWin: Math.max(0, parseInt($('#s-bounty').value, 10) || 0),
         bountyMinStreak: Math.max(1, parseInt($('#s-bountymin').value, 10) || Store.DEFAULTS.bountyMinStreak),
+        missionReward: Math.max(0, parseInt($('#s-mission').value, 10) || 0),
+        porraStake: Math.max(1, parseInt($('#s-porra').value, 10) || Store.DEFAULTS.porraStake),
+        porraCloseDate: $('#s-porraclose').value || Store.DEFAULTS.porraCloseDate,
+        lastRoundMinutes: Math.max(0, parseInt($('#s-lastround').value, 10) || 0),
+        kingMinutes: Math.max(1, parseInt($('#s-kingmin').value, 10) || Store.DEFAULTS.kingMinutes),
+        kingEveryMinutes: Math.max(1, parseInt($('#s-kingevery').value, 10) || Store.DEFAULTS.kingEveryMinutes),
+        kingTribute: Math.max(1, parseInt($('#s-kingtrib').value, 10) || Store.DEFAULTS.kingTribute),
         startDate: $('#s-startdate').value || Store.DEFAULTS.startDate,
         endDate: $('#s-end').value || Store.DEFAULTS.endDate,
         limitSchedule: sched.length ? sched : Store.DEFAULTS.limitSchedule,
@@ -1658,8 +1688,8 @@
       // y se olvida que el calendario y la Banca ya estaban creados
       const s = Object.assign({}, S.settings);
       const r = s.eventRehearsal;
-      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes', 'plebisciteVoteMinutes'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
-      ['eventRehearsal', 'eventsSeeded', 'bankPlayerId'].forEach((k) => delete s[k]);
+      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes', 'plebisciteVoteMinutes', 'kingMinutes', 'kingEveryMinutes', 'dilemmaMinutes'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
+      ['eventRehearsal', 'eventsSeeded', 'eventsSeeded2', 'bankPlayerId'].forEach((k) => delete s[k]);
       act(() => Store.replaceAll({ settings: s }), '🧨 Mesa limpia');
     });
 
@@ -1695,6 +1725,7 @@
         renderAll();
         notifyChallenges();
         notifyLoans();
+        notifyPlayers();
         MODULES.forEach((m) => { try { if (m.onState) m.onState(first); } catch (e) { console.error(e); } });
         tick();
         setTimeout(sweepAll, 0);
@@ -1728,7 +1759,7 @@
     toast, modal, act, notify, go, renderAll, sweepAll,
     me, player, who, face, deviceId, isAdmin, bankId, isSpectator, setSpectator,
     balances, balancesAt, effects, sortedPlayers, playerStats, achievements, txItem, txLine,
-    maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago,
+    maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago, lastRound, lastRoundTs,
     activeChallenges, challengeBlock, fillPlayerSelect, rankMask,
     registerTx: (type, def) => { TX[type] = def; },
   };

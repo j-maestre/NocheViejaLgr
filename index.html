@@ -41,8 +41,11 @@
     <section id="view-ranking" class="view" hidden>
       <div id="slot-pending-banner" hidden></div>
       <div id="next-event"></div>
+      <div id="missions-card"></div>
+      <div id="porra-card"></div>
       <div id="limit-info" class="limit-info"></div>
       <div id="final-banner"></div>
+      <div id="loanreq-card"></div>
       <ol id="ranking-list" class="ranking"></ol>
       <div id="ranking-stats" class="stats"></div>
 
@@ -297,6 +300,8 @@
           <div id="bank-info"></div>
         </div>
 
+        <div class="card bank-card" id="loanreq-admin" hidden></div>
+
         <div class="card">
           <h3>💸 Conceder préstamo</h3>
           <p class="hint">Solo para quien está en la ruina (menos fichas que la apuesta mínima).</p>
@@ -351,9 +356,16 @@
               <label>Caducidad de retos (h)<input type="number" id="s-expiry" min="1" step="0.5"></label>
               <label>🎯 Diana: fichas por victoria<input type="number" id="s-bounty" min="0"></label>
               <label>🎯 Diana: racha mínima<input type="number" id="s-bountymin" min="1"></label>
+              <label>🕵️ Premio por misión<input type="number" id="s-mission" min="0"></label>
+              <label>🔮 Apuesta de la porra<input type="number" id="s-porra" min="1"></label>
+              <label>⚡ Última ronda (min)<input type="number" id="s-lastround" min="0"></label>
+              <label>👑 Rey: duración (min)<input type="number" id="s-kingmin" min="1"></label>
+              <label>👑 Rey: cobra cada (min)<input type="number" id="s-kingevery" min="1"></label>
+              <label>👑 Rey: fichas por jugador<input type="number" id="s-kingtrib" min="1"></label>
             </div>
             <label>Inicio de la partida<input type="datetime-local" id="s-startdate"></label>
             <label>Cierre de la partida<input type="datetime-local" id="s-end"></label>
+            <label>🔮 Cierre de la porra<input type="datetime-local" id="s-porraclose"></label>
             <label>Límite de apuesta (% del capital) por fecha
               <textarea id="s-schedule" rows="5" placeholder="2026-12-01 = 20"></textarea>
             </label>
@@ -483,6 +495,9 @@
   <script src="js/mod-shows.js"></script>
   <script src="js/mod-photo.js"></script>
   <script src="js/mod-tutorial.js"></script>
+  <script src="js/mod-loans.js"></script>
+  <script src="js/mod-missions.js"></script>
+  <script src="js/mod-porra.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

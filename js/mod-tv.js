@@ -75,8 +75,12 @@
   }
 
   // ---------------------------------------------------------- ceremonia
+  // ¿Hay porra con premios? Entonces el podio es el de antes de la porra y luego se actualiza
+  const porra = () => { const r = MN.porra && MN.porra.result(); return r && (r.sides.win.n || r.sides.lose.n) ? r : null; };
+
   function ceremony() {
-    const bal = MN.balances(); const top = MN.sortedPlayers(bal).slice(0, 3);
+    const pr = porra();
+    const bal = pr ? pr.before : MN.balances(); const top = MN.sortedPlayers(bal).slice(0, 3);
     if (!top.length) return;
     const box = MN.$('#ceremony'); box.hidden = false; document.body.classList.add('no-scroll');
     const esc = MN.esc;
@@ -87,14 +91,41 @@
       <div class="cer-title">🏆 La mesa está cerrada</div>
       <div class="cer-sub">Y el ganador del Mercado Negro es…</div>
       <div class="podium">${step(top[1], 2)}${step(top[0], 1)}${step(top[2], 3)}</div>
+      <div class="cer-porra" id="cer-porra"></div>
       <div class="cer-actions"><button type="button" class="btn primary" id="cer-wrapped">🎁 Ver tu resumen</button>
       <button type="button" class="link" id="cer-close">Cerrar</button></div></div>`;
     const reveal = (place, delay, big) => setTimeout(() => {
       const s = box.querySelector('.place-' + place); if (s) s.classList.add('shown');
       if (MN.fx) { MN.fx.play(big ? 'win' : 'event'); if (big) { MN.fx.confetti({ count: 260, duration: 4000 }); setTimeout(() => MN.fx.confetti({ count: 200 }), 1200); } }
-      if (big) box.querySelector('.cer-actions').classList.add('shown');
+      if (big && !pr) box.querySelector('.cer-actions').classList.add('shown');
     }, delay);
     reveal(3, 1500); reveal(2, 3500); reveal(1, 6000, true);
+    if (pr) setTimeout(() => porraStage(box, pr), 9000);
+  }
+
+  // 🔮 Los premios de la porra y la clasificación final actualizada
+  async function porraStage(box, pr) {
+    if (box.hidden) return;
+    const esc = MN.esc; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const el = box.querySelector('#cer-porra'); const nm = (id) => `${esc(MN.player(id).emoji)} ${esc(MN.player(id).name)}`;
+    const sideHtml = (k, icon, label) => { const s = pr.sides[k]; if (!s.n) return '';
+      return `<div class="cp-side"><div>${icon} <b>${label}</b>: ${nm(s.target)}</div>
+        <div class="small">${s.hit.length ? `Acertaron ${s.hit.map(nm).join(', ')} → <b>+${s.share}</b> cada uno` : `Nadie acertó: los <b>${s.pot}</b> de bote se los queda la Banca 🎩`}</div></div>`; };
+    el.innerHTML = `<div class="cp-title">🔮 ¡Pero aún queda la porra!</div>${sideHtml('win', '👑', 'Campeón')}${sideHtml('lose', '🏮', 'Farolillo rojo')}`;
+    el.classList.add('shown'); el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (MN.fx) MN.fx.play('drum');
+    await sleep(3500); if (box.hidden) return;
+    const pos = (b) => { const ids = MN.S.players.map((p) => p.id).sort((a, c) => b[c] - b[a]); return Object.fromEntries(ids.map((id, i) => [id, i])); };
+    const p0 = pos(pr.before); const p1 = pos(pr.after);
+    const ids = Object.keys(p1).sort((a, c) => p1[a] - p1[c]);
+    const changed = ids[0] !== Object.keys(p0).find((id) => p0[id] === 0);
+    el.insertAdjacentHTML('beforeend', `<div class="cp-title">📊 Clasificación final</div>
+      ${changed ? `<div class="cp-shock">😱 ¡La porra cambia al campeón! Gana ${nm(ids[0])}</div>` : ''}
+      <ol class="cp-rank">${ids.map((id) => { const d = p0[id] - p1[id]; const gain = pr.after[id] - pr.before[id];
+        return `<li class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}"><span>${p1[id] + 1}.</span><span class="cp-n">${nm(id)}</span><b>${pr.after[id]}</b>${gain ? `<span class="cp-g">+${gain}</span>` : ''}<span class="cp-d">${d > 0 ? `▲${d}` : d < 0 ? `▼${-d}` : ''}</span></li>`; }).join('')}</ol>`);
+    el.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (MN.fx) { MN.fx.play(changed ? 'win' : 'event'); if (changed) MN.fx.confetti({ count: 260, duration: 4000 }); }
+    box.querySelector('.cer-actions').classList.add('shown');
   }
 
   // ---------------------------------------------------------- wrapped
@@ -245,6 +276,8 @@
     if (fg) slides.push({ icon: '🃏', title: 'Tu juego', body: `<div class="wr-name">${esc(fg[0])}</div><div>lo jugaste <b>${fg[1]}</b> ${fg[1] === 1 ? 'vez' : 'veces'}</div>${bw && bw[0] !== fg[0] ? `<div class="muted">pero donde más ganaste fue en <b>${esc(bw[0])}</b></div>` : ''}` });
     if (stats.victim || stats.nemesis) slides.push({ icon: '😈', title: 'Tus rivales', body: `${stats.victim ? `<div>🍖 Tu víctima: <b>${name(stats.victim[0])}</b> (+${stats.victim[1]})</div>` : ''}${stats.nemesis ? `<div>👹 Tu némesis: <b>${name(stats.nemesis[0])}</b> (${stats.nemesis[1]})</div>` : ''}` });
     if (s.bets) slides.push({ icon: '🎲', title: 'Tus apuestas', body: `<div class="wr-big ${s.bets < 0 ? 'wr-down' : ''}">${s.bets > 0 ? '+' : ''}${s.bets}</div><div>fichas apostando por los demás</div>` });
+    const ms = (window.MNModules || []).find((m) => m.missionsDone);
+    if (ms && (ms.missionsDone(id) || ms.cardsWon(id))) slides.push({ icon: '🕵️', title: 'Tus misiones secretas', body: `<div class="wr-big">${ms.missionsDone(id)}</div><div>misiones cumplidas</div>${ms.cardsWon(id) ? `<div>☠️ y <b>${ms.cardsWon(id)}</b> ${ms.cardsWon(id) === 1 ? 'carta' : 'cartas'} del caos</div>` : ''}` });
     const [pi, pt, pd] = persona(id, s, st, pos);
     slides.push({ icon: pi, title: 'Tu título', body: `<div class="wr-name">${pt}</div><div>${pd}</div>`, party: true });
     return slides;
@@ -284,7 +317,7 @@
   function autoFinale() {
     try { if (localStorage.getItem(seenKey())) return; localStorage.setItem(seenKey(), '1'); } catch (e) { /* sin almacenamiento: se muestra igual */ }
     ceremony();
-    autoTimer = setTimeout(() => { if (!MN.$('#ceremony').hidden) wrapped(); }, 11000);
+    autoTimer = setTimeout(() => { if (!MN.$('#ceremony').hidden) wrapped(); }, porra() ? 24000 : 11000);
   }
 
   return {

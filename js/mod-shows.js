@@ -274,6 +274,72 @@
     sfx('trombone');
   }
 
+  // ---------------------------------------------------------- 👑 rey de la colina
+  async function kingShow(box, ev) {
+    const r = ev.result || {};
+    if (!r.top) return;
+    const mine = MN.me();
+    const rows = Object.entries(r.reigns).sort((a, b) => b[1] - a[1]);
+    const paid = mine ? MN.S.txs.filter((t) => t.kind === 'king' && t.eventId === ev.id && !t.voided).reduce((a, t) => a + Math.min(0, t.payouts[mine.id] || 0), 0) : 0;
+    box.innerHTML = `<div class="show-inner king-show">
+      <div class="show-title">👑 REY DE LA COLINA</div>
+      <div class="show-kicker">¿Quién aguantó más tiempo en la cima?</div>
+      <ul class="pv-bars" id="kg-bars">${rows.map(([id]) => `<li data-id="${MN.esc(id)}"><span class="pv-name">${MN.esc(name(id))}</span><span class="kg-crowns"></span><b>0</b></li>`).join('')}</ul>
+      <div class="pv-winner" id="kg-win"></div>${closeBtn}</div>`;
+    sfx('drum'); await sleep(900);
+    const max = rows[0][1];
+    for (let v = 1; v <= max; v++) {
+      rows.forEach(([id, n]) => {
+        if (n < v) return;
+        const li = box.querySelector(`li[data-id="${CSS.escape(id)}"]`);
+        li.querySelector('.kg-crowns').insertAdjacentHTML('beforeend', '<i>👑</i>'); li.querySelector('b').textContent = v;
+      });
+      sfx('tick'); await sleep(Math.max(150, 520 - v * 30));
+    }
+    await sleep(500);
+    box.querySelector(`li[data-id="${CSS.escape(r.top)}"]`).classList.add('win');
+    MN.$('#kg-win').innerHTML = `<div class="pv-medal">👑</div><div class="pv-who">${MN.esc(name(r.top))}</div>
+      <div>reinó <b>${r.reigns[r.top]}</b> ${r.reigns[r.top] === 1 ? 'ronda' : 'rondas'} y cobró <b>${r.earned[r.top]}</b> fichas</div>
+      ${mine && r.earned[mine.id] ? `<div class="kg-me up">Tú cobraste <b>+${r.earned[mine.id]}</b>${paid ? ` y pagaste ${-paid}` : ''}</div>` : mine && paid ? `<div class="kg-me down">Tú pagaste <b>${-paid}</b> fichas de tributo 🫠</div>` : ''}`;
+    MN.$('#kg-win').classList.add('shown');
+    sfx('win'); boom({ colors: ['#f5c542', '#5cc8ff', '#ffffff'], count: 160 });
+  }
+
+  // ---------------------------------------------------------- 🤝 dilema del prisionero
+  async function dilemmaShow(box, ev) {
+    const r = ev.result || {};
+    if (!r.pairs || !r.pairs.length) return;
+    const mine = MN.me(); const BANK = '__banca';
+    const nm = (id) => (id === BANK ? '🎩 La Banca' : name(id));
+    // Mi pareja, la última (la más emocionante)
+    const pairs = r.pairs.slice().sort((a, b) => (mine && (a.a.id === mine.id || a.b.id === mine.id) ? 1 : 0) - (mine && (b.a.id === mine.id || b.b.id === mine.id) ? 1 : 0));
+    box.innerHTML = `<div class="show-inner dilemma-show">
+      <div class="show-title">🤝 DILEMA DEL PRISIONERO</div>
+      <div class="show-kicker">¿Quién cooperó y quién traicionó?</div>
+      <div class="dl-list" id="dl-list"></div>${closeBtn}</div>`;
+    sfx('drum'); await sleep(900);
+    const icon = (c) => (c === 'coop' ? '🤝' : '🔪');
+    const verdict = (p) => (p.a.c === 'coop' && p.b.c === 'coop' ? '💚 ¡Confianza ciega! Ganan los dos'
+      : p.a.c === 'betray' && p.b.c === 'betray' ? '💀 Traición mutua: pierden los dos'
+        : `🗡️ ¡Puñalada de ${MN.esc(nm(p.a.c === 'betray' ? p.a.id : p.b.id))}!`);
+    for (const p of pairs) {
+      const isMe = mine && (p.a.id === mine.id || p.b.id === mine.id);
+      const el = document.createElement('div'); el.className = `dl-pair ${isMe ? 'me' : ''}`;
+      const side = (x) => `<div class="dl-side"><div class="dl-name">${MN.esc(nm(x.id))}</div><div class="dl-card"><span class="dl-back">❓</span><span class="dl-front ${x.c}">${icon(x.c)}</span></div><b class="${x.g >= 0 ? 'up' : 'down'}">${x.id === BANK ? '' : `${x.g > 0 ? '+' : ''}${x.g}`}</b></div>`;
+      el.innerHTML = `${isMe ? '<div class="dl-tag">TU PAREJA</div>' : ''}<div class="dl-row">${side(p.a)}<span class="dl-vs">VS</span>${side(p.b)}</div><div class="dl-verdict"></div>`;
+      MN.$('#dl-list').appendChild(el); el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      await sleep(isMe ? 1400 : 700);
+      if (isMe) { sfx('drum'); await sleep(900); }
+      el.querySelectorAll('.dl-card').forEach((c) => c.classList.add('flip'));
+      await sleep(450);
+      el.querySelector('.dl-verdict').innerHTML = verdict(p);
+      el.classList.add('done', p.a.c === 'coop' && p.b.c === 'coop' ? 'good' : p.a.c === 'betray' && p.b.c === 'betray' ? 'bad' : 'mixed');
+      sfx(p.a.c === 'coop' && p.b.c === 'coop' ? 'event' : 'stop');
+      await sleep(isMe ? 1200 : 700);
+    }
+    boom({ colors: ['#39ff88', '#ff4d6d', '#ffffff'], count: 120 });
+  }
+
   // ---------------------------------------------------------- ⏱️ cronómetro
   async function stopwatchShow(box, ev) {
     const r = ev.result || {};
@@ -329,7 +395,7 @@
     res.classList.add('shown');
   }
 
-  const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow, plebiscite: plebisciteShow };
+  const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow, plebiscite: plebisciteShow, king: kingShow, dilemma: dilemmaShow };
 
   // ---------------------------------------------------------- qué enseñar a quién
   // "Ya visto" se guarda por jugador (no por móvil): si en un mismo móvil se

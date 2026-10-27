@@ -71,6 +71,16 @@
     // Extras
     bountyPerWin: 6,         // 🎯 cazarrecompensas: fichas por cada victoria de la racha cortada (las pone la Banca)
     bountyMinStreak: 5,      // racha a partir de la cual la cabeza tiene precio
+    lastRoundMinutes: 60,    // ⚡ última ronda antes del cierre: apuesta sin límite + ALL IN extra (0 = no hay)
+
+    // 👑 Rey de la colina (evento): cada X min, el primero cobra Y fichas a cada jugador
+    kingMinutes: 60, kingEveryMinutes: 10, kingTribute: 1,
+    // 🤝 Dilema del prisionero (evento)
+    dilemmaMinutes: 10, dilemmaCoop: 10, dilemmaTemptation: 20, dilemmaSucker: 10, dilemmaPunish: 5,
+    // 🕵️ Misiones diarias
+    missionsPerDay: 3, missionReward: 8,
+    // 🔮 Porra del campeón y del farolillo rojo
+    porraStake: 10, porraCloseDate: '2026-12-30T20:00',
     betWindowMinutes: 10,    // apuestas de espectadores abiertas X min desde que empieza el duelo
     betMaxPct: 10,           // apuesta máxima de un espectador: % de su capital
     marketPrices: { immunity: 15, forced: 20, insurance: 10 },

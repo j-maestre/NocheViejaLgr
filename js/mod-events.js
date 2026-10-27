@@ -1,6 +1,7 @@
 // ============================================================
 //  MÓDULO: EVENTOS Y CALENDARIO
 //  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global · 🦅 fascista (plebiscito)
+//  👑 rey de la colina · 🤝 dilema del prisionero
 //
 //  Los eventos se guardan en la colección `events` y los ejecuta el
 //  primer móvil que tenga la web abierta cuando toca. Todo se calcula
@@ -53,6 +54,17 @@
       <path d="M28 46q10-6 20 0q-10 4-20 0z" fill="#222"/>
       <g fill="#c9a227"><circle cx="122" cy="26" r="6"/><circle cx="134" cy="34" r="5"/><circle cx="122" cy="40" r="4"/></g>
       <text x="80" y="80" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="12" fill="#5a4a20">VOTO</text></svg>`,
+    king: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cc8ff"/><stop offset="1" stop-color="#1b3a5c"/></linearGradient></defs>
+      <rect width="160" height="100" fill="url(#gf)"/>
+      <path d="M0 100 L60 40 L80 55 L110 25 L160 100 Z" fill="#2f6b3a"/><path d="M60 40 L80 55 L70 62 Z" fill="#245a2e"/>
+      <path d="M97 22 l6 -10 l6 8 l6 -8 l6 10 l-2 8 h-20 z" fill="#f5c542" stroke="#a87b12" stroke-width="1.5"/>
+      <g fill="#fff" opacity=".8"><circle cx="24" cy="18" r="6"/><circle cx="32" cy="16" r="7"/><circle cx="40" cy="19" r="5"/></g>
+      <g fill="#f5c542"><circle cx="40" cy="80" r="5"/><circle cx="130" cy="84" r="5"/><circle cx="52" cy="88" r="4"/></g></svg>`,
+    dilemma: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1f6f4a"/><stop offset=".5" stop-color="#222"/><stop offset="1" stop-color="#8a1530"/></linearGradient></defs>
+      <rect width="160" height="100" fill="url(#gg)"/>
+      <g stroke="#ddd" stroke-width="3" opacity=".35">${Array.from({ length: 8 }, (_, i) => `<line x1="${12 + i * 20}" y1="0" x2="${12 + i * 20}" y2="100"/>`).join('')}</g>
+      <text x="44" y="64" text-anchor="middle" font-size="34">🤝</text><text x="116" y="64" text-anchor="middle" font-size="34">🔪</text>
+      <text x="80" y="58" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="18" fill="#fff">VS</text></svg>`,
   };
 
   const ART = new Proxy(ART_SRC, { get: (o, k) => (o[k] ? uniq(o[k]) : undefined) });
@@ -79,6 +91,14 @@
       name: 'Evento fascista', icon: '🦅',
       desc: (s) => `Plebiscito amañado: durante ${s.plebisciteVoteMinutes} minutos se vota en secreto a un Dictador (nadie ve el recuento hasta el final). Cada uno tiene un voto gratis, y los votos extra se compran a ${s.plebiscitePrice} fichas (sin límite: democracia de mercado). El más votado cobra ${s.plebisciteTribute} fichas a cada jugador y lleva el título de 🎖️ Dictador hasta el siguiente plebiscito.`,
     },
+    king: {
+      name: 'Rey de la colina', icon: '👑',
+      desc: (s) => `Durante ${s.kingMinutes} minutos, cada ${s.kingEveryMinutes} minutos el primero del ranking cobra ${s.kingTribute} ficha${Number(s.kingTribute) === 1 ? '' : 's'} a cada jugador. Si no tienes, te quedas en negativo y tendrás que pedir un préstamo a la Banca.`,
+    },
+    dilemma: {
+      name: 'Dilema del prisionero', icon: '🤝',
+      desc: (s) => `Se hacen parejas al azar y cada uno elige en secreto (${s.dilemmaMinutes} min): 🤝 Cooperar o 🔪 Traicionar. Si cooperáis los dos, +${s.dilemmaCoop} cada uno (de la Banca). Si uno traiciona, el traidor gana ${s.dilemmaTemptation} y el otro pierde ${s.dilemmaSucker}. Si traicionáis los dos, perdéis ${s.dilemmaPunish} cada uno. Quien no elige, coopera.`,
+    },
   };
 
   // Calendario por defecto (ids fijos)
@@ -90,6 +110,10 @@
     ['ev-d5', 'lottery', '2026-12-31T20:00'],
     ['ev-d6', 'stopwatch', '2026-12-31T21:30'],
     ['ev-d7', 'plebiscite', '2026-12-31T13:00'],
+    ['ev-d8', 'king', '2026-12-29T18:00'],
+    ['ev-d9', 'king', '2026-12-30T17:00'],
+    ['ev-d10', 'king', '2026-12-31T17:00'],
+    ['ev-d11', 'dilemma', '2026-12-30T21:00'],
   ];
 
   // ---------------------------------------------------------- utilidades
@@ -99,6 +123,9 @@
   const happyEnd = (ev) => ev.at + (Number(set().happyMinutes) || 60) * MIN;
   const signupStart = (ev) => ev.at - (Number(set().stopwatchSignupMinutes) || 15) * MIN;
   const playEnd = (ev) => ev.at + (Number(set().stopwatchPlayMinutes) || 10) * MIN;
+  const kingEnd = (ev) => ev.at + (Number(set().kingMinutes) || 60) * MIN;
+  const kingEvery = () => Math.max(1, Number(set().kingEveryMinutes) || 10) * MIN;
+  const dilemmaEnd = (ev) => ev.at + (Number(set().dilemmaMinutes) || 10) * MIN;
   const voteEnd = (ev) => ev.at + (Number(set().plebisciteVoteMinutes) || 10) * MIN;
   const fmtWhen = (ts) => new Date(ts).toLocaleString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const fmtHour = (ts) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -112,10 +139,12 @@
       case 'stopwatch': return now < signupStart(ev) ? 'upcoming' : now < ev.at ? 'signup' : now < playEnd(ev) ? 'playing' : 'over';
       case 'lottery': return now < ev.at ? (MN.started() ? 'selling' : 'upcoming') : 'over';
       case 'plebiscite': return now < ev.at ? 'upcoming' : now < voteEnd(ev) ? 'voting' : 'over';
+      case 'king': return now < ev.at ? 'upcoming' : now < kingEnd(ev) ? 'reign' : 'over';
+      case 'dilemma': return now < ev.at ? 'upcoming' : now < dilemmaEnd(ev) ? 'choosing' : 'over';
       default: return now < ev.at ? 'upcoming' : 'over';
     }
   }
-  const isLive = (ev) => ['live', 'signup', 'playing', 'voting'].includes(phase(ev));
+  const isLive = (ev) => ['live', 'signup', 'playing', 'voting', 'reign', 'choosing'].includes(phase(ev));
   const happyActiveAt = (ts) => events().some((e) => e.type === 'happyhour' && ts >= e.at && ts < happyEnd(e));
 
   function countdown(ms) {
@@ -136,6 +165,8 @@
       case 'playing': return `🔴 EN JUEGO · ${cd(playEnd(ev), 'cierra en')}`;
       case 'selling': return `🎟️ Boletos a la venta · ${cd(ev.at, 'sorteo en')}`;
       case 'voting': return `🦅 VOTACIÓN SECRETA · ${cd(voteEnd(ev), 'cierra en')}`;
+      case 'reign': { const k = currentKing(); return `👑 EN JUEGO · ${k ? `reina ${MN.who(k)} · ` : ''}${cd(nextKingTick(ev, now), 'cobra en')} · ${cd(kingEnd(ev), 'acaba en')}`; }
+      case 'choosing': return `🤝 ELIGE EN SECRETO · ${cd(dilemmaEnd(ev), 'se revela en')}`;
       case 'over': return '⏳ Calculando resultado…';
       default: return resultLine(ev);
     }
@@ -148,6 +179,8 @@
       case 'communist': return r.from ? `☭ Se expropiaron <b>${r.amount}</b> fichas a ${who(r.from)} para ${r.to.map(who).join(', ')}` : 'No hubo nada que repartir';
       case 'happyhour': return `🍻 Terminó. ${r.bonuses ? `La Banca pagó <b>${r.bonuses}</b> fichas extra` : 'Nadie aprovechó la happy hour'}`;
       case 'lottery': return r.winner ? `🎟️ Ganó ${who(r.winner)}: <b>${r.pot}</b> fichas (${r.tickets} boletos)` : 'No se vendió ningún boleto';
+      case 'king': return r.top ? `👑 ${who(r.top)} reinó ${r.reigns[r.top]} ${r.reigns[r.top] === 1 ? 'ronda' : 'rondas'} y cobró <b>${r.earned[r.top]}</b> fichas` : 'Nadie consiguió reinar en solitario';
+      case 'dilemma': return r.pairs && r.pairs.length ? `🤝 ${r.pairs.length} parejas · ${r.pairs.filter((p) => p.a.c === 'coop' && p.b.c === 'coop').length} cooperaron · ${r.pairs.filter((p) => p.a.c === 'betray' && p.b.c === 'betray').length} se traicionaron mutuamente` : 'No hubo parejas';
       case 'plebiscite': return r.winner ? `🦅 ${who(r.winner)} es el nuevo Dictador con <b>${r.votes[r.winner]}</b> votos y cobró <b>${r.pot}</b> fichas de tributo` : 'Nadie votó: la democracia sobrevive (de momento)';
       case 'stopwatch': return r.winner ? `⏱️ Ganó ${who(r.winner)} con <b>${secs(r.ms)} s</b> y se llevó <b>${r.pot}</b> fichas` : (r.note || 'No hubo partida');
       default: return '';
@@ -165,6 +198,15 @@
     if (ev.type === 'lottery' && ph === 'selling') {
       const n = myTickets(ev, mine.id);
       return `<div class="ev-actions">${bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n} ${n === 1 ? 'boleto' : 'boletos'} · bote: <b>${lotteryPot(ev)}</b></span></div>`;
+    }
+    if (ev.type === 'dilemma' && ph === 'choosing') {
+      const pair = dilemmaPairs(ev).find((p) => p.includes(mine.id));
+      if (!pair) return '<div class="ev-actions"><span class="muted small">Llegaste tarde: no tienes pareja en este dilema.</span></div>';
+      const partner = pair[0] === mine.id ? pair[1] : pair[0];
+      const ch = myChoice(ev, mine.id);
+      return `<div class="ev-actions dilemma-actions"><div class="small">Tu pareja: <b>${partner === BANK ? '🎩 la Banca' : MN.who(partner)}</b></div>
+        ${b('coop', '🤝 Cooperar', ch === 'coop' ? 'primary' : 'ghost')}${b('betray', '🔪 Traicionar', ch === 'betray' ? 'danger-btn' : 'ghost')}
+        <span class="muted small">${ch ? `Has elegido <b>${ch === 'coop' ? '🤝 cooperar' : '🔪 traicionar'}</b> (puedes cambiar hasta el final)` : 'Nadie sabrá qué has elegido hasta el final'}</span></div>`;
     }
     if (ev.type === 'plebiscite' && ph === 'voting') {
       const free = myFreeVote(ev, mine.id);
@@ -285,14 +327,14 @@
     const saved = {
       at: now, startDate: s.startDate,
       happyMinutes: s.happyMinutes, stopwatchSignupMinutes: s.stopwatchSignupMinutes, stopwatchPlayMinutes: s.stopwatchPlayMinutes,
-      communistMaskMinutes: s.communistMaskMinutes, plebisciteVoteMinutes: s.plebisciteVoteMinutes,
+      communistMaskMinutes: s.communistMaskMinutes, plebisciteVoteMinutes: s.plebisciteVoteMinutes, kingMinutes: s.kingMinutes, kingEveryMinutes: s.kingEveryMinutes, dilemmaMinutes: s.dilemmaMinutes,
       events: Object.fromEntries(pending.map((e) => [e.id, e.at])),
     };
     const local = (ts) => new Date(ts - new Date().getTimezoneOffset() * MIN).toISOString().slice(0, 16);
     await MN.act(async () => {
       await Store.saveSettings(Object.assign({}, s, {
         eventRehearsal: saved, startDate: local(now - MIN),
-        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30, plebisciteVoteMinutes: 3,
+        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30, plebisciteVoteMinutes: 3, kingMinutes: 3, kingEveryMinutes: 1, dilemmaMinutes: 3,
       }));
       await Store.putMany({ events: pending.map((e, i) => Object.assign({}, e, { at: now + (i + 1) * REHEARSAL_GAP })) });
     }, '🧪 Ensayo en marcha: el primer evento empieza en 4 minutos');
@@ -312,7 +354,7 @@
       const next = Object.assign({}, s, {
         startDate: r.startDate, happyMinutes: r.happyMinutes, stopwatchSignupMinutes: r.stopwatchSignupMinutes, stopwatchPlayMinutes: r.stopwatchPlayMinutes,
         communistMaskMinutes: r.communistMaskMinutes == null || r.communistMaskMinutes === 60 ? 30 : r.communistMaskMinutes,
-        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10,
+        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10, kingMinutes: r.kingMinutes || 60, kingEveryMinutes: r.kingEveryMinutes || 10, dilemmaMinutes: r.dilemmaMinutes || 10,
       });
       delete next.eventRehearsal;
       await Store.saveSettings(next);
@@ -350,6 +392,8 @@
       const startTs = ev.type === 'stopwatch' ? signupStart(ev) : ev.at;
       if (ph === 'upcoming' && startTs - now <= 15 * MIN && startTs - now > 0 && !seen(ev.id + ':15')) msgs.push(`⏰ En 15 minutos: ${T.icon} ${T.name}`);
       if (ph === 'live' && !seen(ev.id + ':start')) msgs.push(`🍻 ¡Empieza la happy hour! Los duelos pagan x${set().happyMultiplier} durante ${set().happyMinutes} min`);
+      if (ph === 'reign' && !seen(ev.id + ':reign')) msgs.push(`👑 ¡Rey de la colina! Durante ${set().kingMinutes} min, el primero cobra ${set().kingTribute} a cada uno cada ${set().kingEveryMinutes} min. ¡A por él!`);
+      if (ph === 'choosing' && !seen(ev.id + ':choosing')) msgs.push(`🤝 ¡Dilema del prisionero! Tienes ${set().dilemmaMinutes} min para elegir en secreto: cooperar o traicionar`);
       if (ph === 'voting' && !seen(ev.id + ':voting')) msgs.push(`🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${set().plebisciteVoteMinutes} min. Los votos extra se compran 😏`);
       if (ph === 'signup' && !seen(ev.id + ':signup')) msgs.push('⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya');
       if (ph === 'playing' && mine && mySignup(ev, mine.id) && !seen(ev.id + ':play')) msgs.push('⏱️ ¡Te toca! Juega al cronómetro global antes de que cierre');
@@ -379,8 +423,12 @@
       if (ev.type === 'lottery') await runLottery(ev);
       if (ev.type === 'stopwatch') await runStopwatch(ev);
       if (ev.type === 'plebiscite') await runPlebiscite(ev);
+      if (ev.type === 'king') await runKing(ev);
+      if (ev.type === 'dilemma') await runDilemma(ev);
       if (ev.type === 'happyhour') await Store.update('events', ev.id, { status: 'done', result: { at: happyEnd(ev), bonuses: happyBonuses(ev).reduce((a, x) => a + x.amount, 0) } });
     }
+    // Rey de la colina en marcha: se cobra en cada marca
+    for (const ev of events()) if (ev.type === 'king' && ev.status === 'scheduled' && phase(ev, now) === 'reign') await syncKing(ev, now);
     // El cronómetro también se resuelve antes si ya han jugado todos los apuntados
     for (const ev of events()) {
       if (ev.type === 'stopwatch' && ev.status === 'scheduled' && phase(ev, now) === 'playing') {
@@ -391,12 +439,22 @@
     await syncHappyBonuses();
   }
 
+  const NEW_DEFAULTS = ['ev-d8', 'ev-d9', 'ev-d10', 'ev-d11'];
   async function seedCalendar() {
     const S = MN.S;
+    // Partidas ya empezadas: se añaden los eventos nuevos del calendario por defecto (una sola vez)
+    if (S.settings.eventsSeeded && MN.isAdmin() && !S.settings.eventsSeeded2) {
+      const have = new Set((S.events || []).map((e) => e.id));
+      const add = DEFAULT_CALENDAR.filter(([id]) => NEW_DEFAULTS.includes(id) && !have.has(id))
+        .map(([id, type, at]) => ({ id, type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }));
+      if (add.length) await Store.putMany({ events: add });
+      await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded2: true }));
+      return;
+    }
     if (S.settings.eventsSeeded || !MN.isAdmin() || (S.events || []).length) return;
     const list = DEFAULT_CALENDAR.map(([id, type, at]) => ({ id, type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }));
     await Store.putMany({ events: list });
-    await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded: true }));
+    await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded: true, eventsSeeded2: true }));
   }
 
   async function runCommunist(ev) {
@@ -439,6 +497,69 @@
       Object.assign(result, { winner, pot, tribute });
     }
     await Store.update('events', ev.id, { status: 'done', result });
+  }
+
+  // ---------------------------------------------------------- 👑 rey de la colina
+  // En cada marca (cada X min desde el inicio) el primero del ranking cobra a todos. Empate en cabeza: nadie cobra.
+  const nextKingTick = (ev, now = Date.now()) => ev.at + (Math.floor((now - ev.at) / kingEvery()) + 1) * kingEvery();
+  function leaderAt(ts) {
+    const bal = MN.balancesAt(ts);
+    const list = MN.S.players.filter((p) => p.createdAt <= ts).map((p) => p.id).sort((a, b) => bal[b] - bal[a]);
+    return list.length >= 2 && bal[list[0]] > bal[list[1]] ? list[0] : null;
+  }
+  function currentKing() {
+    const live = events().find((e) => e.type === 'king' && e.status === 'scheduled' && phase(e) === 'reign');
+    return live ? leaderAt(Date.now()) : null;
+  }
+  async function syncKing(ev, now) {
+    const s = set(); const end = Math.min(kingEnd(ev), now); const tribute = Number(s.kingTribute) || 1;
+    const writes = [];
+    for (let k = 1; ev.at + k * kingEvery() <= end; k++) {
+      const ts = ev.at + k * kingEvery(); const id = `king_${ev.id}_${k}`;
+      if (MN.S.txs.some((t) => t.id === id)) continue;
+      const king = leaderAt(ts - 1); if (!king) continue;
+      const payouts = {}; let pot = 0;
+      MN.S.players.filter((p) => p.id !== king && p.createdAt <= ts).forEach((p) => { payouts[p.id] = -tribute; pot += tribute; });
+      if (!pot) continue;
+      payouts[king] = pot;
+      writes.push({ id, type: 'payout', kind: 'king', ts, eventId: ev.id, king, round: k, pot, payouts });
+    }
+    if (writes.length) await Store.putMany({ txs: writes });
+  }
+  async function runKing(ev) {
+    await syncKing(ev, kingEnd(ev));
+    const reigns = {}; const earned = {};
+    MN.S.txs.filter((t) => t.kind === 'king' && t.eventId === ev.id && !t.voided).forEach((t) => { reigns[t.king] = (reigns[t.king] || 0) + 1; earned[t.king] = (earned[t.king] || 0) + t.pot; });
+    const top = Object.keys(reigns).sort((a, b) => reigns[b] - reigns[a] || earned[b] - earned[a])[0] || null;
+    await Store.update('events', ev.id, { status: 'done', result: { at: kingEnd(ev), reigns, earned, top } });
+  }
+
+  // ---------------------------------------------------------- 🤝 dilema del prisionero
+  const BANK = '__banca';
+  // Parejas al azar (pero el mismo azar en todos los móviles). Si sobra uno, le toca la Banca.
+  function dilemmaPairs(ev) {
+    const ids = MN.S.players.filter((p) => p.createdAt <= ev.at).map((p) => p.id).sort((a, b) => MN.hash(ev.id + a) - MN.hash(ev.id + b));
+    const pairs = [];
+    for (let i = 0; i < ids.length; i += 2) pairs.push([ids[i], ids[i + 1] || BANK]);
+    return pairs;
+  }
+  const myChoice = (ev, id) => { const e = entriesOf(ev, 'choice').find((x) => x.player === id); return e ? e.choice : null; };
+  const bankChoice = (ev) => (Math.abs(MN.hash(ev.id + 'banca')) % 2 ? 'betray' : 'coop');
+  async function runDilemma(ev) {
+    const s = set(); const C = Number(s.dilemmaCoop) || 10; const T = Number(s.dilemmaTemptation) || 20;
+    const L = Number(s.dilemmaSucker) || 10; const P = Number(s.dilemmaPunish) || 5;
+    const choice = (id) => (id === BANK ? bankChoice(ev) : myChoice(ev, id) || 'coop');
+    const gain = (me, other) => (me === 'coop' ? (other === 'coop' ? C : -L) : (other === 'coop' ? T : -P));
+    const payouts = {}; const pairs = [];
+    dilemmaPairs(ev).forEach(([a, b]) => {
+      const ca = choice(a); const cb = choice(b);
+      const ga = gain(ca, cb); const gb = gain(cb, ca);
+      if (a !== BANK) payouts[a] = (payouts[a] || 0) + ga;
+      if (b !== BANK) payouts[b] = (payouts[b] || 0) + gb;
+      pairs.push({ a: { id: a, c: ca, g: ga }, b: { id: b, c: cb, g: gb } });
+    });
+    if (Object.values(payouts).some((v) => v)) await Store.put('txs', { id: 'ev_' + ev.id, type: 'payout', kind: 'dilemma', ts: dilemmaEnd(ev), eventId: ev.id, payouts });
+    await Store.update('events', ev.id, { status: 'done', result: { at: dilemmaEnd(ev), pairs } });
   }
 
   // El último Dictador elegido lleva el título hasta el siguiente plebiscito
@@ -597,6 +718,11 @@
         if (en && phase(ev) === 'signup') await MN.act(() => Store.update('entries', en.id, { withdrawn: true }), 'Te has borrado');
       }
       if (b.dataset.evact === 'play') openStopwatch(ev);
+      if (b.dataset.evact === 'coop' || b.dataset.evact === 'betray') {
+        if (phase(ev) !== 'choosing') return;
+        await MN.act(() => Store.put('entries', { id: `dc_${ev.id}_${mine.id}`, eventId: ev.id, kind: 'choice', player: mine.id, choice: b.dataset.evact, ts: now }),
+          b.dataset.evact === 'coop' ? '🤝 Has elegido cooperar. Ojalá tu pareja también…' : '🔪 Has elegido traicionar. Muajaja.');
+      }
       if (b.dataset.evact === 'vote' || b.dataset.evact === 'buyvote') {
         if (phase(ev) !== 'voting') return;
         const sel = b.closest('.ev-actions').querySelector('.pv-sel'); const cand = sel && sel.value; if (!cand) return;
@@ -638,6 +764,8 @@
       MN.registerTx('happy', { line: (t) => ({ icon: '🍻', text: `Happy hour: la Banca paga <b>${t.amount}</b> fichas extra a ${MN.who(t.player)}`, sub: 'Premio doble' }) });
       MN.registerTx('ticket', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.player)} compra un boleto de lotería`, sub: `${t.amount} fichas` }) });
       MN.registerTx('lottery', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.winner)} gana la lotería y se lleva <b>${t.pot}</b> fichas`, sub: `${t.tickets} boletos vendidos` }) });
+      MN.registerTx('king', { line: (t) => ({ icon: '👑', text: `${MN.who(t.king)} sigue en la cima y cobra <b>${t.pot}</b> fichas de tributo`, sub: `Rey de la colina · ronda ${t.round}` }) });
+      MN.registerTx('dilemma', { line: (t) => ({ icon: '🤝', text: `Dilema del prisionero: ${Object.entries(t.payouts).map(([id, v]) => `${MN.who(id)} ${v > 0 ? '+' : ''}${v}`).join(', ')}`, sub: 'Cooperar o traicionar' }) });
       MN.registerTx('vote', { line: (t) => ({ icon: '🕶️', text: 'Alguien compra un voto secreto en el evento fascista', sub: `${t.amount} fichas a la Banca` }) });
       MN.registerTx('plebiscite', { line: (t) => ({ icon: '🎖️', text: `${MN.who(t.winner)} gana el evento fascista y cobra <b>${t.pot}</b> fichas de tributo`, sub: `${t.votes} votos` }) });
       MN.registerTx('stopwatch', { line: (t) => ({ icon: '⏱️', text: `${MN.who(t.winner)} gana el cronómetro global con ${secs(t.ms)} s y se lleva <b>${t.pot}</b> fichas`, sub: `Entrada: ${t.buyIn} fichas por cabeza` }) });
@@ -691,9 +819,9 @@
         chart: '☭<br><b>Censurado por el Partido</b><br><span class="muted small">La gráfica vuelve tras la expropiación</span>',
       };
     },
-    rankExtra(id) { return id === dictator() ? '<span class="bounty-tag dictator-tag" title="Elegido en el evento fascista">🎖️ DICTADOR</span>' : ''; },
+    rankExtra(id) { return (id === currentKing() ? '<span class="bounty-tag king-tag" title="Cobra a todos en cada ronda">👑 REY</span>' : '') + (id === dictator() ? '<span class="bounty-tag dictator-tag" title="Elegido en el evento fascista">🎖️ DICTADOR</span>' : ''); },
     // Para otros módulos y las normas
-    api: () => ({ events, phase, happyActiveAt, TYPES, ART, dictator }),
+    api: () => ({ events, phase, happyActiveAt, TYPES, ART, dictator, dilemmaPairs, BANK }),
     rules(section) {
       const s = set();
       return section('🎉', 'Eventos', `

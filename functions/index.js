@@ -131,12 +131,48 @@ exports.prestamos = onDocumentWritten('games/{gameId}/txs/{id}', async (e) => {
   ]);
 });
 
+// ---------------------------------------------------------- jugadores nuevos
+exports.registros = onDocumentWritten('games/{gameId}/players/{id}', async (e) => {
+  if (e.data.before.exists || !e.data.after.exists) return null;
+  const p = e.data.after.data(); if (p.demo) return null;
+  const all = await game(e.params.gameId).collection('players').get();
+  return send(e.params.gameId, null, `🎰 ${p.name || 'Alguien'} se ha sentado a la mesa. ¡Ya sois ${all.size}!`, e.params.id);
+});
+
+// ---------------------------------------------------------- peticiones y cartas
+// 🙏 Préstamos pedidos (a la Banca), denegados (al jugador) y 🃏 cartas del caos usadas
+exports.peticiones = onDocumentWritten('games/{gameId}/entries/{id}', async (e) => {
+  const before = e.data.before.exists ? e.data.before.data() : null;
+  const x = e.data.after.exists ? e.data.after.data() : null;
+  if (!x) return null;
+  const g = e.params.gameId;
+  if (x.kind === 'loanreq') {
+    if (!before && x.status === 'pending') {
+      const [n, set] = await Promise.all([names(g), game(g).collection('meta').doc('settings').get()]);
+      const bank = set.exists ? set.data().bankPlayerId : null;
+      if (bank && bank !== x.player) return send(g, [bank], `🙏 ${n[x.player] || 'Alguien'} pide un préstamo a la Banca${x.msg ? `: «${x.msg}»` : ''}`);
+    }
+    if (before && before.status === 'pending' && x.status === 'denied') return send(g, [x.player], '🏦 La Banca ha denegado tu préstamo. Suplica mejor.');
+    return null;
+  }
+  if (x.kind === 'card' && x.usedAt && !(before && before.usedAt)) {
+    const n = await names(g); const who = n[x.player] || 'Alguien';
+    if (x.power === 'heist' && x.target) return send(g, [x.target], `🦹 ${who} te ha atracado con una carta del caos: −5 fichas`);
+    if (x.power === 'gag' && x.target) return send(g, [x.target], `🤐 ${who} te ha puesto una mordaza: no puedes retar a nadie durante 1 hora`);
+    if (x.power === 'tax') return send(g, null, `💸 ${who} usa el Impuesto revolucionario: le pagas 2 fichas`, x.player);
+    if (x.power === 'ghost') return send(g, null, `👻 ${who} se vuelve fantasma: nadie puede retarle durante 1 hora`, x.player);
+  }
+  return null;
+});
+
 // ---------------------------------------------------------- eventos
 const EVENTS = {
   communist: ['☭', 'Evento comunista', '☭ ¡Empieza el evento comunista! Entra a ver a quién expropia el Partido 👀'],
   happyhour: ['🍻', 'Happy hour', '🍻 ¡Empieza la happy hour! Los duelos pagan el doble'],
   lottery: ['🎟️', 'Lotería', '🎟️ ¡Se sortea la lotería! Entra a ver quién se lleva el bote 👀'],
   plebiscite: ['🦅', 'Evento fascista', '🦅 ¡Evento fascista! Vota en secreto a tu Dictador. Los votos extra se compran 😏'],
+  king: ['👑', 'Rey de la colina', '👑 ¡Rey de la colina! El primero del ranking cobra a todos cada pocos minutos. ¡A por él!'],
+  dilemma: ['🤝', 'Dilema del prisionero', '🤝 ¡Dilema del prisionero! Elige en secreto: cooperar o traicionar'],
   stopwatch: ['⏱️', 'Cronómetro global', '⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya'],
 };
 
@@ -148,9 +184,21 @@ exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Ma
   const games = await db.collection('games').listDocuments();
   for (const g of games) {
     const [evs, set] = await Promise.all([g.collection('events').get(), g.collection('meta').doc('settings').get()]);
-    if (evs.empty) continue;
     const s = set.exists ? set.data() : {};
     if (s.endDate && now >= new Date(s.endDate).getTime() + 30 * MIN) continue;
+    // ⚡ Última ronda y 🕵️ misiones nuevas cada mañana (una vez)
+    const once = async (key, msg) => {
+      try { await g.collection('pushlog').doc(key).create({ at: now }); } catch (err) { return; }
+      await send(g.id, null, msg);
+    };
+    const endTs = s.endDate ? new Date(s.endDate).getTime() : 0;
+    const last = Number(s.lastRoundMinutes) || 0;
+    if (endTs && last && now >= endTs - last * MIN && now < endTs) await once(`lastround_${endTs}`, `⚡ ¡ÚLTIMA RONDA! Queda ${last >= 60 ? `${last / 60} hora` : `${last} min`}: apuesta sin límite y un 💣 ALL IN extra para todos`);
+    const startTs = s.startDate ? new Date(s.startDate).getTime() : 0;
+    const madrid = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date(now));
+    const part = (t) => (madrid.find((x) => x.type === t) || {}).value;
+    if (startTs && now >= startTs && now < endTs && Number(part('hour')) >= 10) await once(`missions_${part('year')}-${part('month')}-${part('day')}_${startTs}`, '🕵️ Tienes misiones secretas nuevas para hoy. ¡Y una ☠️ Misión del caos!');
+
     for (const d of evs.docs) {
       const ev = d.data(); const T = EVENTS[ev.type]; if (!T || ev.status === 'cancelled') continue;
       const start = ev.type === 'stopwatch' ? ev.at - (Number(s.stopwatchSignupMinutes) || 15) * MIN : ev.at;
@@ -160,7 +208,8 @@ exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Ma
       };
       if (ev.status === 'scheduled') {
         if (start - now <= 15 * MIN && start - now > 2 * MIN) await fire('15', `⏰ En 15 minutos: ${T[0]} ${T[1]}`);
-        const msg = ev.type === 'plebiscite' ? `🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
+        const msg = ev.type === 'king' ? `👑 ¡Rey de la colina! Durante ${s.kingMinutes || 60} min, el primero cobra ${s.kingTribute || 1} a cada uno cada ${s.kingEveryMinutes || 10} min. ¡A por él!`
+          : ev.type === 'dilemma' ? `🤝 ¡Dilema del prisionero! Tienes ${s.dilemmaMinutes || 10} min para elegir en secreto: cooperar o traicionar` : ev.type === 'plebiscite' ? `🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
         if (now >= start && now - start < 5 * MIN) await fire('start', msg);
         // Cronómetro: a los apuntados, cuando les toca jugar
         if (ev.type === 'stopwatch' && now >= ev.at && now - ev.at < 5 * MIN) {
@@ -174,6 +223,8 @@ exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Ma
       if (ev.type === 'plebiscite') end = ev.at + (Number(s.plebisciteVoteMinutes) || 10) * MIN;
       if (ev.type === 'stopwatch') end = ev.at + (Number(s.stopwatchPlayMinutes) || 10) * MIN;
       if (ev.type === 'happyhour') end = ev.at + (Number(s.happyMinutes) || 60) * MIN;
+      if (ev.type === 'king') end = ev.at + (Number(s.kingMinutes) || 60) * MIN;
+      if (ev.type === 'dilemma') end = ev.at + (Number(s.dilemmaMinutes) || 10) * MIN;
       if (ev.status === 'done' && ev.result && ev.result.at && end) end = Math.min(end, ev.result.at);
       if (end && now >= end && now - end < 10 * MIN) {
         await fire('end', ev.type === 'happyhour' ? '🍻 Se acabó la happy hour. Los duelos vuelven a pagar lo normal' : `${T[0]} ${T[1]}: ¡ya ha terminado! Entra para ver qué ha pasado 👀`);
