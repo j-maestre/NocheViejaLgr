@@ -17,7 +17,14 @@
 //   },
 //
 window.MN_CONFIG = {
-  firebase: null,
+  firebase: {
+    apiKey: 'AIzaSyDODoJFlJZ0jP8lpwZAKQgArtPj_1ZLj9Y',
+    authDomain: 'nocheviejalgr.firebaseapp.com',
+    projectId: 'nocheviejalgr',
+    storageBucket: 'nocheviejalgr.firebasestorage.app',
+    messagingSenderId: '286238050587',
+    appId: '1:286238050587:web:bd16c3ad61715f7972ebbe',
+  },
 
   // Identificador de la partida. Cámbialo para empezar una partida nueva
   // sin borrar la anterior (p. ej. 'nochevieja-2027').
@@ -28,3 +35,7 @@ window.MN_CONFIG = {
   // pasar el enlace). Déjalo vacío para usar solo el PIN.
   bankName: 'Xema',
 };
+
+// Con "?local" en la dirección se juega en modo local (sin tocar la partida
+// real de Firebase): útil para hacer pruebas.
+if (/[?&]local\b/.test(location.search)) { window.MN_CONFIG.firebase = null; window.MN_CONFIG.localTest = true; }

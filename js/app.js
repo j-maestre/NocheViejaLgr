@@ -1549,7 +1549,14 @@
       const ok = await modal(`<div class="modal-icon">🧨</div>
         <p class="modal-text">¿Borrar <b>todos</b> los jugadores y movimientos?</p>
         <p class="hint center">Las reglas se mantienen. Exporta una copia antes si la quieres.</p>`, 'Borrar todo');
-      if (ok) act(() => Store.replaceAll({ players: [], txs: [], challenges: [], settings: S.settings }), '🧨 Mesa limpia');
+      if (!ok) return;
+      // Partida como nueva: se mantienen las reglas, pero se deshace un ensayo a medias
+      // y se olvida que el calendario y la Banca ya estaban creados
+      const s = Object.assign({}, S.settings);
+      const r = s.eventRehearsal;
+      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
+      ['eventRehearsal', 'eventsSeeded', 'bankPlayerId'].forEach((k) => delete s[k]);
+      act(() => Store.replaceAll({ settings: s }), '🧨 Mesa limpia');
     });
 
     // Refresca textos relativos ("hace 5 min") y límites por fecha
@@ -1596,7 +1603,9 @@
       if (mode === 'local') {
         const b = $('#mode-banner');
         b.hidden = false;
-        b.innerHTML = '⚠️ <b>Modo local</b>: los datos solo se guardan en este navegador. Configura Firebase en <code>js/config.js</code> para jugar todos juntos.';
+        b.innerHTML = (window.MN_CONFIG || {}).localTest
+          ? '🧪 <b>Modo pruebas</b>: estás en una partida local de este navegador, separada de la real. Quita <code>?local</code> de la dirección para volver.'
+          : '⚠️ <b>Modo local</b>: los datos solo se guardan en este navegador. Configura Firebase en <code>js/config.js</code> para jugar todos juntos.';
       }
     } catch (err) {
       onError(err);

@@ -546,8 +546,13 @@ body.no-scroll { overflow: hidden; }
 .ev-actions .btn { width: auto; padding: 10px 14px; }
 .link.small { font-size: 12px; padding: 4px 0; }
 @media (max-width: 480px) {
-  .ev-hero { grid-template-columns: 1fr; }
-  .ev-art svg { max-height: 120px; width: 100%; object-fit: cover; }
+  .ev-hero { grid-template-columns: 84px 1fr; gap: 10px; padding: 10px; }
+  .ev-name { font-size: 22px; }
+  .ev-desc { font-size: 12px; }
+}
+@media (max-width: 360px) {
+  .ev-hero { grid-template-columns: 64px 1fr; }
+  .ev-desc { display: none; }
 }
 
 /* ---------- Eventos: calendario ---------- */
@@ -858,3 +863,32 @@ img, svg, canvas, video { max-width: 100%; }
 input[type="datetime-local"] { min-height: 46px; -webkit-appearance: none; appearance: none; text-align: left; }
 input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .grid-2 > label { min-width: 0; }
+
+/* ---------- Pantallas completas en móviles bajos o apaisados ---------- */
+.tutorial, .show, .ceremony, .wrapped, .sw-game, .modal, .welcome { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.tutorial, .show, .ceremony, .wrapped, .sw-game { align-items: safe center; }
+@media (max-height: 560px) {
+  .tut-card { min-height: 0; padding-top: 36px; gap: 8px; }
+  .tut-art { font-size: 48px; margin-top: 0; }
+  .tut-title { font-size: 28px; }
+  .tut-body { font-size: 14px; }
+  .slot-show { --sym-h: 60px; gap: 8px; }
+  .sym { font-size: 38px; }
+  .slot-title { font-size: 28px; }
+  .podium { min-height: 0; }
+  .place-1 .podium-block { height: 110px; } .place-2 .podium-block { height: 80px; } .place-3 .podium-block { height: 60px; }
+  .podium-emoji { font-size: 40px; }
+  .cer-title { font-size: 32px; } .cer-sub { margin-bottom: 12px; }
+  .wr-card { min-height: 0; padding: 36px 20px 18px; }
+  .wr-icon { font-size: 44px; } .wr-big { font-size: 64px; } .wr-emoji { font-size: 56px; }
+  .sw-display { font-size: 64px; margin: 10px 0; }
+  .sw-btn { width: 150px; height: 150px; font-size: 30px; }
+  .lot-drum { width: 170px; height: 170px; }
+  .lot-balls span { transform: rotate(calc(var(--i) * 36deg)) translate(56px); }
+  .com-star { font-size: 64px; }
+}
+@media (max-width: 340px) {
+  .slot-show { --sym-h: 64px; }
+  .sym { font-size: 40px; }
+  .sw-btn { width: 180px; height: 180px; }
+}
