@@ -59,7 +59,7 @@
     const el = MN.$('#app-card'); if (!el) return;
     const perm = permission();
     let notifyHtml;
-    if (perm === 'granted') notifyHtml = '<p>🔔 <b>Notificaciones activadas.</b> Te avisaremos de retos, resultados y eventos${(window.MN_CONFIG || {}).vapidKey ? ', aunque tengas la app cerrada' : ''}.</p>';
+    if (perm === 'granted') notifyHtml = `<p>🔔 <b>Notificaciones activadas.</b> Te avisaremos de retos, resultados y eventos${(window.MN_CONFIG || {}).vapidKey ? ', aunque tengas la app cerrada' : ''}.</p>`;
     else if (perm === 'denied') notifyHtml = '<p>🔕 Has bloqueado las notificaciones. Actívalas en los ajustes del navegador para esta web.</p>';
     else if (perm === 'unsupported' || (isIOS() && !isStandalone())) notifyHtml = '';
     else notifyHtml = '<button type="button" class="btn primary" id="notify-btn">🔔 Activar notificaciones</button>';
