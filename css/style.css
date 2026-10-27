@@ -984,3 +984,7 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .trib-fine { opacity: 0; transform: scale(.8); transition: .4s; }
 .trib-fine.shown { opacity: 1; transform: none; }
 .trib-minus { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 44px; color: #ff6b6b; line-height: 1; }
+
+.notif-help { margin-top: 8px; font-size: 14px; }
+.notif-help summary { cursor: pointer; color: var(--gold); font-weight: 600; }
+.notif-help ol { margin: 8px 0 4px; padding-left: 20px; display: grid; gap: 4px; }

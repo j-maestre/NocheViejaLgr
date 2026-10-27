@@ -59,7 +59,17 @@
     const el = MN.$('#app-card'); if (!el) return;
     const perm = permission();
     let notifyHtml;
-    if (perm === 'granted') notifyHtml = `<p>🔔 <b>Notificaciones activadas.</b> Te avisaremos de retos, resultados y eventos${(window.MN_CONFIG || {}).vapidKey ? ', aunque tengas la app cerrada' : ''}.</p>`;
+    if (perm === 'granted') {
+      notifyHtml = `<p>🔔 <b>Notificaciones activadas.</b> Te avisaremos de retos, resultados y eventos${(window.MN_CONFIG || {}).vapidKey ? ', aunque tengas la app cerrada' : ''}.</p>
+        <details class="notif-help"><summary>¿Solo te salen en la barra de arriba y no como WhatsApp?</summary>
+        ${isIOS() ? `<ol><li>Abre <b>Ajustes → Notificaciones → Mercado Negro</b>.</li>
+          <li>Activa <b>Pantalla bloqueada</b>, <b>Centro de notificaciones</b> y <b>Banners</b> (mejor en estilo <b>Persistente</b>).</li></ol>`
+        : `<ol><li>Mantén pulsada una notificación de Mercado Negro y toca <b>⚙️ Ajustes</b> (o ve a <b>Ajustes → Aplicaciones → ${isStandalone() ? 'Mercado Negro' : 'Chrome'} → Notificaciones</b>).</li>
+          <li>En la categoría de esta web elige <b>Alertas</b> (no "Silencio").</li>
+          <li>Activa <b>Mostrar como ventana emergente</b> (o "Aparecer en pantalla" / "Notificación flotante"): así salen arriba como WhatsApp.</li>
+          <li>Activa <b>Pantalla de bloqueo</b> y, si tu móvil lo tiene, <b>Luz parpadeante</b>.</li></ol>`}
+        <p class="hint">Es un ajuste del móvil: ninguna web puede activarlo por ti.</p></details>`;
+    }
     else if (perm === 'denied') notifyHtml = '<p>🔕 Has bloqueado las notificaciones. Actívalas en los ajustes del navegador para esta web.</p>';
     else if (perm === 'unsupported' || (isIOS() && !isStandalone())) notifyHtml = '';
     else notifyHtml = '<button type="button" class="btn primary" id="notify-btn">🔔 Activar notificaciones</button>';

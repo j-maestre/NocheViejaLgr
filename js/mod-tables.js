@@ -52,8 +52,9 @@
     if (t.status === 'open') {
       status = `🪑 Buscando jugadores… (${t.seats.length} sentados)`;
       if (myId && !mine) {
-        const max = MN.maxBetFor(MN.balances()[myId] || 0);
-        if (t.buyIn > max) status += ` <span class="muted small">· la entrada supera tu máximo (${max})</span>`;
+        // Para sentarse basta con poder pagar la entrada
+        const bal = MN.balances()[myId] || 0;
+        if (t.buyIn > bal) status += ` <span class="muted small">· no te llega: la entrada es de ${t.buyIn} y tienes ${bal}</span>`;
         else actions += t.mode === 'teams' ? TEAMS.map((tm) => btn('join', `Sentarme en el ${tm}`, 'primary', `data-team="${tm}"`)).join('') : btn('join', '🪑 Sentarme', 'primary');
       }
       if (mine && t.createdBy !== myId) actions += btn('leave', 'Levantarme', 'ghost');
@@ -104,7 +105,7 @@
     if (gv && [...g.options].some((o) => o.value === gv)) g.value = gv;
     MN.$('#t-game-other').hidden = g.value !== '__other';
     const max = MN.maxBetFor(MN.balances()[mine.id] || 0);
-    MN.$('#t-max').innerHTML = max > 0 ? `Entrada máxima para ti: <b>${max}</b> fichas. Solo podrán sentarse quienes la puedan pagar con su límite.` : 'Estás en bancarrota: pásate por la Banca 🏦';
+    MN.$('#t-max').innerHTML = max > 0 ? `Entrada máxima para ti: <b>${max}</b> fichas (tu límite de apuesta). Podrá sentarse cualquiera que tenga fichas para pagarla.` : 'Estás en bancarrota: pásate por la Banca 🏦';
     const b = MN.$('#t-buyin');
     if (!b.value || Number(b.value) > max) b.value = Math.min(max, Number(MN.S.settings.minBet) || 1);
     b.max = Math.max(1, max);
@@ -160,7 +161,7 @@
       switch (b.dataset.tact) {
         case 'join': {
           if (!myId || seated(t, myId)) return;
-          if (t.buyIn > MN.maxBetFor(MN.balances()[myId] || 0)) return MN.toast('La entrada supera tu límite de apuesta', 'bad');
+          if (t.buyIn > (MN.balances()[myId] || 0)) return MN.toast('No tienes fichas suficientes para la entrada', 'bad');
           await MN.act(() => Store.update('tables', t.id, { seats: [...t.seats, { player: myId, team: b.dataset.team || null }] }), '🪑 Te has sentado a la mesa');
           break;
         }
