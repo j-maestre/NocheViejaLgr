@@ -426,7 +426,7 @@
     const ranked = Object.entries(v).sort((a, b) => b[1] - a[1] || MN.hash(ev.id + a[0]) - MN.hash(ev.id + b[0]));
     if (ranked.length) {
       const winner = ranked[0][0]; const bal = MN.balancesAt(end);
-      const tribute = Number(s.plebisciteTribute) || 2;
+      const tribute = Number(s.plebisciteTribute) || 5;
       const payouts = {}; let pot = 0;
       MN.S.players.filter((p) => p.id !== winner && p.createdAt <= end).forEach((p) => {
         const paid = Math.min(tribute, Math.max(0, bal[p.id] || 0));

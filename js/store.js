@@ -66,7 +66,7 @@
     stopwatchPlayMinutes: 10,
     plebisciteVoteMinutes: 10, // 🗳️ plebiscito: minutos de votación
     plebiscitePrice: 3,        // precio de cada voto extra (va a la Banca)
-    plebisciteTribute: 2,      // lo que paga cada jugador al Dictador
+    plebisciteTribute: 5,      // lo que paga cada jugador al Dictador
 
     // Extras
     bountyPerWin: 3,         // cazarrecompensas: fichas por cada victoria de la racha cortada (racha 5+)
@@ -94,6 +94,8 @@
     const out = { settings: Object.assign({}, DEFAULTS, raw.settings || {}) };
     // La censura antes del comunista pasó de 60 (o 3 en el ensayo) a 30 minutos
     if ([60, 3].includes(Number(out.settings.communistMaskMinutes))) out.settings.communistMaskMinutes = 30;
+    // El tributo al Dictador pasó de 2 a 5 fichas por cabeza
+    if (Number(out.settings.plebisciteTribute) === 2) out.settings.plebisciteTribute = 5;
     out.settings.marketPrices = Object.assign({}, DEFAULTS.marketPrices, (raw.settings || {}).marketPrices || {});
     NAMES.forEach((n) => {
       const k = COLLECTIONS[n];
