@@ -25,7 +25,7 @@
       const st = MN.playerStats(p.id);
       const fire = st.streakWin && st.streak >= 3 ? `<span class="fire lvl-${st.streak >= 7 ? 3 : st.streak >= 5 ? 2 : 1}"><span class="flame">🔥</span>${st.streak}</span>` : '';
       return `<li class="tv-row ${i === 0 ? 'first' : ''}"><span class="tv-pos">${i < 3 ? MN.MEDALS[i] : i + 1}</span>
-        <span class="tv-emoji">${esc(p.emoji)}</span><span class="tv-name">${esc(p.name)} ${fire}</span><span class="tv-chips">${bal[p.id]}</span></li>`;
+        <span class="tv-emoji">${MN.face(p)}</span><span class="tv-name">${esc(p.name)} ${fire}</span><span class="tv-chips">${bal[p.id]}</span></li>`;
     }).join('');
 
     // Evento actual o próximo
@@ -81,7 +81,7 @@
     const box = MN.$('#ceremony'); box.hidden = false; document.body.classList.add('no-scroll');
     const esc = MN.esc;
     const step = (p, place) => (p ? `<div class="podium-step place-${place}">
-        <div class="podium-player"><div class="podium-emoji">${esc(p.emoji)}</div><div class="podium-name">${esc(p.name)}</div><div class="podium-chips">${bal[p.id]} fichas</div></div>
+        <div class="podium-player"><div class="podium-emoji">${MN.face(p)}</div><div class="podium-name">${esc(p.name)}</div><div class="podium-chips">${bal[p.id]} fichas</div></div>
         <div class="podium-block">${place}</div></div>` : '<div class="podium-step"></div>');
     box.innerHTML = `<div class="cer-inner">
       <div class="cer-title">🏆 La mesa está cerrada</div>
@@ -109,7 +109,7 @@
 
     slides.push({ icon: '🎰', title: 'La partida en números', body: `<div class="wr-big">${duels.length}</div><div>duelos</div>
       <div class="wr-row"><span><b>${tables.length}</b> mesas</span><span><b>${moved}</b> fichas en juego</span><span><b>${(S.events || []).filter((e) => e.status === 'done').length}</b> eventos</span></div>` });
-    if (sorted[0]) slides.push({ icon: '👑', title: 'Campeón del Mercado Negro', body: `<div class="wr-emoji">${esc(sorted[0].emoji)}</div><div class="wr-name">${esc(sorted[0].name)}</div><div>${bal[sorted[0].id]} fichas</div>` });
+    if (sorted[0]) slides.push({ icon: '👑', title: 'Campeón del Mercado Negro', body: `<div class="wr-emoji">${MN.face(sorted[0])}</div><div class="wr-name">${esc(sorted[0].name)}</div><div>${bal[sorted[0].id]} fichas</div>` });
 
     const big = duels.reduce((m, t) => (t.amount > (m ? m.amount : 0) ? t : m), null);
     if (big) slides.push({ icon: '💥', title: 'El mayor golpe', body: `<div class="wr-name">${name(big.winner)}</div><div>le arrancó <b>${big.amount}</b> fichas a ${name(big.loser)}</div><div class="muted">${esc(big.game)}</div>${big.dedication ? `<div class="wr-quote">“${esc(big.dedication)}”</div>` : ''}` });
@@ -153,7 +153,7 @@
 
     if (sorted.length > 1) {
       const last = sorted[sorted.length - 1];
-      slides.push({ icon: '🏮', title: 'El farolillo rojo', body: `<div class="wr-emoji">${esc(last.emoji)}</div><div class="wr-name">${esc(last.name)}</div><div>${bal[last.id]} fichas. El año que viene será.</div>` });
+      slides.push({ icon: '🏮', title: 'El farolillo rojo', body: `<div class="wr-emoji">${MN.face(last)}</div><div class="wr-name">${esc(last.name)}</div><div>${bal[last.id]} fichas. El año que viene será.</div>` });
     }
     slides.push({ icon: '🥂', title: '¡Feliz año nuevo!', body: '<div>Gracias por jugar al Mercado Negro.</div><div class="muted">La Banca siempre gana.</div>' });
     return slides;

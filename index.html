@@ -240,6 +240,13 @@
           <form id="profile-form" autocomplete="off">
             <label>Nombre<input id="pf-name-input" maxlength="24"></label>
             <label>Avatar</label>
+            <label>Foto</label>
+            <div class="photo-pick">
+            <div class="photo-preview" data-photo-preview="profile" hidden></div>
+            <label class="btn ghost photo-btn">📸 Hacerme una foto<input type="file" accept="image/*" capture="user" data-photo="profile" hidden></label>
+            <button type="button" class="link" data-photo-clear="profile" hidden>Quitar foto</button>
+          </div>
+            <p class="hint">Si no tienes foto se usa el avatar:</p>
             <div id="pf-emojis" class="emoji-grid"></div>
             <button class="btn primary" type="submit">Guardar cambios</button>
           </form>
@@ -257,6 +264,7 @@
         <h2 class="section-title">📜 Tus movimientos</h2>
         <ul id="pf-history" class="feed"></ul>
 
+        <button type="button" class="btn ghost wide" data-tutorial-open>📖 Ver el tutorial</button>
         <button type="button" id="unlink-btn" class="btn ghost wide">🚪 Desvincular este dispositivo</button>
       </div>
     </section>
@@ -389,17 +397,34 @@
   <div id="welcome" class="welcome" hidden>
     <div class="welcome-box">
       <div class="welcome-logo">🎰</div>
-      <h2>Bienvenido al<br>Mercado Negro</h2>
+      <div class="welcome-kicker">Te damos la bienvenida al</div>
+      <h2>Mercado Negro</h2>
 
-      <div id="w-register">
-        <p class="hint center">Elige tu nombre de jugador. Este dispositivo quedará asociado a él.</p>
+      <div id="w-intro">
+        <p class="welcome-pitch">El casino clandestino de Nochevieja: retos, fichas, eventos y una Banca que siempre gana.</p>
+        <button type="button" class="btn primary" id="w-start">Empezar ➜</button>
+        <div class="welcome-links">
+          <button type="button" class="link" id="w-to-recover-2" onclick="document.getElementById('w-to-recover').click()">Ya tengo jugador (otro móvil, borré datos…)</button>
+          <button type="button" class="link" onclick="document.getElementById('w-spectate').click()">Solo quiero mirar 👀</button>
+          <button type="button" class="link" onclick="document.getElementById('w-rules').click()">📖 Leer las normas</button>
+        </div>
+      </div>
+
+      <div id="w-register" hidden>
+        <p class="hint center">¿Cómo te llaman en la mesa? Este móvil quedará asociado a tu jugador.</p>
         <form id="register-form" autocomplete="off">
-          <label>Tu nombre<input id="r-name" maxlength="24" placeholder="¿Cómo te llaman en la mesa?"></label>
-          <label>Tu avatar</label>
+          <label>Tu nombre<input id="r-name" maxlength="24" placeholder="Tu nombre o mote"></label>
+          <label>Tu cara</label>
+          <div class="photo-pick">
+            <div class="photo-preview" data-photo-preview="register" hidden></div>
+            <label class="btn ghost photo-btn">📸 Hacerme una foto<input type="file" accept="image/*" capture="user" data-photo="register" hidden></label>
+            <button type="button" class="link" data-photo-clear="register" hidden>Quitar foto</button>
+          </div>
+          <p class="hint">…o elige un avatar:</p>
           <div id="r-emojis" class="emoji-grid"></div>
           <button class="btn primary" type="submit">Sentarme a la mesa</button>
         </form>
-        <div class="welcome-links">
+        <div class="welcome-links hidden-links">
           <button type="button" class="link" id="w-to-recover">Ya tengo jugador (otro móvil, borré datos…)</button>
           <button type="button" class="link" id="w-spectate">Solo quiero mirar 👀</button>
           <button type="button" class="link" id="w-rules">📖 Leer las normas</button>
@@ -435,6 +460,7 @@
   <div id="ceremony" class="ceremony" hidden></div>
   <div id="wrapped" class="wrapped" hidden></div>
   <div id="show" class="show" hidden></div>
+  <div id="tutorial" class="tutorial" hidden></div>
 
   <script src="js/config.js"></script>
   <script src="js/store.js"></script>
@@ -448,6 +474,8 @@
   <script src="js/mod-fx.js"></script>
   <script src="js/mod-tv.js"></script>
   <script src="js/mod-shows.js"></script>
+  <script src="js/mod-photo.js"></script>
+  <script src="js/mod-tutorial.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

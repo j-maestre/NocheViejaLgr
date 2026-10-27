@@ -115,7 +115,10 @@
   //  LÓGICA DEL JUEGO
   // ============================================================
   const player = (id) => S.players.find((p) => p.id === id) || { name: '¿?', emoji: '❓' };
-  const who = (id) => { const p = player(id); return `<b class="who">${esc(p.emoji)} ${esc(p.name)}</b>`; };
+  // Cara del jugador: su foto si tiene, si no su emoji
+  const face = (p, cls = '') => (p && typeof p.photo === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(p.photo)
+    ? `<img class="face ${cls}" src="${p.photo}" alt="">` : esc((p && p.emoji) || '❓'));
+  const who = (id) => { const p = player(id); return `<b class="who">${face(p, 'mini')} ${esc(p.name)}</b>`; };
 
   // Tipos de movimiento que añaden los módulos: { tipo: { line(t) } }
   // `payout` es genérico: t.payouts = { jugador: +/- fichas } (repartos, eventos…)
@@ -444,7 +447,7 @@
       return `
         <li class="rank-row pos-${pos + 1} ${bal[p.id] <= 0 ? 'broke' : ''} ${mine && mine.id === p.id ? 'is-me' : ''} ${onFire && !mask ? 'on-fire' : ''} ${mask ? 'masked' : ''}">
           <div class="pos">${pos < 3 ? MEDALS[pos] : '#' + (pos + 1)}</div>
-          <div class="avatar">${mask ? mask.icon : esc(p.emoji)}</div>
+          <div class="avatar">${mask ? mask.icon : face(p)}</div>
           ${mask ? `<div class="info"><div class="name">${mask.name} ${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}</div><div class="sub">Identidad protegida por el Partido</div></div>` : `
           <div class="info">
             <div class="name">${esc(p.name)} ${fireHtml(st)}${p.id === bankId() ? '<span class="tag bank-tag">🎩 BANCA</span>' : ''}${mine && mine.id === p.id ? '<span class="tag me-tag">TÚ</span>' : ''}${morosos.has(p.id) ? '<span class="tag moroso">MOROSO</span>' : ''}${bal[p.id] <= 0 ? '<span class="tag broke-tag">EN BANCARROTA</span>' : ''}</div>
@@ -589,7 +592,7 @@
       pick.innerHTML = [a, b].map((id) => {
         const p = player(id);
         return `<button type="button" data-win="${esc(id)}" class="${winner === id ? 'selected' : ''}">
-          <span class="crown">👑</span><span class="emoji">${esc(p.emoji)}</span>${esc(p.name)}</button>`;
+          <span class="crown">👑</span><span class="emoji">${face(p)}</span>${esc(p.name)}</button>`;
       }).join('');
     } else {
       pick.innerHTML = '<p class="hint">Primero elige a los jugadores.</p>';
@@ -887,7 +890,7 @@
     const mine = me();
     $('#profile-none').hidden = !!mine;
     $('#profile').hidden = !mine;
-    $('#tab-me').textContent = mine ? mine.emoji : '👤';
+    $('#tab-me').innerHTML = mine ? face(mine, 'tab') : '👤';
     if (!mine) return;
 
     const bal = balances();
@@ -895,7 +898,7 @@
     const pos = sorted.findIndex((p) => bal[p.id] === bal[mine.id]) + 1;
     const moroso = pendingPunishments().some((t) => t.player === mine.id);
 
-    $('#pf-avatar').textContent = mine.emoji;
+    $('#pf-avatar').innerHTML = face(mine);
     $('#pf-name').innerHTML = esc(mine.name) + (moroso ? ' <span class="tag moroso">MOROSO</span>' : '');
     $('#pf-pos').textContent = `${pos <= 3 ? MEDALS[pos - 1] + ' ' : ''}Puesto ${pos} de ${sorted.length} · Apuesta máx.: ${maxBetFor(bal[mine.id])}`;
     $('#pf-chips').textContent = bal[mine.id];
@@ -1026,7 +1029,7 @@
     const w = $('#welcome');
     if (show && w.hidden) {
       // Se abre: estado inicial limpio
-      $('#w-register').hidden = false; $('#w-recover').hidden = true;
+      $('#w-intro').hidden = false; $('#w-register').hidden = true; $('#w-recover').hidden = true;
       regEmoji = regEmoji || randomEmoji();
       renderEmojiGrid($('#r-emojis'), regEmoji);
     }
@@ -1084,7 +1087,7 @@
 
     $('#admin-players').innerHTML = S.players.map((p) => `
       <li>
-        <span>${esc(p.emoji)} ${esc(p.name)} ${p.demo ? '<span class="tag">PRUEBA</span>' : ''}</span>
+        <span>${face(p, 'mini')} ${esc(p.name)} ${p.demo ? '<span class="tag">PRUEBA</span>' : ''}</span>
         <span class="row">
           <code title="Código de recuperación">${esc(p.code || '—')}</code>
           <span class="muted small">📱 ${(p.deviceIds || []).length}</span>
@@ -1298,7 +1301,7 @@
       if (bankId()) return toast('Ya hay Banca: el PIN ya no sirve', 'bad');
       if ($('#pin').value === String(S.settings.adminPin)) {
         setAdmin(true); $('#pin').value = '';
-        fillSettingsForm(); renderAll(); toast('🏦 Bienvenido, señor Banquero', 'ok');
+        fillSettingsForm(); renderAll(); toast('🏦 La Banca abre sus puertas', 'ok');
       } else {
         toast('🚫 PIN incorrecto', 'bad');
       }
@@ -1436,7 +1439,7 @@
       if (!name) return toast('Ponte un nombre', 'bad');
       if (nameTaken(name)) return toast('Ese nombre ya está pillado. Si eres tú, usa "Ya tengo jugador".', 'bad');
       const { p, init } = newPlayerRecords(name, regEmoji || randomEmoji(), { deviceIds: [deviceId()] });
-      const done = await act(() => Store.addMany({ players: [p], txs: [init] }), `🪑 Bienvenido a la mesa, ${esc(name)}. Tienes ${init.amount} fichas.`);
+      const done = await act(() => Store.addMany({ players: [p], txs: [init] }), `🪑 ${esc(name)} se sienta a la mesa con ${init.amount} fichas`);
       if (done) { $('#r-name').value = ''; regEmoji = null; go('perfil'); }
     });
 
@@ -1600,7 +1603,7 @@
     get S() { return S; }, get view() { return view; },
     $, $$, esc, pad, hash, shuffle, lines, HOUR, MEDALS,
     toast, modal, act, notify, go, renderAll, sweepAll,
-    me, player, who, deviceId, isAdmin, bankId, isSpectator, setSpectator,
+    me, player, who, face, deviceId, isAdmin, bankId, isSpectator, setSpectator,
     balances, balancesAt, effects, sortedPlayers, playerStats, achievements, txItem, txLine,
     maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago,
     activeChallenges, challengeBlock, fillPlayerSelect, rankMask,

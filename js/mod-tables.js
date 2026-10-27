@@ -35,7 +35,7 @@
   }
 
   function seatsHtml(t) {
-    const p = (id) => `<span class="seat">${MN.esc(MN.player(id).emoji)} ${MN.esc(MN.player(id).name)}</span>`;
+    const p = (id) => `<span class="seat">${MN.face(MN.player(id), 'mini')} ${MN.esc(MN.player(id).name)}</span>`;
     if (t.mode === 'teams') {
       return TEAMS.map((tm) => `<div class="team-row"><b class="team-tag team-${tm}">Equipo ${tm}</b> ${teamPlayers(t, tm).map(p).join('') || '<span class="muted small">vacío</span>'}</div>`).join('');
     }

@@ -6,13 +6,13 @@
 //  - Muestra notificaciones: las que pide la propia web y, cuando
 //    se configure Firebase, las push que lleguen con el móvil bloqueado.
 // ============================================================
-const CACHE = 'mn-v4';
+const CACHE = 'mn-v5';
 const SHELL = [
   './', 'index.html', 'manifest.json',
   'css/style.css',
   'js/config.js', 'js/store.js', 'js/chart.js', 'js/app.js',
   'js/mod-app.js', 'js/mod-tables.js', 'js/mod-events.js', 'js/mod-extras.js',
-  'js/mod-bets.js', 'js/mod-market.js', 'js/mod-fx.js', 'js/mod-tv.js', 'js/mod-shows.js',
+  'js/mod-bets.js', 'js/mod-market.js', 'js/mod-fx.js', 'js/mod-tv.js', 'js/mod-shows.js', 'js/mod-photo.js', 'js/mod-tutorial.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 
