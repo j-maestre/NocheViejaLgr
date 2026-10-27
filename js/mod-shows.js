@@ -198,29 +198,128 @@
     boom({ count: 220 });
   }
 
+  // ---------------------------------------------------------- 🎰 resultado de mi apuesta
+  async function betShow(box, pay, bet) {
+    const c = MN.S.challenges.find((x) => x.id === pay.challengeId);
+    const got = (pay.payouts || {})[bet.player] || 0;
+    box.innerHTML = `<div class="show-inner bet-show">
+      <div class="show-title">🎰 TU APUESTA</div>
+      <div class="show-kicker">${c ? `${MN.esc(name(c.from))} vs ${MN.esc(name(c.to))} · ${MN.esc(c.game)}` : ''}</div>
+      <div class="bet-ticket">Apostaste <b>${bet.amount}</b> fichas por<div class="bet-pick">${MN.esc(name(bet.on))}</div></div>
+      <div class="com-spot" id="bet-spot">¿Quién ganó?</div>
+      <div class="show-result" id="bet-result"></div>${closeBtn}</div>`;
+    sfx('drum'); await sleep(1300);
+    if (pay.refund) {
+      MN.$('#bet-spot').textContent = 'Duelo anulado';
+      MN.$('#bet-result').innerHTML = `<div class="show-big">↩️ Te devolvemos tus ${bet.amount} fichas</div>`;
+      MN.$('#bet-result').classList.add('shown'); sfx('event'); return;
+    }
+    const winner = c && c.winner;
+    for (let k = 0; k < 7 && c; k++) { MN.$('#bet-spot').textContent = name(k % 2 ? c.from : c.to); sfx('tick'); await sleep(150 + k * 45); }
+    MN.$('#bet-spot').textContent = winner ? `🏆 ${name(winner)}` : '¿?';
+    MN.$('#bet-spot').classList.add('hit'); sfx('stop');
+    await sleep(600);
+    const res = MN.$('#bet-result');
+    if (got > bet.amount) {
+      res.innerHTML = `<div class="show-big win">¡ACERTASTE! +${got - bet.amount} fichas</div><div class="muted">Cobras ${got} (tu apuesta + tu parte del bote)</div>`;
+      boom({ count: 200 }); sfx('win');
+    } else if (got > 0) {
+      res.innerHTML = `<div class="show-big win">¡Acertaste!</div><div class="muted">Pero nadie apostó en contra: recuperas tus ${got} fichas</div>`;
+      sfx('event');
+    } else {
+      res.innerHTML = `<div class="show-big lose">Fallaste… −${bet.amount} fichas</div><div class="muted">Otra vez será</div>`;
+      sfx('lose');
+    }
+    res.classList.add('shown');
+  }
+
   const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow };
 
   // ---------------------------------------------------------- qué enseñar a quién
+  // "Ya visto" se guarda por jugador (no por móvil): si en un mismo móvil se
+  // juega con varios jugadores, cada uno tiene sus propias animaciones pendientes
   const seenKey = 'mn_shows_seen';
-  function seen(k) {
-    try { const s = JSON.parse(localStorage.getItem(seenKey) || '{}'); if (s[k]) return true; s[k] = 1; localStorage.setItem(seenKey, JSON.stringify(s)); } catch (e) { /* nada */ }
-    return false;
-  }
+  const seenMap = () => { try { return JSON.parse(localStorage.getItem(seenKey) || '{}'); } catch (e) { return {}; } };
+  const hasSeen = (k) => !!seenMap()[k];
+  function markSeen(k) { try { const s = seenMap(); s[k] = 1; localStorage.setItem(seenKey, JSON.stringify(s)); } catch (e) { /* nada */ } }
+  function seen(k) { if (hasSeen(k)) return true; markSeen(k); return false; }
   const isTV = () => location.hash === '#tv';
+  const slotKey = (d, pid) => `slot:${d.id}:${pid}`;
+  const slotSeen = (d, pid) => hasSeen(slotKey(d, pid)) || hasSeen('slot:' + d.id); // la clave antigua era por móvil
+
+  // Duelos míos cuya tragaperras aún no he visto: quedan pendientes hasta que toque "Girar"
+  function pendingSlots() {
+    const mine = MN.me(); if (!mine || isTV()) return [];
+    return MN.S.txs.filter((t) => eligible(t) && !t.voided && (t.winner === mine.id || t.loser === mine.id) && !slotSeen(t, mine.id)).reverse();
+  }
+
+  function pendingBets() {
+    const mine = MN.me(); if (!mine || isTV()) return [];
+    return MN.S.txs.filter((t) => t.kind === 'bets' && !t.voided).map((t) => {
+      const bet = (MN.S.bets || []).find((b) => b.challengeId === t.challengeId && b.player === mine.id && !b.cancelled);
+      return bet && !hasSeen(`bet:${t.id}:${mine.id}`) ? { pay: t, bet } : null;
+    }).filter(Boolean).reverse();
+  }
+  function playBet(x) {
+    const mine = MN.me();
+    if (mine) markSeen(`bet:${x.pay.id}:${mine.id}`);
+    enqueue((box) => betShow(box, x.pay, x.bet));
+    MN.renderAll();
+  }
+
+  function playSlot(d) {
+    const mine = MN.me();
+    if (mine) markSeen(slotKey(d, mine.id));
+    enqueue((box) => slotShow(box, d));
+    MN.renderAll();
+  }
+
+  function renderPending() {
+    const list = pendingSlots(); const betsList = pendingBets();
+    const total = list.length + betsList.length;
+    const wrap = MN.$('#slot-pending-wrap'); const el = MN.$('#slot-pending');
+    if (wrap) {
+      wrap.hidden = !total;
+      const MAXV = 5; let shown = 0;
+      el.innerHTML = betsList.filter(() => shown++ < MAXV).map((x) => {
+        const c = MN.S.challenges.find((y) => y.id === x.pay.challengeId);
+        return `<li class="challenge status-reported needs-me slot-pending">
+          <div class="ch-head">🎰 Tu apuesta<span class="ch-amount">${x.bet.amount}</span></div>
+          <div class="ch-sub">${c ? `${MN.esc(name(c.from))} vs ${MN.esc(name(c.to))} · ${MN.esc(c.game)}` : ''}</div>
+          <div class="ch-status">Apostaste por ${MN.who(x.bet.on)}. ¿Acertaste?</div>
+          <div class="ch-actions"><button type="button" class="btn primary" data-bet-play="${MN.esc(x.pay.id)}">🎰 Ver resultado</button></div></li>`;
+      }).join('') + list.filter(() => shown++ < MAXV).map((d) => {
+        const mine = MN.me(); const won = d.winner === mine.id;
+        return `<li class="challenge status-reported needs-me slot-pending">
+          <div class="ch-head">${MN.who(d.winner)}<span class="ch-vs">VS</span>${MN.who(d.loser)}<span class="ch-amount">${d.amount}</span></div>
+          <div class="ch-sub">${MN.esc(d.game)} · ${MN.ago(d.ts)}</div>
+          <div class="ch-status">${won ? '🏆 ¡Ganaste!' : '😵 Perdiste…'} Falta ver qué dice la tragaperras.</div>
+          <div class="ch-actions"><button type="button" class="btn primary" data-slot-play="${MN.esc(d.id)}">🎰 Girar</button></div></li>`;
+      }).join('') + (total > 3 ? `<li class="pending-more">${total > MAXV ? `…y ${total - MAXV} más · ` : ''}<button type="button" class="link" data-seen-all>Marcar todas como vistas</button></li>` : '');
+    }
+    const banner = MN.$('#slot-pending-banner');
+    if (banner) {
+      banner.hidden = !total;
+      const first = betsList[0] ? `data-bet-play="${MN.esc(betsList[0].pay.id)}"` : list[0] ? `data-slot-play="${MN.esc(list[0].id)}"` : '';
+      banner.innerHTML = total ? `<button type="button" class="slot-banner" ${first}>🎰 Tienes ${total === 1 ? 'un resultado' : total + ' resultados'} por revelar · <b>Ver</b></button>` : '';
+    }
+  }
 
   let known = null;
   function onState() {
     const mine = MN.me(); const now = Date.now();
     const ids = new Set(MN.S.txs.map((t) => t.id));
     if (known) {
-      // Tragaperras: duelos nuevos en los que juego o he apostado (o en la TV, todos)
+      // En directo: si estoy conectado cuando se resuelve mi duelo (o he apostado, o es la TV), sale sola
       MN.S.txs.filter((t) => eligible(t) && !t.voided && !known.has(t.id) && now - t.ts < 5 * 60000).forEach((d) => {
         const bet = mine && (MN.S.bets || []).some((b) => b.challengeId === d.challengeId && b.player === mine.id);
-        if (isTV() || (mine && (d.winner === mine.id || d.loser === mine.id)) || bet) {
-          if (!seen('slot:' + d.id)) enqueue((box) => slotShow(box, d));
-        }
+        const mineDuel = mine && (d.winner === mine.id || d.loser === mine.id);
+        if (isTV()) { if (!seen('slot:' + d.id + ':tv')) enqueue((box) => slotShow(box, d)); }
+        else if (mineDuel) { if (!slotSeen(d, mine.id)) playSlot(d); }
+        else if (bet && !seen(slotKey(d, mine.id))) enqueue((box) => slotShow(box, d));
       });
     }
+    if (known) pendingBets().filter((x) => !known.has(x.pay.id)).forEach(playBet);
     known = ids;
     // Eventos recién resueltos (todos los ven, una vez por móvil)
     (MN.S.events || []).filter((e) => e.status === 'done' && EVENT_SHOWS[e.type] && e.result && now - (e.result.at || e.at) < 10 * 60000).forEach((e) => {
@@ -240,12 +339,24 @@
         },
       });
       document.addEventListener('click', (e) => {
+        const sp = e.target.closest('[data-slot-play]');
+        if (sp) { const d = MN.S.txs.find((t) => t.id === sp.dataset.slotPlay); if (d) playSlot(d); return; }
+        if (e.target.closest('[data-seen-all]')) {
+          const mine = MN.me(); if (!mine) return;
+          pendingSlots().forEach((d) => markSeen(slotKey(d, mine.id)));
+          pendingBets().forEach((x) => markSeen(`bet:${x.pay.id}:${mine.id}`));
+          MN.renderAll(); return;
+        }
+        const bp = e.target.closest('[data-bet-play]');
+        if (bp) { const x = pendingBets().find((y) => y.pay.id === bp.dataset.betPlay); if (x) playBet(x); return; }
         const b = e.target.closest('[data-replay]'); if (!b) return;
         const ev = (MN.S.events || []).find((x) => x.id === b.dataset.replay); if (ev) MN.shows.replay(ev);
       });
     },
     onState,
     sweep,
+    render: renderPending,
+    duelBadge: () => pendingSlots().length + pendingBets().length,
     rules(section) {
       return section('🎰', 'Tragaperras', `
         <p>Al terminar cada duelo gira una tragaperras con un modificador aleatorio:</p>

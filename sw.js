@@ -6,7 +6,7 @@
 //  - Muestra notificaciones: las que pide la propia web y, cuando
 //    se configure Firebase, las push que lleguen con el móvil bloqueado.
 // ============================================================
-const CACHE = 'mn-v5';
+const CACHE = 'mn-v8';
 const SHELL = [
   './', 'index.html', 'manifest.json',
   'css/style.css',

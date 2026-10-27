@@ -39,6 +39,7 @@
 
     <!-- ============ RANKING ============ -->
     <section id="view-ranking" class="view" hidden>
+      <div id="slot-pending-banner" hidden></div>
       <div id="next-event"></div>
       <div id="limit-info" class="limit-info"></div>
       <div id="final-banner"></div>
@@ -60,6 +61,11 @@
 
     <!-- ============ DUELO ============ -->
     <section id="view-duelo" class="view" hidden>
+      <div id="slot-pending-wrap" hidden>
+        <h2 class="section-title">🎰 Resultados por revelar</h2>
+        <ul id="slot-pending" class="challenges"></ul>
+      </div>
+
       <div id="my-challenges-wrap">
         <h2 class="section-title">🎯 Tus retos</h2>
         <ul id="my-challenges" class="challenges"></ul>
@@ -163,10 +169,8 @@
       <div id="cal-admin" class="card bank-card" hidden>
         <h3>🏦 Gestionar eventos</h3>
         <form id="ev-form" autocomplete="off">
-          <div class="grid-2">
-            <label>Evento<select id="ev-type"></select></label>
-            <label>Fecha y hora<input type="datetime-local" id="ev-at"></label>
-          </div>
+          <label>Evento<select id="ev-type"></select></label>
+          <label>Fecha y hora<input type="datetime-local" id="ev-at"></label>
           <div class="row wrap">
             <button class="btn primary" type="submit">📅 Programar</button>
             <button type="button" class="btn ghost" id="ev-surprise">⚡ Lanzar por sorpresa ahora</button>
@@ -239,7 +243,6 @@
           <h3>✏️ Editar perfil</h3>
           <form id="profile-form" autocomplete="off">
             <label>Nombre<input id="pf-name-input" maxlength="24"></label>
-            <label>Avatar</label>
             <label>Foto</label>
             <div class="photo-pick">
             <div class="photo-preview" data-photo-preview="profile" hidden></div>
@@ -344,12 +347,10 @@
               <label>Retos pendientes máx.<input type="number" id="s-maxpend" min="1"></label>
               <label>Caducidad de retos (h)<input type="number" id="s-expiry" min="1" step="0.5"></label>
             </div>
-            <div class="grid-2">
-              <label>Inicio de la partida<input type="datetime-local" id="s-startdate"></label>
-              <label>Cierre de la partida<input type="datetime-local" id="s-end"></label>
-            </div>
+            <label>Inicio de la partida<input type="datetime-local" id="s-startdate"></label>
+            <label>Cierre de la partida<input type="datetime-local" id="s-end"></label>
             <label>Límite de apuesta (% del capital) por fecha
-              <textarea id="s-schedule" rows="3" placeholder="2026-12-01 = 20"></textarea>
+              <textarea id="s-schedule" rows="5" placeholder="2026-12-01 = 20"></textarea>
             </label>
             <p class="hint">Una línea por cambio: <code>AAAA-MM-DD = 20</code> (desde las 00:00) o con hora: <code>AAAA-MM-DD HH:MM = 50</code>.</p>
             <label>Minijuegos (uno por línea)<textarea id="s-games" rows="5"></textarea></label>
@@ -454,7 +455,7 @@
       </div>
     </form>
   </div>
-  <div id="toast" class="toast"></div>
+  <div id="toaster" class="toaster" aria-live="polite"></div>
   <div id="sw-game" class="sw-game" hidden></div>
   <div id="tv" class="tv" hidden></div>
   <div id="ceremony" class="ceremony" hidden></div>

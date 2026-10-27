@@ -362,12 +362,21 @@
     });
   }
 
-  let toastTimer;
+  // Toaster: avisos apilados arriba; se cierran solos o al tocarlos
+  const TOAST_MAX = 4;
   function toast(msg, kind = '') {
-    const t = $('#toast');
-    t.innerHTML = msg; t.className = 'toast show ' + kind;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.className = 'toast'; }, 3200);
+    const box = $('#toaster');
+    const el = document.createElement('div');
+    el.className = 'toast-item ' + (kind || 'info');
+    el.setAttribute('role', kind === 'bad' ? 'alert' : 'status');
+    el.innerHTML = `<div class="toast-msg">${msg}</div>`;
+    box.appendChild(el);
+    while (box.children.length > TOAST_MAX) box.firstElementChild.remove();
+    requestAnimationFrame(() => el.classList.add('in'));
+    const text = el.textContent || '';
+    const close = () => { if (el.classList.contains('out')) return; el.classList.add('out'); setTimeout(() => el.remove(), 300); };
+    el.addEventListener('click', close);
+    setTimeout(close, Math.min(8000, 3200 + text.length * 35));
   }
 
   // Aviso al jugador: mensaje emergente + vibración, y notificación del sistema
@@ -375,7 +384,7 @@
   function notify(msgs) {
     const list = [].concat(msgs);
     if (!list.length) return;
-    toast(list.join('<br>'), 'ok');
+    list.forEach((m) => toast(m, 'ok'));
     try {
       const touched = !navigator.userActivation || navigator.userActivation.hasBeenActive;
       if (navigator.vibrate && touched) navigator.vibrate([120, 60, 120]);

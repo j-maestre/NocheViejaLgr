@@ -89,7 +89,7 @@
         const got = t.payouts[mine.id] || 0;
         msgs.push(t.refund ? `🎰 Te devolvemos tu apuesta de ${myBet.amount} fichas` : got ? `🎰 ¡Acertaste! Cobras ${got} fichas de tu apuesta` : `🎰 Fallaste la apuesta: pierdes ${myBet.amount} fichas`);
       });
-      if (msgs.length) MN.notify(msgs);
+      if (msgs.length && !(MN.shows && document.visibilityState === 'visible')) MN.notify(msgs);
     }
     prev = now;
   }
