@@ -140,25 +140,44 @@ const EVENTS = {
   stopwatch: ['⏱️', 'Cronómetro global', '⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya'],
 };
 
-// Cada minuto: avisos de 15 minutos antes y de inicio (una sola vez cada uno)
+// Cada minuto: avisos de 15 minutos antes, de inicio y de final (una sola vez cada uno).
+// El final se avisa por la hora, aunque nadie tenga la web abierta para resolver el evento:
+// al entrar, el móvil lo resuelve y enseña la animación.
 exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Madrid' }, async () => {
   const now = Date.now();
   const games = await db.collection('games').listDocuments();
   for (const g of games) {
-    const [evs, set] = await Promise.all([g.collection('events').where('status', '==', 'scheduled').get(), g.collection('meta').doc('settings').get()]);
+    const [evs, set] = await Promise.all([g.collection('events').get(), g.collection('meta').doc('settings').get()]);
     if (evs.empty) continue;
     const s = set.exists ? set.data() : {};
-    if (s.endDate && now >= new Date(s.endDate).getTime()) continue;
+    if (s.endDate && now >= new Date(s.endDate).getTime() + 30 * MIN) continue;
     for (const d of evs.docs) {
-      const ev = d.data(); const T = EVENTS[ev.type]; if (!T) continue;
+      const ev = d.data(); const T = EVENTS[ev.type]; if (!T || ev.status === 'cancelled') continue;
       const start = ev.type === 'stopwatch' ? ev.at - (Number(s.stopwatchSignupMinutes) || 15) * MIN : ev.at;
-      const fire = async (key, msg) => {
+      const fire = async (key, msg, pids = null) => {
         try { await g.collection('pushlog').doc(`${d.id}_${key}_${ev.at}`).create({ at: now }); } catch (err) { return; } // ya enviado
-        await send(g.id, null, msg);
+        await send(g.id, pids, msg);
       };
-      if (start - now <= 15 * MIN && start - now > 2 * MIN) await fire('15', `⏰ En 15 minutos: ${T[0]} ${T[1]}`);
-      const msg = ev.type === 'plebiscite' ? `🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
-      if (now >= start && now - start < 5 * MIN) await fire('start', msg);
+      if (ev.status === 'scheduled') {
+        if (start - now <= 15 * MIN && start - now > 2 * MIN) await fire('15', `⏰ En 15 minutos: ${T[0]} ${T[1]}`);
+        const msg = ev.type === 'plebiscite' ? `🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${s.plebisciteVoteMinutes || 10} min. Los votos extra se compran 😏` : ev.type === 'happyhour' ? `🍻 ¡Empieza la happy hour! Los duelos pagan x${s.happyMultiplier || 2} durante ${s.happyMinutes || 60} min` : T[2];
+        if (now >= start && now - start < 5 * MIN) await fire('start', msg);
+        // Cronómetro: a los apuntados, cuando les toca jugar
+        if (ev.type === 'stopwatch' && now >= ev.at && now - ev.at < 5 * MIN) {
+          const ents = await g.collection('entries').where('eventId', '==', d.id).get();
+          const pids = ents.docs.map((x) => x.data()).filter((x) => x.kind === 'signup' && !x.withdrawn).map((x) => x.player);
+          if (pids.length) await fire('play', '⏱️ ¡Te toca! Juega al cronómetro global antes de que cierre', pids);
+        }
+      }
+      // Final (la lotería y el comunista se resuelven al empezar: ya avisa el de inicio)
+      let end = null;
+      if (ev.type === 'plebiscite') end = ev.at + (Number(s.plebisciteVoteMinutes) || 10) * MIN;
+      if (ev.type === 'stopwatch') end = ev.at + (Number(s.stopwatchPlayMinutes) || 10) * MIN;
+      if (ev.type === 'happyhour') end = ev.at + (Number(s.happyMinutes) || 60) * MIN;
+      if (ev.status === 'done' && ev.result && ev.result.at && end) end = Math.min(end, ev.result.at);
+      if (end && now >= end && now - end < 10 * MIN) {
+        await fire('end', ev.type === 'happyhour' ? '🍻 Se acabó la happy hour. Los duelos vuelven a pagar lo normal' : `${T[0]} ${T[1]}: ¡ya ha terminado! Entra para ver qué ha pasado 👀`);
+      }
     }
   }
 });
