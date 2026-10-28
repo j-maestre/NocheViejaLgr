@@ -186,6 +186,7 @@ const EVENTS = {
   lottery: ['🎟️', 'Lotería', '🎟️ ¡Se sortea la lotería! Entra a ver quién se lleva el bote 👀'],
   plebiscite: ['🦅', 'Evento fascista', '🦅 ¡Evento fascista! Vota en secreto a tu Dictador. Los votos extra se compran 😏'],
   king: ['👑', 'Rey de la colina', '👑 ¡Rey de la colina! El primero del ranking cobra a todos cada pocos minutos. ¡A por él!'],
+  bingo: ['🎱', 'Bingo', '🎱 ¡Empieza el bingo! Entra a ver si cantas línea'],
   dilemma: ['🤝', 'Dilema del prisionero', '🤝 ¡Dilema del prisionero! Elige en secreto: cooperar o traicionar'],
   stopwatch: ['⏱️', 'Cronómetro global', '⏱️ ¡Inscripción abierta para el cronómetro global! Apúntate ya'],
 };

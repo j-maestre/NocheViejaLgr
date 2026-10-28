@@ -436,6 +436,95 @@
     return { score: me.score * 100000 + step, label: `${me.score} ${me.score === 1 ? 'tubo' : 'tubos'}${vs}`, data: { f: flaps } };
   }
 
+  // ---------------------------------------------------------- 🔍 ¿Qué es esto? (objeto muy ampliado)
+  const OBJECTS = { '🍌': 'Plátano', '🔑': 'Llave', '✂️': 'Tijeras', '📎': 'Clip', '🍫': 'Chocolate', '🎸': 'Guitarra', '🧲': 'Imán', '💡': 'Bombilla', '🧽': 'Esponja',
+    '🍍': 'Piña', '🍓': 'Fresa', '🍋': 'Limón', '🥝': 'Kiwi', '🥑': 'Aguacate', '🥦': 'Brócoli', '🧄': 'Ajo', '🍄': 'Seta', '🥚': 'Huevo', '🥐': 'Cruasán',
+    '🌽': 'Mazorca', '🥕': 'Zanahoria', '🍅': 'Tomate', '🍇': 'Uvas', '🍒': 'Cerezas', '🍉': 'Sandía', '🍕': 'Pizza', '🍔': 'Hamburguesa', '🍣': 'Sushi',
+    '🍩': 'Dónut', '🧀': 'Queso', '🥨': 'Pretzel', '⚽': 'Balón de fútbol', '🏀': 'Balón de baloncesto', '🎲': 'Dado', '🧩': 'Pieza de puzle', '🎮': 'Mando',
+    '🖱️': 'Ratón', '⌨️': 'Teclado', '🎧': 'Auriculares', '📷': 'Cámara', '⏰': 'Despertador', '⌚': 'Reloj', '👓': 'Gafas', '☂️': 'Paraguas', '🔨': 'Martillo',
+    '🪛': 'Destornillador', '🔩': 'Tornillo', '⚓': 'Ancla', '🧭': 'Brújula', '🔭': 'Telescopio', '🔬': 'Microscopio', '🚲': 'Bicicleta', '🎈': 'Globo',
+    '🕯️': 'Vela', '🪑': 'Silla', '🚽': 'Váter', '🛁': 'Bañera', '🧸': 'Osito de peluche', '🎁': 'Regalo', '🎄': 'Árbol de Navidad', '🍾': 'Botella de cava',
+    '🍷': 'Copa de vino', '🍺': 'Jarra de cerveza', '🪩': 'Bola de discoteca', '🌵': 'Cactus', '🌻': 'Girasol', '🐌': 'Caracol', '🦔': 'Erizo', '🐙': 'Pulpo',
+    '🦀': 'Cangrejo', '🧦': 'Calcetines', '👟': 'Zapatilla', '🎩': 'Chistera', '💍': 'Anillo', '🔔': 'Campana', '📱': 'Móvil', '💾': 'Disquete', '📼': 'Cinta de vídeo' };
+  const emojiUrl = (e) => `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${[...e].map((c) => c.codePointAt(0).toString(16)).filter((x) => x !== 'fe0f').join('-')}.svg`;
+  async function playObject(G, seed) {
+    if (!await intro(G, 'Sale un trocito <b>muy ampliado</b> de un objeto, que se va alejando poco a poco. ¿Qué es? <b>5 rondas</b>, 12 segundos cada una.')) return null;
+    frame(`${G.icon} ${G.name}`, '<p class="center">Cargando objetos…</p>');
+    const r = rng(seed + 'obj'); const picks = pickN(Object.keys(OBJECTS), 5, r);
+    await Promise.all(picks.map((e) => preload(emojiUrl(e))));
+    const rounds = picks.map((e) => {
+      const name = OBJECTS[e]; const options = shuffle([name, ...pickN(Object.values(OBJECTS), 3, r, [name])], r);
+      const ox = 25 + r() * 50; const oy = 25 + r() * 50; let el = null;
+      return {
+        options: options.map(MN.esc), ok: options.indexOf(name),
+        show: (st) => { st.innerHTML = `<div class="logo-win obj-win"><img class="logo-zoom" src="${emojiUrl(e)}" alt="" style="transform-origin:${ox}% ${oy}%;transform:scale(9)"></div>`; el = st.querySelector('img'); },
+        onTick: (k) => { if (el) el.style.transform = `scale(${9 - k * 7.5})`; },
+        reveal: () => { if (el) { el.style.transition = 'transform .4s'; el.style.transform = 'scale(1)'; } },
+      };
+    });
+    return quizRun(G, rounds, 12000);
+  }
+
+  // ---------------------------------------------------------- 🌍 GeoGuessr (vista de satélite)
+  const PLACES = [
+    ['Sagrada Familia (Barcelona)', 41.40363, 2.17436, 17], ['Camp Nou (Barcelona)', 41.38087, 2.12282, 16], ['Santiago Bernabéu (Madrid)', 40.45306, -3.68835, 17],
+    ['Puerta del Sol (Madrid)', 40.41692, -3.70348, 18], ['Alhambra (Granada)', 37.17605, -3.58808, 16], ['Ciudad de las Artes (Valencia)', 39.45488, -0.35018, 16],
+    ['Guggenheim (Bilbao)', 43.26869, -2.93403, 17], ['Mezquita de Córdoba', 37.87897, -4.77937, 17], ['Plaza de España (Sevilla)', 37.37720, -5.98689, 17],
+    ['Peñón de Gibraltar', 36.13552, -5.34504, 13], ['Teide (Tenerife)', 28.27235, -16.64253, 13], ['Concha de San Sebastián', 43.31758, -1.98617, 15],
+    ['Torre Eiffel (París)', 48.85837, 2.29448, 17], ['Coliseo (Roma)', 41.89021, 12.49223, 17], ['Vaticano', 41.90224, 12.45330, 16], ['Torre de Pisa', 43.72297, 10.39659, 17],
+    ['Venecia', 45.43408, 12.33895, 15], ['Big Ben (Londres)', 51.50073, -0.12463, 17], ['Stonehenge', 51.17887, -1.82618, 17], ['Mont Saint-Michel', 48.63605, -1.51146, 16],
+    ['Acrópolis (Atenas)', 37.97153, 23.72575, 17], ['Kremlin (Moscú)', 55.75204, 37.61748, 16], ['Ámsterdam (canales)', 52.37218, 4.88328, 16],
+    ['Pirámides de Guiza', 29.97923, 31.13420, 16], ['Estatua de la Libertad', 40.68925, -74.04450, 17], ['Central Park (Nueva York)', 40.78253, -73.96557, 14],
+    ['Golden Gate (San Francisco)', 37.81993, -122.47826, 15], ['Las Vegas Strip', 36.11469, -115.17284, 15], ['Gran Cañón', 36.10697, -112.11299, 13],
+    ['Cataratas del Niágara', 43.07700, -79.07454, 16], ['Cristo Redentor (Río)', -22.95192, -43.21049, 17], ['Machu Picchu', -13.16314, -72.54496, 16],
+    ['Ópera de Sídney', -33.85678, 151.21530, 17], ['Uluru', -25.34443, 131.03688, 13], ['Palm Jumeirah (Dubái)', 25.11234, 55.13896, 13],
+    ['Taj Mahal', 27.17501, 78.04215, 17], ['Gran Muralla (Badaling)', 40.35982, 116.01953, 16], ['Monte Fuji', 35.36063, 138.72736, 12],
+    ['Ciudad Prohibida (Pekín)', 39.91629, 116.39715, 15], ['Santorini (Oia)', 36.46186, 25.37557, 16],
+  ];
+  let leafletP = null;
+  function leaflet() {
+    if (!leafletP) leafletP = new Promise((res, rej) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css'; document.head.appendChild(css);
+      const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'; sc.onload = () => res(window.L); sc.onerror = rej; document.head.appendChild(sc);
+    });
+    return leafletP;
+  }
+  const km = (a, b) => { const R = 6371; const r = (d) => d * Math.PI / 180; const dl = r(b[0] - a[0]); const dg = r(b[1] - a[1]); const x = Math.sin(dl / 2) ** 2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(dg / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+  async function playGeo(G, seed) {
+    if (!await intro(G, 'Verás un sitio famoso <b>desde el satélite</b> (sin nombres). Márcalo en el mapa del mundo: cuanto más cerca, más puntos (hasta 5.000). <b>3 rondas</b>, 45 segundos cada una.')) return null;
+    frame(`${G.icon} ${G.name}`, '<p class="center">Cargando mapas…</p>');
+    const L = await leaflet();
+    const r = rng(seed + 'geo'); const picks = pickN(PLACES, 3, r);
+    let total = 0; const lines = [];
+    for (let i = 0; i < picks.length; i++) {
+      const [name, lat, lng, z] = picks[i];
+      const body = frame(`${G.icon} ${G.name}`, `<div class="ag-round">Ronda ${i + 1} de ${picks.length}</div>
+        <div class="geo-sat" id="geo-sat"></div><div class="ag-timer"><i id="ag-bar"></i></div>
+        <div class="geo-map" id="geo-map"></div><button type="button" class="btn primary" id="geo-ok" disabled>📍 Marca en el mapa dónde crees que es</button>`);
+      const sat = L.map(body.querySelector('#geo-sat'), { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false }).setView([lat, lng], z);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(sat);
+      const map = L.map(body.querySelector('#geo-map'), { worldCopyJump: true, attributionControl: false }).setView([30, 0], 1);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { maxZoom: 12 }).addTo(map);
+      let guess = null; let marker = null;
+      map.on('click', (e) => { guess = [e.latlng.lat, ((e.latlng.lng + 540) % 360) - 180]; if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map); const b = body.querySelector('#geo-ok'); b.disabled = false; b.textContent = '✅ ¡Aquí!'; });
+      const t0 = performance.now(); const bar = body.querySelector('#ag-bar'); let raf;
+      await new Promise((res) => {
+        const tick = () => { const k = (performance.now() - t0) / 45000; bar.style.width = `${Math.max(0, 100 - k * 100)}%`; if (k >= 1) res(); else raf = requestAnimationFrame(tick); };
+        tick(); body.querySelector('#geo-ok').addEventListener('click', res);
+      });
+      cancelAnimationFrame(raf);
+      const d = guess ? km(guess, [lat, lng]) : 20000; const pts = guess ? Math.round(5000 * Math.exp(-d / 1500)) : 0;
+      total += pts; lines.push(`${name}: ${guess ? `${Math.round(d).toLocaleString('es-ES')} km` : 'sin marcar'} → ${pts}`);
+      L.marker([lat, lng]).addTo(map); if (guess) L.polyline([guess, [lat, lng]], { color: '#f5c542', dashArray: '6 6' }).addTo(map);
+      map.fitBounds(guess ? L.latLngBounds([guess, [lat, lng]]).pad(0.3) : L.latLngBounds([[lat - 5, lng - 5], [lat + 5, lng + 5]]));
+      const b = body.querySelector('#geo-ok'); b.disabled = false; b.innerHTML = `📍 ${MN.esc(name)} · ${guess ? `${Math.round(d).toLocaleString('es-ES')} km` : 'sin marcar'} · <b>+${pts}</b> — Seguir`;
+      if (MN.fx) MN.fx.play(pts > 3000 ? 'win' : pts > 1000 ? 'event' : 'stop');
+      await new Promise((res) => b.addEventListener('click', res, { once: true }));
+      sat.remove(); map.remove();
+    }
+    return { score: total, label: `${total.toLocaleString('es-ES')} puntos`, data: null, lines };
+  }
+
   // ---------------------------------------------------------- catálogo
   const GAMES = {
     stopwatch: { icon: '⏱️', name: 'Cronómetro (segundo exacto)' },
@@ -445,6 +534,8 @@
     quiz: { icon: '🧠', name: 'Quiz', play: playQuiz },
     song: { icon: '🎵', name: 'Adivina la canción', play: playSong },
     flappy: { icon: '🐦', name: 'Flappy con tu cara', play: (G, s, o) => playFlappy(G, s, o) },
+    object: { icon: '🔍', name: '¿Qué es esto?', play: playObject },
+    geo: { icon: '🌍', name: 'GeoGuessr de satélite', play: playGeo },
   };
 
   // Juega y devuelve { score, label, data } (o null si no llegó a empezar)

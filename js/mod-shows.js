@@ -343,6 +343,19 @@
     boom({ colors: ['#39ff88', '#ff4d6d', '#ffffff'], count: 120 });
   }
 
+  // ---------------------------------------------------------- 🎱 bingo (resumen para quien no lo vio en directo)
+  async function bingoShow(box, ev) {
+    const r = ev.result || {};
+    if (!r.bingo) return;
+    const mine = MN.me(); const names = (l) => l.map((id) => MN.esc(name(id))).join(', ');
+    box.innerHTML = `<div class="show-inner"><div class="show-title">🎱 BINGO</div>
+      <div class="bg-call" id="bs-line" style="opacity:0">📣 LÍNEA en la bola ${r.lineBall}: ${names(r.line)} <b>+${Math.floor(r.linePrize / r.line.length)}</b></div>
+      <div class="bg-call big" id="bs-bingo" style="opacity:0">🎉 ¡BINGO! en la bola ${r.bingoBall}: ${names(r.bingo)} <b>+${Math.floor(r.bingoPrize / r.bingo.length)}</b></div>
+      ${mine && (r.line.includes(mine.id) || r.bingo.includes(mine.id)) ? '<div class="pv-who">🏆 ¡Has cantado!</div>' : ''}${closeBtn}</div>`;
+    sfx('drum'); await sleep(1000); MN.$('#bs-line').style.opacity = 1; sfx('event'); await sleep(1500);
+    sfx('drum'); await sleep(900); MN.$('#bs-bingo').style.opacity = 1; sfx('win'); boom({ count: 200 });
+  }
+
   // ---------------------------------------------------------- ⏱️ cronómetro
   async function stopwatchShow(box, ev) {
     const r = ev.result || {};
@@ -398,7 +411,7 @@
     res.classList.add('shown');
   }
 
-  const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow, plebiscite: plebisciteShow, king: kingShow, dilemma: dilemmaShow };
+  const EVENT_SHOWS = { lottery: lotteryShow, communist: communistShow, stopwatch: stopwatchShow, plebiscite: plebisciteShow, king: kingShow, dilemma: dilemmaShow, bingo: bingoShow };
 
   // ---------------------------------------------------------- qué enseñar a quién
   // "Ya visto" se guarda por jugador (no por móvil): si en un mismo móvil se

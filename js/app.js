@@ -1797,8 +1797,8 @@
       // y se olvida que el calendario y la Banca ya estaban creados
       const s = Object.assign({}, S.settings);
       const r = s.eventRehearsal;
-      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes', 'plebisciteVoteMinutes', 'kingMinutes', 'kingEveryMinutes', 'dilemmaMinutes'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
-      ['eventRehearsal', 'eventsSeeded', 'eventsSeeded2', 'bankPlayerId'].forEach((k) => delete s[k]);
+      if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes', 'plebisciteVoteMinutes', 'kingMinutes', 'kingEveryMinutes', 'dilemmaMinutes', 'bingoBallSeconds'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
+      ['eventRehearsal', 'eventsSeeded', 'eventsSeeded2', 'seededDefaults', 'bankPlayerId'].forEach((k) => delete s[k]);
       act(() => Store.replaceAll({ settings: s }), '🧨 Mesa limpia');
     });
 

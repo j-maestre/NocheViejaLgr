@@ -79,6 +79,8 @@
     dilemmaMinutes: 10, dilemmaCoop: 10, dilemmaTemptation: 20, dilemmaSucker: 10, dilemmaPunish: 5,
     // 🕵️ Misiones diarias
     missionsPerDay: 3, missionReward: 8,
+    // 🎱 Bingo (evento)
+    bingoPrice: 5, bingoMaxCards: 4, bingoBallSeconds: 6, bingoBankBonus: 20, bingoLinePct: 30,
     // 🔮 Porra del campeón y del farolillo rojo
     porraStake: 10, porraCloseDate: '2026-12-30T20:00',
     betWindowMinutes: 10,    // apuestas de espectadores abiertas X min desde que empieza el duelo

@@ -1,7 +1,7 @@
 // ============================================================
 //  MÓDULO: EVENTOS Y CALENDARIO
 //  ☭ comunista · 🍻 happy hour · 🎟️ lotería · ⏱️ cronómetro global · 🦅 fascista (plebiscito)
-//  👑 rey de la colina · 🤝 dilema del prisionero
+//  👑 rey de la colina · 🤝 dilema del prisionero · 🎱 bingo
 //
 //  Los eventos se guardan en la colección `events` y los ejecuta el
 //  primer móvil que tenga la web abierta cuando toca. Todo se calcula
@@ -65,6 +65,14 @@
       <g stroke="#ddd" stroke-width="3" opacity=".35">${Array.from({ length: 8 }, (_, i) => `<line x1="${12 + i * 20}" y1="0" x2="${12 + i * 20}" y2="100"/>`).join('')}</g>
       <text x="44" y="64" text-anchor="middle" font-size="34">🤝</text><text x="116" y="64" text-anchor="middle" font-size="34">🔪</text>
       <text x="80" y="58" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="18" fill="#fff">VS</text></svg>`,
+    bingo: `<svg viewBox="0 0 160 100" aria-hidden="true"><defs><radialGradient id="gh" cx="50%" cy="40%" r="75%"><stop offset="0" stop-color="#ff7a3d"/><stop offset="1" stop-color="#7a1a00"/></radialGradient></defs>
+      <rect width="160" height="100" fill="url(#gh)"/>
+      <rect x="18" y="20" width="70" height="60" rx="6" fill="#fff8e8" stroke="#c8961c" stroke-width="2"/>
+      <g font-family="Bebas Neue, Impact" font-size="13" fill="#7a1a00" text-anchor="middle">${[[30, 36, '7'], [53, 36, '23'], [76, 36, '61'], [30, 56, '14'], [53, 56, '48'], [76, 56, '90'], [30, 74, '3'], [53, 74, '35'], [76, 74, '72']].map(([x, y, t]) => `<text x="${x}" y="${y}">${t}</text>`).join('')}</g>
+      <circle cx="53" cy="52" r="9" fill="#c0182f" opacity=".55"/><circle cx="76" cy="32" r="9" fill="#c0182f" opacity=".55"/>
+      <circle cx="120" cy="42" r="22" fill="#f5c542" stroke="#fff" stroke-width="3"/><circle cx="120" cy="42" r="13" fill="#fff"/>
+      <text x="120" y="47" text-anchor="middle" font-family="Bebas Neue, Impact" font-size="15" fill="#7a1a00">45</text>
+      <circle cx="140" cy="78" r="10" fill="#5cc8ff"/><circle cx="104" cy="80" r="8" fill="#39ff88"/></svg>`,
   };
 
   const ART = new Proxy(ART_SRC, { get: (o, k) => (o[k] ? uniq(o[k]) : undefined) });
@@ -99,6 +107,10 @@
       name: 'Dilema del prisionero', icon: '🤝',
       desc: (s) => `Se hacen parejas al azar y cada uno elige en secreto (${s.dilemmaMinutes} min): 🤝 Cooperar o 🔪 Traicionar. Si cooperáis los dos, +${s.dilemmaCoop} cada uno (de la Banca). Si uno traiciona, el traidor gana ${s.dilemmaTemptation} y el otro pierde ${s.dilemmaSucker}. Si traicionáis los dos, perdéis ${s.dilemmaPunish} cada uno. Quien no elige, coopera.`,
     },
+    bingo: {
+      name: 'Bingo', icon: '🎱',
+      desc: (s) => `Compra cartones a ${s.bingoPrice} fichas antes de que empiece. Se canta una bola cada ${s.bingoBallSeconds} s y se marcan solas. La primera línea se lleva el ${s.bingoLinePct}% del bote y el primer bingo (cartón completo), el resto. La Banca pone ${s.bingoBankBonus} fichas extra.`,
+    },
   };
 
   // Calendario por defecto (ids fijos)
@@ -114,6 +126,7 @@
     ['ev-d9', 'king', '2026-12-30T17:00'],
     ['ev-d10', 'king', '2026-12-31T17:00'],
     ['ev-d11', 'dilemma', '2026-12-30T21:00'],
+    ['ev-d12', 'bingo', '2026-12-31T19:00'],
   ];
 
   // ---------------------------------------------------------- utilidades
@@ -141,10 +154,11 @@
       case 'plebiscite': return now < ev.at ? 'upcoming' : now < voteEnd(ev) ? 'voting' : 'over';
       case 'king': return now < ev.at ? 'upcoming' : now < kingEnd(ev) ? 'reign' : 'over';
       case 'dilemma': return now < ev.at ? 'upcoming' : now < dilemmaEnd(ev) ? 'choosing' : 'over';
+      case 'bingo': return now < ev.at ? (MN.started() ? 'selling' : 'upcoming') : now < bingoEnd(ev) ? 'drawing' : 'over';
       default: return now < ev.at ? 'upcoming' : 'over';
     }
   }
-  const isLive = (ev) => ['live', 'signup', 'playing', 'voting', 'reign', 'choosing'].includes(phase(ev));
+  const isLive = (ev) => ['live', 'signup', 'playing', 'voting', 'reign', 'choosing', 'drawing'].includes(phase(ev));
   const happyActiveAt = (ts) => events().some((e) => e.type === 'happyhour' && ts >= e.at && ts < happyEnd(e));
 
   function countdown(ms) {
@@ -163,10 +177,11 @@
       case 'live': return `🔴 EN CURSO · ${cd(happyEnd(ev), 'termina en')}`;
       case 'signup': return `📝 INSCRIPCIÓN ABIERTA · ${cd(ev.at, 'empieza en')}`;
       case 'playing': return `🔴 EN JUEGO · ${cd(playEnd(ev), 'cierra en')}`;
-      case 'selling': return `🎟️ Boletos a la venta · ${cd(ev.at, 'sorteo en')}`;
+      case 'selling': return ev.type === 'bingo' ? `🎱 Cartones a la venta · ${cd(ev.at, 'empieza en')}` : `🎟️ Boletos a la venta · ${cd(ev.at, 'sorteo en')}`;
       case 'voting': return `🦅 VOTACIÓN SECRETA · ${cd(voteEnd(ev), 'cierra en')}`;
       case 'reign': { const k = currentKing(); return `👑 EN JUEGO · ${k ? `reina ${MN.who(k)} · ` : ''}${cd(nextKingTick(ev, now), 'cobra en')} · ${cd(kingEnd(ev), 'acaba en')}`; }
       case 'choosing': return `🤝 ELIGE EN SECRETO · ${cd(dilemmaEnd(ev), 'se revela en')}`;
+      case 'drawing': return `🎱 CANTANDO BOLAS · van ${ballsOut(ev)} de 90`;
       case 'over': return '⏳ Calculando resultado…';
       default: return resultLine(ev);
     }
@@ -179,6 +194,7 @@
       case 'communist': return r.from ? `☭ Se expropiaron <b>${r.amount}</b> fichas a ${who(r.from)} para ${r.to.map(who).join(', ')}` : 'No hubo nada que repartir';
       case 'happyhour': return `🍻 Terminó. ${r.bonuses ? `La Banca pagó <b>${r.bonuses}</b> fichas extra` : 'Nadie aprovechó la happy hour'}`;
       case 'lottery': return r.winner ? `🎟️ Ganó ${who(r.winner)}: <b>${r.pot}</b> fichas (${r.tickets} boletos)` : 'No se vendió ningún boleto';
+      case 'bingo': return r.bingo ? `🎱 Línea: ${r.line.map(who).join(', ')} · ¡Bingo!: ${r.bingo.map(who).join(', ')} (bote ${r.pot})` : (r.note || 'No hubo bingo');
       case 'king': return r.top ? `👑 ${who(r.top)} reinó ${r.reigns[r.top]} ${r.reigns[r.top] === 1 ? 'ronda' : 'rondas'} y cobró <b>${r.earned[r.top]}</b> fichas` : 'Nadie consiguió reinar en solitario';
       case 'dilemma': return r.pairs && r.pairs.length ? `🤝 ${r.pairs.length} parejas · ${r.pairs.filter((p) => p.a.c === 'coop' && p.b.c === 'coop').length} cooperaron · ${r.pairs.filter((p) => p.a.c === 'betray' && p.b.c === 'betray').length} se traicionaron mutuamente` : 'No hubo parejas';
       case 'plebiscite': return r.winner ? `🦅 ${who(r.winner)} es el nuevo Dictador con <b>${r.votes[r.winner]}</b> votos y cobró <b>${r.pot}</b> fichas de tributo` : 'Nadie votó: la democracia sobrevive (de momento)';
@@ -195,6 +211,11 @@
     const mine = MN.me(); if (!mine) return '';
     const ph = phase(ev); const s = set(); const bal = MN.balances()[mine.id] || 0;
     const b = (act, label, cls = 'primary') => `<button type="button" class="btn ${cls}" data-evact="${act}" data-id="${MN.esc(ev.id)}">${label}</button>`;
+    if (ev.type === 'bingo' && ph === 'selling') {
+      const n = bingoCards(ev).filter((x) => x.player === mine.id).length; const max = Number(s.bingoMaxCards) || 4;
+      return `<div class="ev-actions">${bal >= s.bingoPrice && n < max ? b('bcard', `🎱 Comprar cartón (${s.bingoPrice})`) : ''}<span class="muted small">Tienes ${n}/${max} cartones · bote: <b>${bingoPot(ev)}</b></span>${n ? b('bwatch', '👀 Ver mis cartones', 'ghost') : ''}</div>`;
+    }
+    if (ev.type === 'bingo' && ph === 'drawing') return `<div class="ev-actions">${b('bwatch', '🎱 ¡Ver el bingo en directo!')}</div>`;
     if (ev.type === 'lottery' && ph === 'selling') {
       const n = myTickets(ev, mine.id);
       return `<div class="ev-actions">${bal >= s.lotteryPrice ? b('ticket', `🎟️ Comprar boleto (${s.lotteryPrice})`) : ''}<span class="muted small">Tienes ${n} ${n === 1 ? 'boleto' : 'boletos'} · bote: <b>${lotteryPot(ev)}</b></span></div>`;
@@ -327,14 +348,14 @@
     const saved = {
       at: now, startDate: s.startDate,
       happyMinutes: s.happyMinutes, stopwatchSignupMinutes: s.stopwatchSignupMinutes, stopwatchPlayMinutes: s.stopwatchPlayMinutes,
-      communistMaskMinutes: s.communistMaskMinutes, plebisciteVoteMinutes: s.plebisciteVoteMinutes, kingMinutes: s.kingMinutes, kingEveryMinutes: s.kingEveryMinutes, dilemmaMinutes: s.dilemmaMinutes,
+      communistMaskMinutes: s.communistMaskMinutes, plebisciteVoteMinutes: s.plebisciteVoteMinutes, kingMinutes: s.kingMinutes, kingEveryMinutes: s.kingEveryMinutes, dilemmaMinutes: s.dilemmaMinutes, bingoBallSeconds: s.bingoBallSeconds,
       events: Object.fromEntries(pending.map((e) => [e.id, e.at])),
     };
     const local = (ts) => new Date(ts - new Date().getTimezoneOffset() * MIN).toISOString().slice(0, 16);
     await MN.act(async () => {
       await Store.saveSettings(Object.assign({}, s, {
         eventRehearsal: saved, startDate: local(now - MIN),
-        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30, plebisciteVoteMinutes: 3, kingMinutes: 3, kingEveryMinutes: 1, dilemmaMinutes: 3,
+        happyMinutes: 5, stopwatchSignupMinutes: 3, stopwatchPlayMinutes: 3, communistMaskMinutes: 30, plebisciteVoteMinutes: 3, kingMinutes: 3, kingEveryMinutes: 1, dilemmaMinutes: 3, bingoBallSeconds: 2,
       }));
       await Store.putMany({ events: pending.map((e, i) => Object.assign({}, e, { at: now + (i + 1) * REHEARSAL_GAP })) });
     }, '🧪 Ensayo en marcha: el primer evento empieza en 4 minutos');
@@ -354,7 +375,7 @@
       const next = Object.assign({}, s, {
         startDate: r.startDate, happyMinutes: r.happyMinutes, stopwatchSignupMinutes: r.stopwatchSignupMinutes, stopwatchPlayMinutes: r.stopwatchPlayMinutes,
         communistMaskMinutes: r.communistMaskMinutes == null || r.communistMaskMinutes === 60 ? 30 : r.communistMaskMinutes,
-        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10, kingMinutes: r.kingMinutes || 60, kingEveryMinutes: r.kingEveryMinutes || 10, dilemmaMinutes: r.dilemmaMinutes || 10,
+        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10, kingMinutes: r.kingMinutes || 60, kingEveryMinutes: r.kingEveryMinutes || 10, dilemmaMinutes: r.dilemmaMinutes || 10, bingoBallSeconds: r.bingoBallSeconds || 6,
       });
       delete next.eventRehearsal;
       await Store.saveSettings(next);
@@ -393,6 +414,10 @@
       const startTs = ev.type === 'stopwatch' ? signupStart(ev) : ev.at;
       if (ph === 'upcoming' && startTs - now <= 15 * MIN && startTs - now > 0 && !seen(ev.id + ':15')) msgs.push(`⏰ En 15 minutos: ${T.icon} ${T.name}`);
       if (ph === 'live' && !seen(ev.id + ':start')) msgs.push(`🍻 ¡Empieza la happy hour! Los duelos pagan x${set().happyMultiplier} durante ${set().happyMinutes} min`);
+      if (ph === 'drawing' && !seen(ev.id + ':drawing')) {
+        msgs.push('🎱 ¡Empieza el bingo! Entra a ver si cantas línea');
+        if (mine && bingoCards(ev).some((x) => x.player === mine.id) && document.visibilityState === 'visible') setTimeout(() => watchBingo(ev), 300);
+      }
       if (ph === 'reign' && !seen(ev.id + ':reign')) msgs.push(`👑 ¡Rey de la colina! Durante ${set().kingMinutes} min, el primero cobra ${set().kingTribute} a cada uno cada ${set().kingEveryMinutes} min. ¡A por él!`);
       if (ph === 'choosing' && !seen(ev.id + ':choosing')) msgs.push(`🤝 ¡Dilema del prisionero! Tienes ${set().dilemmaMinutes} min para elegir en secreto: cooperar o traicionar`);
       if (ph === 'voting' && !seen(ev.id + ':voting')) msgs.push(`🦅 ¡Evento fascista! Vota en secreto a tu Dictador en los próximos ${set().plebisciteVoteMinutes} min. Los votos extra se compran 😏`);
@@ -426,6 +451,7 @@
       if (ev.type === 'plebiscite') await runPlebiscite(ev);
       if (ev.type === 'king') await runKing(ev);
       if (ev.type === 'dilemma') await runDilemma(ev);
+      if (ev.type === 'bingo') await runBingo(ev);
       if (ev.type === 'happyhour') await Store.update('events', ev.id, { status: 'done', result: { at: happyEnd(ev), bonuses: happyBonuses(ev).reduce((a, x) => a + x.amount, 0) } });
     }
     // Rey de la colina en marcha: se cobra en cada marca
@@ -440,22 +466,25 @@
     await syncHappyBonuses();
   }
 
-  const NEW_DEFAULTS = ['ev-d8', 'ev-d9', 'ev-d10', 'ev-d11'];
+  const NEW_DEFAULTS = ['ev-d8', 'ev-d9', 'ev-d10', 'ev-d11', 'ev-d12'];
   async function seedCalendar() {
     const S = MN.S;
-    // Partidas ya empezadas: se añaden los eventos nuevos del calendario por defecto (una sola vez)
-    if (S.settings.eventsSeeded && MN.isAdmin() && !S.settings.eventsSeeded2) {
+    // Partidas ya empezadas: se añaden los eventos nuevos del calendario por defecto (cada uno una sola vez)
+    if (S.settings.eventsSeeded && MN.isAdmin()) {
+      const done = new Set(S.settings.seededDefaults || (S.settings.eventsSeeded2 ? ['ev-d8', 'ev-d9', 'ev-d10', 'ev-d11'] : []));
+      const todo = NEW_DEFAULTS.filter((id) => !done.has(id));
+      if (!todo.length) return;
       const have = new Set((S.events || []).map((e) => e.id));
-      const add = DEFAULT_CALENDAR.filter(([id]) => NEW_DEFAULTS.includes(id) && !have.has(id))
+      const add = DEFAULT_CALENDAR.filter(([id]) => todo.includes(id) && !have.has(id))
         .map(([id, type, at]) => ({ id, type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }));
       if (add.length) await Store.putMany({ events: add });
-      await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded2: true }));
+      await Store.saveSettings(Object.assign({}, S.settings, { seededDefaults: NEW_DEFAULTS }));
       return;
     }
     if (S.settings.eventsSeeded || !MN.isAdmin() || (S.events || []).length) return;
     const list = DEFAULT_CALENDAR.map(([id, type, at]) => ({ id, type, at: new Date(at).getTime(), status: 'scheduled', createdAt: Date.now() }));
     await Store.putMany({ events: list });
-    await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded: true, eventsSeeded2: true }));
+    await Store.saveSettings(Object.assign({}, S.settings, { eventsSeeded: true, seededDefaults: NEW_DEFAULTS }));
   }
 
   async function runCommunist(ev) {
@@ -534,6 +563,91 @@
     const top = Object.keys(reigns).sort((a, b) => reigns[b] - reigns[a] || earned[b] - earned[a])[0] || null;
     await Store.update('events', ev.id, { status: 'done', result: { at: kingEnd(ev), reigns, earned, top } });
   }
+
+  // ---------------------------------------------------------- 🎱 bingo (90 bolas)
+  // Todo se deduce de la semilla: el orden de las bolas y los números de cada cartón.
+  // La bola k sale en ev.at + (k+1)·intervalo, igual en todos los móviles.
+  const ballMs = () => Math.max(2, Number(set().bingoBallSeconds) || 6) * 1000;
+  function evRng(seed) { let a = MN.hash(seed) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const drawCache = {};
+  function drawOrder(ev) {
+    if (!drawCache[ev.id]) { const r = evRng(ev.id + 'bolas'); const a = Array.from({ length: 90 }, (_, i) => i + 1); for (let i = 89; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } drawCache[ev.id] = a; }
+    return drawCache[ev.id];
+  }
+  // Cartón español: 3 filas × 9 columnas, 5 números por fila; la columna c lleva del 10c al 10c+9 (la 1.ª del 1 al 9; la última hasta el 90)
+  const cardCache = {};
+  function cardNumbers(id) {
+    if (cardCache[id]) return cardCache[id];
+    const r = evRng(id);
+    for (let tries = 0; tries < 200; tries++) {
+      const counts = Array(9).fill(1); let extra = 6;
+      while (extra) { const c = Math.floor(r() * 9); if (counts[c] < 3) { counts[c]++; extra--; } }
+      const rows = [[], [], []]; const grid = [[], [], []]; let ok = true;
+      const order = [...Array(9).keys()].sort((a, b) => counts[b] - counts[a]);
+      for (const c of order) {
+        const lo = c === 0 ? 1 : c * 10; const hi = c === 8 ? 90 : c * 10 + 9;
+        const pool = []; for (let n = lo; n <= hi; n++) pool.push(n);
+        const nums = []; while (nums.length < counts[c]) nums.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
+        nums.sort((a, b) => a - b);
+        const free = [0, 1, 2].filter((x) => rows[x].length < 5).sort((a, b) => rows[a].length - rows[b].length || r() - 0.5).slice(0, counts[c]).sort();
+        if (free.length < counts[c]) { ok = false; break; }
+        free.forEach((rw, k) => { rows[rw].push(nums[k]); grid[rw][c] = nums[k]; });
+      }
+      if (ok && rows.every((x) => x.length === 5)) { cardCache[id] = { rows, grid }; return cardCache[id]; }
+    }
+    return null;
+  }
+  const bingoCards = (ev) => entriesOf(ev, 'bcard').filter((x) => MN.S.txs.some((t) => t.id === 'bcardtx_' + x.id && !t.voided));
+  const bingoPot = (ev) => bingoCards(ev).length * (Number(set().bingoPrice) || 5) + (Number(set().bingoBankBonus) || 0);
+  // Cuándo canta cada cartón línea y bingo (índice de la bola), y quién gana
+  function bingoGame(ev) {
+    const order = drawOrder(ev); const pos = {}; order.forEach((n, i) => { pos[n] = i; });
+    const cards = bingoCards(ev).map((x) => { const c = cardNumbers(x.id); const rowsAt = c.rows.map((row) => Math.max(...row.map((n) => pos[n]))); return { x, line: Math.min(...rowsAt), bingo: Math.max(...rowsAt) }; });
+    if (!cards.length) return null;
+    const lineAt = Math.min(...cards.map((c) => c.line)); const bingoAt = Math.min(...cards.map((c) => c.bingo));
+    return { cards, lineAt, bingoAt, line: cards.filter((c) => c.line === lineAt).map((c) => c.x), bingo: cards.filter((c) => c.bingo === bingoAt).map((c) => c.x) };
+  }
+  function bingoEnd(ev) { const g = bingoGame(ev); return g ? ev.at + (g.bingoAt + 1) * ballMs() + 8000 : ev.at; }
+  const ballsOut = (ev, now = Date.now()) => Math.max(0, Math.min(90, Math.floor((now - ev.at) / ballMs())));
+  async function runBingo(ev) {
+    const s = set(); const g = bingoGame(ev);
+    if (!g) return Store.update('events', ev.id, { status: 'done', result: { at: ev.at, note: 'Nadie compró cartones' } });
+    const pot = bingoPot(ev); const linePot = Math.floor(pot * (Number(s.bingoLinePct) || 30) / 100); const bingoPotV = pot - linePot;
+    const payouts = {};
+    const share = (list, amount) => { const each = Math.floor(amount / list.length); list.forEach((x) => { payouts[x.player] = (payouts[x.player] || 0) + each; }); };
+    share(g.line, linePot); share(g.bingo, bingoPotV);
+    const bonus = Number(s.bingoBankBonus) || 0;
+    // Los cartones ya se cobraron al comprarlos; aquí solo se paga el premio (el extra de la Banca va incluido)
+    await Store.put('txs', { id: 'ev_' + ev.id, type: 'payout', kind: 'bingo', ts: bingoEnd(ev), eventId: ev.id, pot, bonus, payouts });
+    const uniq = (l) => [...new Set(l.map((x) => x.player))];
+    await Store.update('events', ev.id, { status: 'done', result: { at: bingoEnd(ev), pot, line: uniq(g.line), bingo: uniq(g.bingo), lineBall: g.lineAt + 1, bingoBall: g.bingoAt + 1, linePrize: linePot, bingoPrize: bingoPotV } });
+  }
+
+  // Pantalla en directo: bola actual, últimas bolas y mis cartones marcándose solos
+  let bingoTimer = null;
+  function watchBingo(ev) {
+    const box = MN.$('#bingo'); if (!box) return;
+    box.hidden = false; document.body.classList.add('no-scroll');
+    const mine = MN.me(); let shownLine = false; let shownBingo = false;
+    const paint = () => {
+      const e = events().find((x) => x.id === ev.id) || ev;
+      const g = bingoGame(e); const order = drawOrder(e); const out = Math.min(ballsOut(e), g ? g.bingoAt + 1 : 90);
+      const drawn = new Set(order.slice(0, out)); const cur = out ? order[out - 1] : null;
+      const myCards = mine ? bingoCards(e).filter((x) => x.player === mine.id) : [];
+      const card = (x) => { const c = cardNumbers(x.id); return `<div class="bg-card">${c.grid.map((row) => `<div class="bg-row">${Array.from({ length: 9 }, (_, k) => row[k] ? `<span class="${drawn.has(row[k]) ? 'hit' : ''}">${row[k]}</span>` : '<span class="blank"></span>').join('')}</div>`).join('')}</div>`; };
+      const started = Date.now() >= e.at;
+      box.innerHTML = `<div class="bg-inner"><div class="rl-top"><div class="ag-title">🎱 Bingo</div><button type="button" class="tv-exit" data-bingo="close">✕</button></div>
+        ${started ? `<div class="bg-ball ${cur ? 'pop' : ''}">${cur || '…'}</div><div class="bg-count">Bola ${out} de 90</div>
+        <div class="bg-last">${order.slice(Math.max(0, out - 8), Math.max(0, out - 1)).reverse().map((n) => `<span>${n}</span>`).join('')}</div>` : `<div class="bg-count">Empieza en <b class="ev-cd" data-to="${e.at}">${countdown(e.at - Date.now())}</b></div>`}
+        <div class="bg-calls" id="bg-calls">${g && out > g.lineAt ? `<div class="bg-call">📣 LÍNEA: ${[...new Set(g.line.map((x) => x.player))].map(MN.who).join(', ')}</div>` : ''}${g && out > g.bingoAt ? `<div class="bg-call big">🎉 ¡BINGO!: ${[...new Set(g.bingo.map((x) => x.player))].map(MN.who).join(', ')}</div>` : ''}</div>
+        ${myCards.length ? `<div class="bg-cards">${myCards.map(card).join('')}</div>` : '<p class="hint center">No tienes cartones: estás mirando 👀</p>'}</div>`;
+      if (g && out > g.lineAt && !shownLine) { shownLine = true; if (MN.fx) { MN.fx.play('event'); MN.fx.confetti({ count: 80 }); } }
+      if (g && out > g.bingoAt && !shownBingo) { shownBingo = true; if (MN.fx) { MN.fx.play('win'); MN.fx.confetti({ count: 240 }); } }
+      if (cur && box.dataset.last !== String(cur)) { box.dataset.last = cur; if (MN.fx) MN.fx.play('tick'); }
+    };
+    clearInterval(bingoTimer); paint(); bingoTimer = setInterval(paint, 500);
+  }
+  function closeBingo() { clearInterval(bingoTimer); const box = MN.$('#bingo'); if (box) { box.hidden = true; box.innerHTML = ''; } document.body.classList.remove('no-scroll'); }
 
   // ---------------------------------------------------------- 🤝 dilema del prisionero
   const BANK = '__banca';
@@ -719,6 +833,17 @@
         if (en && phase(ev) === 'signup') await MN.act(() => Store.update('entries', en.id, { withdrawn: true }), 'Te has borrado');
       }
       if (b.dataset.evact === 'play') openStopwatch(ev);
+      if (b.dataset.evact === 'bcard') {
+        if (phase(ev) !== 'selling') return;
+        if (bingoCards(ev).filter((x) => x.player === mine.id).length >= (Number(s.bingoMaxCards) || 4)) return MN.toast('Ya tienes el máximo de cartones', 'bad');
+        if ((MN.balances()[mine.id] || 0) < s.bingoPrice) return MN.toast('No te llega para un cartón', 'bad');
+        const id = Store.uid();
+        await MN.act(() => Store.putMany({
+          entries: [{ id, eventId: ev.id, kind: 'bcard', player: mine.id, ts: now }],
+          txs: [{ id: 'bcardtx_' + id, type: 'charge', kind: 'bcard', ts: now, player: mine.id, amount: s.bingoPrice, eventId: ev.id }],
+        }), '🎱 Cartón comprado. ¡Suerte!');
+      }
+      if (b.dataset.evact === 'bwatch') watchBingo(ev);
       if (b.dataset.evact === 'coop' || b.dataset.evact === 'betray') {
         if (phase(ev) !== 'choosing') return;
         await MN.act(() => Store.put('entries', { id: `dc_${ev.id}_${mine.id}`, eventId: ev.id, kind: 'choice', player: mine.id, choice: b.dataset.evact, ts: now }),
@@ -767,6 +892,9 @@
       MN.registerTx('lottery', { line: (t) => ({ icon: '🎟️', text: `${MN.who(t.winner)} gana la lotería y se lleva <b>${t.pot}</b> fichas`, sub: `${t.tickets} boletos vendidos` }) });
       MN.registerTx('king', { line: (t) => ({ icon: '👑', text: `${MN.who(t.king)} sigue en la cima y cobra <b>${t.pot}</b> fichas de tributo`, sub: `Rey de la colina · ronda ${t.round}` }) });
       MN.registerTx('dilemma', { line: (t) => ({ icon: '🤝', text: `Dilema del prisionero: ${Object.entries(t.payouts).map(([id, v]) => `${MN.who(id)} ${v > 0 ? '+' : ''}${v}`).join(', ')}`, sub: 'Cooperar o traicionar' }) });
+      MN.registerTx('bcard', { line: (t) => ({ icon: '🎱', text: `${MN.who(t.player)} compra un cartón de bingo`, sub: `${t.amount} fichas` }) });
+      MN.registerTx('bingo', { line: (t) => ({ icon: '🎱', text: `Bingo: cobran ${Object.entries(t.payouts).map(([id, v]) => `${MN.who(id)} (<b>${v}</b>)`).join(', ')}`, sub: `Bote: ${t.pot} fichas` }) });
+      document.addEventListener('click', (e) => { if (e.target.closest('[data-bingo="close"]')) closeBingo(); });
       MN.registerTx('vote', { line: (t) => ({ icon: '🕶️', text: 'Alguien compra un voto secreto en el evento fascista', sub: `${t.amount} fichas a la Banca` }) });
       MN.registerTx('plebiscite', { line: (t) => ({ icon: '🎖️', text: `${MN.who(t.winner)} gana el evento fascista y cobra <b>${t.pot}</b> fichas de tributo`, sub: `${t.votes} votos` }) });
       MN.registerTx('stopwatch', { line: (t) => ({ icon: '⏱️', text: `${MN.who(t.winner)} gana el cronómetro global con ${secs(t.ms)} s y se lleva <b>${t.pot}</b> fichas`, sub: `Entrada: ${t.buyIn} fichas por cabeza` }) });
