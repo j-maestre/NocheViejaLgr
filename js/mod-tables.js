@@ -102,7 +102,7 @@
     MN.$('#table-new').hidden = !mine || MN.ended();
     if (!mine) return;
     const g = MN.$('#t-game'); const gv = g.value;
-    g.innerHTML = (MN.S.settings.games || []).map((x) => `<option>${MN.esc(x)}</option>`).join('') + '<option value="__other">Otro…</option>';
+    g.innerHTML = (MN.S.settings.games || []).filter((x) => !/cron[oó]metro/i.test(x)).map((x) => `<option>${MN.esc(x)}</option>`).join('') + '<option value="__other">Otro…</option>';
     if (gv && [...g.options].some((o) => o.value === gv)) g.value = gv;
     MN.$('#t-game-other').hidden = g.value !== '__other';
     const max = MN.maxBetFor(MN.balances()[mine.id] || 0);

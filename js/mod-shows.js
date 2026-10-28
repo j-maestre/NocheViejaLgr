@@ -62,10 +62,13 @@
   // ---------------------------------------------------------- escenario (cola de animaciones)
   const queue = []; let playing = false;
   function enqueue(fn) { queue.push(fn); if (!playing) next(); }
+  // Mientras alguien está jugando (cronómetro o juego de la app), las animaciones esperan
+  const gameOpen = () => ['#app-game', '#sw-game'].some((s) => { const el = MN.$(s); return el && !el.hidden; });
   async function next() {
-    const fn = queue.shift();
-    if (!fn) { playing = false; return; }
+    if (!queue.length) { playing = false; return; }
     playing = true;
+    while (gameOpen()) await sleep(600);
+    const fn = queue.shift();
     const box = MN.$('#show');
     box.hidden = false; document.body.classList.add('no-scroll');
     try { await fn(box); } catch (e) { console.error(e); }
@@ -494,7 +497,11 @@
     if (!MN.S || document.visibilityState !== 'visible') return;
     const now = Date.now();
     (MN.S.events || []).filter((e) => e.status === 'done' && EVENT_SHOWS[e.type] && e.result && now - (e.result.at || e.at) < 6 * 3600000).forEach((e) => {
-      if (!seen(`ev:${e.id}:${e.result.at || e.at}`)) enqueue((box) => EVENT_SHOWS[e.type](box, e));
+      // La clave usa la hora del evento (fija). La hora del resultado puede cambiar si varios móviles
+      // lo calculan a la vez, y eso hacía que la animación se repitiera. Se respeta la clave antigua.
+      const k = `ev:${e.id}:${e.at}`;
+      if (hasSeen(`ev:${e.id}:${e.result.at}`)) { markSeen(k); return; }
+      if (!seen(k)) enqueue((box) => EVENT_SHOWS[e.type](box, e));
     });
   }
 

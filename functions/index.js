@@ -74,6 +74,13 @@ exports.retos = onDocumentWritten('games/{gameId}/challenges/{id}', async (e) =>
   else if (c.status === 'expired') to(c.from, `⌛ ${rival(c.from)} no contestó a tu reto y ha caducado`);
   else if (c.status === 'cancelled') [c.from, c.to].filter((p) => p !== c.cancelledBy).forEach((p) => to(p, `🚫 Se ha cancelado el reto con ${rival(p)}`));
   else if (c.status === 'reported') [c.from, c.to].filter((p) => p !== c.reportedBy).forEach((p) => to(p, `⚖️ ${rival(p)} ha registrado el resultado. Confírmalo.`));
+  else if (c.status === 'done' && c.agAuto) {
+    const lab = (p) => (c['ag_' + p] != null ? c['agl_' + p] : 'Abandonó a medias');
+    [c.from, c.to].filter((p) => p !== c.finishedBy).forEach((p) => {
+      const o = p === c.from ? c.to : c.from;
+      to(p, c.winner === p ? `🏆 ¡Le ganas a ${rival(p)} en ${c.game}! ${lab(p)}` : `😵 ${rival(p)} te gana en ${c.game}: ${lab(o)}`);
+    });
+  }
   else if (c.status === 'done' && c.swAuto) {
     const secs = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
     [c.from, c.to].filter((p) => p !== c.finishedBy).forEach((p) => {

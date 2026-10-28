@@ -375,6 +375,7 @@
   let lastPhases = ''; let lastMasked = null;
 
   // ---------------------------------------------------------- avisos
+  function wasSeen(key) { try { return !!JSON.parse(localStorage.getItem('mn_ev_seen') || '{}')[key]; } catch (e) { return false; } }
   function seen(key) {
     try {
       const s = JSON.parse(localStorage.getItem('mn_ev_seen') || '{}');
@@ -401,7 +402,7 @@
       const animated = MN.shows && ev.type !== 'happyhour';
       if (ev.status === 'done' && ev.result && now - (ev.result.at || ev.at) < 30 * MIN) {
         if (!animated) { if (!seen(ev.id + ':done')) msgs.push(`${T.icon} ${resultLine(ev).replace(/<[^>]+>/g, '')}`); }
-        else if (document.visibilityState !== 'visible' && !seen(`${ev.id}:done:${ev.result.at || ev.at}`)) msgs.push(`${T.icon} ${T.name}: ¡ya ha terminado! Entra para ver qué ha pasado 👀`);
+        else if (document.visibilityState !== 'visible' && !wasSeen(`${ev.id}:done:${ev.result.at}`) && !seen(`${ev.id}:done:${ev.at}`)) msgs.push(`${T.icon} ${T.name}: ¡ya ha terminado! Entra para ver qué ha pasado 👀`);
       }
     });
     if (msgs.length) MN.notify(msgs);
@@ -586,7 +587,7 @@
   async function runStopwatch(ev) {
     const s = set(); const target = (Number(s.stopwatchTarget) || 10) * 1000;
     const signed = entriesOf(ev, 'signup');
-    const result = { at: Date.now() };
+    const result = { at: (ev.result && ev.result.at) || Math.min(Date.now(), playEnd(ev)) };
     if (signed.length < 2) {
       result.note = signed.length ? 'Solo se apuntó una persona: no hubo partida' : 'No se apuntó nadie';
       return Store.update('events', ev.id, { status: 'done', result });

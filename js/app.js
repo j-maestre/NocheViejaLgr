@@ -203,8 +203,13 @@
   const activeChallenges = () => S.challenges.filter((c) => ACTIVE.includes(c.status) && !isExpired(c));
 
   // Anti-spam: ¿puede `from` retar ahora a `to`? Devuelve el motivo si no.
+  // Reto en juego (aceptado o esperando confirmar el resultado) de un jugador, si lo tiene
+  const playingNow = (id, except) => activeChallenges().find((c) => c.id !== except && ['accepted', 'reported'].includes(c.status) && (c.from === id || c.to === id));
+
   function challengeBlock(from, to) {
     for (const m of MODULES) { const r = m.challengeBlock && m.challengeBlock(from, to); if (r) return r; }
+    const busyMe = playingNow(from);
+    if (busyMe) return `⚔️ Ya tienes un reto en juego con <b>${esc(player(busyMe.from === from ? busyMe.to : busyMe.from).name)}</b>. Terminadlo antes de retar a otro.`;
     if (activeBetween(from, to)) return `Ya tienes un reto abierto con <b>${esc(player(to).name)}</b>. Terminadlo primero.`;
     const maxOut = Number(S.settings.maxPendingOut) || 2;
     const out = activeChallenges().filter((c) => c.from === from && c.status === 'pending').length;
@@ -223,7 +228,8 @@
   const rivalOf = (c, id) => (c.from === id ? c.to : c.from);
   // ¿Este reto espera una acción mía?
   const needsMe = (c, myId) => (c.status === 'pending' && c.to === myId) || (c.status === 'reported' && c.reportedBy !== myId && (c.from === myId || c.to === myId))
-    || (c.status === 'accepted' && isSwGame(c) && (c.from === myId || c.to === myId) && c['sw_' + myId] == null);
+    || (c.status === 'accepted' && isSwGame(c) && (c.from === myId || c.to === myId) && c['sw_' + myId] == null)
+    || (c.status === 'accepted' && isAgGame(c) && (c.from === myId || c.to === myId) && !agStarted(c, myId));
 
   // 💣 ALL IN: una vez por jugador en toda la partida, os jugáis todo lo que tiene el más pobre.
   // Solo se gasta si el reto sigue vivo o se juega (rechazado, cancelado o caducado no cuenta).
@@ -231,6 +237,19 @@
   const allInUsed = (pid) => S.challenges.some((c) => c.allIn && c.from === pid && !['rejected', 'cancelled', 'expired'].includes(c.status)
     && (!lastRound() || (c.createdAt || 0) >= lastRoundTs()));
   const allInAmount = (a, b, bal = balances()) => Math.max(0, Math.min(bal[a] || 0, bal[b] || 0));
+
+  // 📱 Juegos dentro de la app (módulo de juegos). El reto guarda el nombre; el id se deduce de él.
+  const appGameOf = (name) => { const g = MN.appGames && MN.appGames.list().find((x) => x.name === name); return g ? g.id : (/cron[oó]metro/i.test(name || '') ? 'stopwatch' : null); };
+  const agId = (c) => c.appGame || appGameOf(c.game);
+  const isAgGame = (c) => { const id = agId(c); return !!id && id !== 'stopwatch'; };
+  const agMine = (c, id) => c['ag_' + id] != null;
+  // Un solo intento: quien empezó y no terminó en 15 min se da por abandonado
+  const agStarted = (c, id) => !!c['ags_' + id];
+  const agQuit = (c, id) => !agMine(c, id) && agStarted(c, id) && Date.now() - c['ags_' + id] > 15 * 60000;
+  const agOver = (c, id) => agMine(c, id) || agQuit(c, id);
+  const agScore = (c, id) => (agMine(c, id) ? c['ag_' + id] : -Infinity);
+  const agLabel = (c, id) => (agMine(c, id) ? c['agl_' + id] : 'Abandonó a medias');
+  const agDone = (c) => c.status === 'accepted' && isAgGame(c) && agOver(c, c.from) && agOver(c, c.to);
 
   // Retos de cronómetro: se juegan dentro de la app y gana quien se acerque más al objetivo
   const isSwGame = (c) => /cron[oó]metro/i.test(c.game || '');
@@ -589,7 +608,7 @@
     const mine = me();
     if (mine && !$('#d-a').value && $('#d-b').value !== mine.id) $('#d-a').value = mine.id;
     const g = $('#d-game'); const gv = g.value;
-    g.innerHTML = (S.settings.games || []).map((x) => `<option>${esc(x)}</option>`).join('') + '<option value="__other">Otro…</option>';
+    g.innerHTML = (S.settings.games || []).filter((x) => !appGameOf(x)).map((x) => `<option>${esc(x)}</option>`).join('') + '<option value="__other">Otro…</option>';
     if (gv && [...g.options].some((o) => o.value === gv)) g.value = gv;
     $('#d-game-other').hidden = g.value !== '__other';
     updateDuel();
@@ -681,7 +700,11 @@
     if ([...sel.options].some((o) => o.value === v)) sel.value = v;
 
     const g = $('#c-game'); const gv = g.value;
-    g.innerHTML = (S.settings.games || []).map((x) => `<option>${esc(x)}</option>`).join('') + '<option value="__other">Otro…</option>';
+    // Dos listas: juegos dentro de la app y juegos en persona
+    const app = MN.appGames ? MN.appGames.list() : [];
+    const irl = (S.settings.games || []).filter((x) => !appGameOf(x));
+    g.innerHTML = (app.length ? `<optgroup label="📱 En la app">${app.map((x) => `<option value="${esc(x.name)}">${x.icon} ${esc(x.name)}</option>`).join('')}</optgroup>` : '')
+      + `<optgroup label="🍻 En persona">${irl.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}<option value="__other">Otro…</option></optgroup>`;
     if (gv && [...g.options].some((o) => o.value === gv)) g.value = gv;
     $('#c-game-other').hidden = g.value !== '__other';
     updateChallengeForm();
@@ -737,6 +760,19 @@
         actions = btn('cancel', 'Cancelar reto', 'ghost');
       } else {
         status = '⏳ Pendiente de respuesta… ¿se acobardará?';
+      }
+    } else if (c.status === 'accepted' && isAgGame(c)) {
+      const G = MN.appGames.GAMES[agId(c)];
+      const played = [c.from, c.to].filter((id) => agOver(c, id)).length;
+      if (mineC && !agMine(c, myId) && agStarted(c, myId)) {
+        status = `${G.icon} Empezaste tu turno y no lo terminaste. Solo había un intento… ${agQuit(c, myId) ? 'cuenta como abandonado.' : 'si no lo acabas pronto, contará como abandonado.'}`;
+      } else if (mineC && !agMine(c, myId)) {
+        status = `${G.icon} ¡A jugar! Cada uno juega su turno en la app y gana quien saque más puntos.${agOver(c, rivalOf(c, myId)) ? ` <b class="who">${esc(rival.name)}</b> ya ha jugado.` : ''}`;
+        actions = btn('agplay', `${G.icon} Jugar mi turno`, 'primary');
+      } else if (mineC) {
+        status = `${G.icon} Tu resultado: <b>${esc(c['agl_' + myId] || '…')}</b>. Esperando a que juegue <b class="who">${esc(rival.name)}</b>…`;
+      } else {
+        status = `${G.icon} Duelo en la app · ${played}/2 han jugado`;
       }
     } else if (c.status === 'accepted' && isSwGame(c)) {
       const played = [c.from, c.to].filter((id) => c['sw_' + id] != null).length;
@@ -818,12 +854,30 @@
         else if (c.status === 'cancelled' && c.cancelledBy !== id) msgs.push(`🚫 Se ha cancelado el reto con ${r}`);
         else if (c.status === 'reported' && c.reportedBy !== id) msgs.push(`⚖️ ${r} ha registrado el resultado. Confírmalo.`);
         else if (c.status === 'done' && c.swAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `⏱️ ¡Ganas el cronómetro contra ${r}! ${swSecs(c['sw_' + id])} s contra ${swSecs(c['sw_' + rivalOf(c, id)])} s` : `⏱️ ${r} te gana al cronómetro: ${swSecs(c['sw_' + rivalOf(c, id)])} s contra tus ${swSecs(c['sw_' + id])} s`);
+        else if (c.status === 'done' && c.agAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `🏆 ¡Le ganas a ${r} en ${esc(c.game)}! ${esc(agLabel(c, id))}` : `😵 ${r} te gana en ${esc(c.game)}: ${esc(agLabel(c, rivalOf(c, id)))}`);
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
         else if (before === 'reported' && c.status === 'accepted' && c.disputedBy && c.disputedBy !== id) msgs.push(`❌ ${r} no está de acuerdo con el resultado`);
       });
       if (msgs.length) notify(msgs);
+      // Te acaban de retar: ventana con la cara de quien te reta
+      const fresh = S.challenges.filter((c) => !prevCh[c.id] && c.status === 'pending' && c.to === id);
+      if (fresh.length) challengePopup(fresh[fresh.length - 1]);
     }
     prevCh = now;
+  }
+
+  async function challengePopup(c) {
+    if (!$('#modal').hidden || document.visibilityState !== 'visible' || !$('#app-game').hidden || !$('#sw-game').hidden) return;
+    const p = player(c.from);
+    const ok = await modal(`<div class="challenge-pop ${c.allIn ? 'allin' : ''}">
+      <div class="cp-face">${face(p)}</div>
+      <div class="cp-who">${esc(p.name)}</div>
+      <div class="cp-what">${c.allIn ? '💣 te reta a un <b>ALL IN</b>' : '⚔️ te reta'} a <b>${esc(c.game)}</b></div>
+      <div class="cp-amount">${c.allIn ? allInAmount(c.from, c.to) : c.amount} <span>fichas</span></div></div>`, '✅ Aceptar');
+    if (!ok) { go('duelo'); return; }
+    go('duelo');
+    const b = $(`[data-act="accept"][data-id="${c.id}"]`);
+    if (b) b.click();
   }
 
   // Aviso a todos cuando alguien nuevo se sienta a la mesa (mismo texto que la push del servidor)
@@ -869,6 +923,8 @@
       switch (b.dataset.act) {
         case 'accept': {
           if (ended()) return toast('🏁 La partida ha terminado', 'bad');
+          const busyMe = playingNow(myId, c.id);
+          if (busyMe) return toast(`⚔️ Ya tienes un reto en juego con ${esc(player(busyMe.from === myId ? busyMe.to : busyMe.from).name)}. Terminadlo antes de aceptar otro.`, 'bad');
           const max = c.allIn ? allInAmount(c.from, c.to) : pairMax(c.from, c.to);
           if (max <= 0) return toast('Alguno de los dos está en bancarrota', 'bad');
           const amount = c.allIn ? max : Math.min(c.amount, max);
@@ -922,6 +978,27 @@
           await finishChallenge(Object.assign({}, c, { dedication }), c.winner, '💰 Resultado confirmado');
           break;
         }
+        case 'agplay': {
+          if (!isAgGame(c) || c.status !== 'accepted' || agStarted(c, myId) || !MN.appGames) return;
+          if (ended()) return toast('🏁 La partida ha terminado', 'bad');
+          const rid = rivalOf(c, myId);
+          const ghostData = c['agx_' + rid];
+          const res = await MN.appGames.play(agId(c), c.id, {
+            ghost: ghostData && ghostData.f ? { flaps: ghostData.f, player: player(rid) } : null,
+            after: agOver(c, rid) ? `${esc(player(rid).name)} ya ha jugado: ¡ahora sale el resultado!` : `El resultado sale cuando juegue ${esc(player(rid).name)}.`,
+            // Al pulsar «Empezar» ya cuenta como jugado (con 0 puntos hasta que acabe)
+            onStart: () => Store.updateChallenge(c.id, { ['ags_' + myId]: Date.now() }).catch(() => {}),
+          });
+          if (!res) return;
+          const at = Date.now();
+          const patch = { ['ag_' + myId]: res.score, ['agl_' + myId]: res.label, ['agAt_' + myId]: at };
+          if (res.data) patch['agx_' + myId] = res.data;
+          await act(() => Store.updateChallenge(c.id, patch));
+          const cur = S.challenges.find((x) => x.id === c.id);
+          const next = Object.assign({}, cur, patch);
+          if (agDone(next)) await finishAg(next);
+          break;
+        }
         case 'swplay': {
           if (!isSwGame(c) || c.status !== 'accepted' || c['sw_' + myId] != null || !MN.stopwatchGame) return;
           if (ended()) return toast('🏁 La partida ha terminado', 'bad');
@@ -959,6 +1036,21 @@
         byBank ? { bank: 'resolved' } : {}, c.dedication && !byBank ? { dedication: c.dedication } : {}, c.tag ? { tag: c.tag } : {}, c.allIn ? { allIn: true } : {}, extra.tx || {}));
       await Store.updateChallenge(c.id, Object.assign({ status: 'done', winner: winnerId, txId, closedAt: now }, extra.challenge || {}));
     }, msg);
+  }
+
+  // Duelo de un juego de la app con los dos resultados: gana la puntuación más alta (empate: quien jugó antes)
+  const finishingAg = new Set();
+  async function finishAg(c) {
+    if (finishingAg.has(c.id) || S.txs.some((t) => t.id === 'agduel_' + c.id)) return;
+    finishingAg.add(c.id);
+    const a = c.from; const b = c.to;
+    const sa = agScore(c, a); const sb = agScore(c, b);
+    const w = sa !== sb ? (sa > sb ? a : b) : ((c['agAt_' + a] || c['ags_' + a] || 0) <= (c['agAt_' + b] || c['ags_' + b] || 0) ? a : b);
+    const l = rivalOf(c, w);
+    const labels = { [a]: agLabel(c, a), [b]: agLabel(c, b) };
+    await finishChallenge(c, w, null, false, { txId: 'agduel_' + c.id, tx: { ag: labels }, challenge: { agAuto: true, finishedBy: (me() || {}).id || null } });
+    const mine = me();
+    if (mine && (mine.id === w || mine.id === l)) toast(mine.id === w ? `🏆 ¡Ganas el duelo! ${esc(labels[w])} contra ${esc(labels[l])}` : `😵 Pierdes: ${esc(labels[l])} contra ${esc(labels[w])} de ${esc(player(w).name)}`, mine.id === w ? 'ok' : 'bad');
   }
 
   // Duelo de cronómetro con las dos marcas: se resuelve solo. El id del
@@ -1258,6 +1350,7 @@
   function renderAll() {
     if (!S) return;
     sweepExpired();
+    S.challenges.filter(agDone).forEach((c) => { if (c.from === (me() || {}).id || c.to === (me() || {}).id || isAdmin()) finishAg(c); });
     S.challenges.filter(swDone).forEach((c) => { if (c.from === (me() || {}).id || c.to === (me() || {}).id || isAdmin()) finishSw(c); });
     renderImpBanner();
     renderRanking();
