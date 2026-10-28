@@ -504,7 +504,7 @@
       const sat = L.map(body.querySelector('#geo-sat'), { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false }).setView([lat, lng], z);
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(sat);
       const map = L.map(body.querySelector('#geo-map'), { worldCopyJump: true, attributionControl: false }).setView([30, 0], 1);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { maxZoom: 12 }).addTo(map);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 12 }).addTo(map);
       let guess = null; let marker = null;
       map.on('click', (e) => { guess = [e.latlng.lat, ((e.latlng.lng + 540) % 360) - 180]; if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map); const b = body.querySelector('#geo-ok'); b.disabled = false; b.textContent = '✅ ¡Aquí!'; });
       const t0 = performance.now(); const bar = body.querySelector('#ag-bar'); let raf;

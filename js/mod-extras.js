@@ -55,6 +55,7 @@
     const list = mine && !MN.ended() ? rematchable(mine.id) : [];
     el.hidden = !list.length;
     if (!list.length) return;
+    const cnt = MN.$('#rematch-count'); if (cnt) cnt.textContent = list.length;
     MN.$('#rematch-list').innerHTML = list.map((t) => {
       const block = MN.challengeBlock(mine.id, t.winner);
       const max = MN.pairMax(mine.id, t.winner);

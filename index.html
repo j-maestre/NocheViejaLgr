@@ -39,15 +39,14 @@
 
     <!-- ============ RANKING ============ -->
     <section id="view-ranking" class="view" hidden>
-      <div id="slot-pending-banner" hidden></div>
-      <div id="next-event"></div>
-      <div id="missions-card"></div>
-      <div id="porra-card"></div>
-      <div id="limit-info" class="limit-info"></div>
       <div id="final-banner"></div>
-      <div id="loanreq-card"></div>
       <ol id="ranking-list" class="ranking"></ol>
+      <div id="limit-info" class="limit-info"></div>
+      <div id="slot-pending-banner" hidden></div>
+      <div id="loanreq-card"></div>
+      <div id="missions-card"></div>
       <div id="ranking-stats" class="stats"></div>
+      <div id="porra-card"></div>
 
       <div class="card chart-card">
         <h3>📈 Evolución de fichas</h3>
@@ -64,21 +63,6 @@
 
     <!-- ============ DUELO ============ -->
     <section id="view-duelo" class="view" hidden>
-      <div id="slot-pending-wrap" hidden>
-        <h2 class="section-title">🎰 Resultados por revelar</h2>
-        <ul id="slot-pending" class="challenges"></ul>
-      </div>
-
-      <div id="my-challenges-wrap">
-        <h2 class="section-title">🎯 Tus retos</h2>
-        <ul id="my-challenges" class="challenges"></ul>
-      </div>
-
-      <div id="rematches" hidden>
-        <h2 class="section-title">🔁 Revanchas</h2>
-        <ul id="rematch-list" class="challenges"></ul>
-      </div>
-
       <h2 class="section-title">⚔️ Retar a alguien</h2>
       <div id="challenge-noreg" class="empty" hidden>
         Para retar a alguien tienes que sentarte a la mesa.<br><br>
@@ -101,6 +85,16 @@
         <button id="c-submit" class="btn primary" type="submit">Enviar reto ⚔️</button>
       </form>
 
+      <div id="slot-pending-wrap" hidden>
+        <h2 class="section-title">🎰 Resultados por revelar</h2>
+        <ul id="slot-pending" class="challenges"></ul>
+      </div>
+
+      <div id="my-challenges-wrap">
+        <h2 class="section-title">🎯 Tus retos</h2>
+        <ul id="my-challenges" class="challenges"></ul>
+      </div>
+
       <h2 class="section-title">🔥 En la mesa ahora</h2>
       <ul id="live-challenges" class="challenges"></ul>
 
@@ -110,41 +104,29 @@
         <ul id="bets-list" class="challenges"></ul>
       </div>
 
-      <div id="roulette-card" class="card rl-card" hidden>
-        <div class="rl-card-art">🎰</div>
-        <div><b>Ruleta de la Banca</b><div class="small muted">Pleno, rojo o negro, docenas… Sin límite de apuesta.</div></div>
-        <button type="button" class="btn primary" data-roulette-open>Jugar</button>
-      </div>
-
-      <h2 class="section-title">🐦 Sala de Flappy</h2>
-      <p class="hint">Jugad todos a la vez: cada uno con su cara, y veréis volar al resto en tiempo real. Con entrada, el último en caer se lleva el bote.</p>
-      <div id="flappy-rooms"></div>
-      <details id="fr-new" class="card direct">
-        <summary>➕ Abrir una sala</summary>
-        <form id="fr-form" autocomplete="off">
-          <label>Entrada por cabeza <span class="muted small">(0 = por diversión)</span><input type="number" id="fr-buyin" min="0" value="0" inputmode="numeric"></label>
-          <label>Mensaje <span class="muted small">(opcional)</span><input id="fr-msg" maxlength="80" placeholder="💬 ¡Venid, que os humillo!"></label>
-          <button class="btn primary" type="submit">🐦 Abrir sala</button>
-        </form>
-      </details>
-
-      <h2 class="section-title">🃏 Mesas de varios jugadores</h2>
-      <p class="hint">Para póker, Dixit, Fallera calavera o partidas por equipos: cada uno pone la entrada y el ganador (o el equipo ganador) se lleva el bote.</p>
+      <h2 class="section-title">🃏 Mesas y salas</h2>
+      <p class="hint">Para jugar varios a la vez: en persona (póker, Dixit, por equipos…) o en la app (Flappy en tiempo real, quiz, canciones…). Cada uno pone la entrada y el ganador se lleva el bote.</p>
       <ul id="tables-list" class="challenges"></ul>
       <details id="table-new" class="card direct">
-        <summary>➕ Abrir una mesa</summary>
+        <summary>➕ Abrir una mesa o sala</summary>
         <form id="table-form" autocomplete="off">
           <label>Juego</label>
+          <div class="seg" id="t-kind"><button type="button" data-kind="app" class="on">📱 En la app</button><button type="button" data-kind="irl">🍻 En persona</button></div>
           <div class="row select-row"><select id="t-game"></select><button type="button" class="btn ghost" data-roulette="t-game" title="Ruleta de minijuegos">🎲</button></div>
           <input id="t-game-other" placeholder="¿Qué juego?" maxlength="60" hidden>
           <div class="grid-2">
-            <label>Entrada por cabeza<input type="number" id="t-buyin" min="1" inputmode="numeric"></label>
-            <label>Modo<select id="t-mode"><option value="solo">Todos contra todos</option><option value="teams">Por equipos (A vs B)</option></select></label>
+            <label>Entrada por cabeza<input type="number" id="t-buyin" min="0" inputmode="numeric"></label>
+            <label id="t-mode-wrap">Modo<select id="t-mode"><option value="solo">Todos contra todos</option><option value="teams">Por equipos (A vs B)</option></select></label>
           </div>
           <p id="t-max" class="hint"></p>
           <label>Mensaje para los demás <span class="muted small">(opcional)</span><input id="t-msg" maxlength="100" placeholder="💬 Ej.: «Póker en el salón, traed cerveza»"></label>
-          <button class="btn primary" type="submit">🃏 Abrir mesa</button>
+          <button class="btn primary" type="submit">🃏 Abrir</button>
         </form>
+      </details>
+
+      <details id="rematches" class="card direct rematch-box" hidden>
+        <summary>🔁 Revanchas pendientes <span class="badge-inline" id="rematch-count"></span></summary>
+        <ul id="rematch-list" class="challenges"></ul>
       </details>
 
       <details id="direct-duel" class="card direct" hidden>
@@ -187,6 +169,7 @@
 
     <!-- ============ EVENTOS ============ -->
     <section id="view-eventos" class="view" hidden>
+      <div id="next-event"></div>
       <h2 class="section-title">📅 Calendario de eventos</h2>
       <div id="calendar"></div>
 
@@ -245,6 +228,12 @@
         <div class="card">
           <h3>🛒 Mercado negro</h3>
           <ul id="market" class="market"></ul>
+        </div>
+
+        <div id="roulette-card" class="card rl-card" hidden>
+          <div class="rl-card-art">🎰</div>
+          <div><b>Ruleta de la Banca</b><div class="small muted">Pleno, rojo o negro, docenas… Sin límite de apuesta.</div></div>
+          <button type="button" class="btn primary" data-roulette-open>Jugar</button>
         </div>
 
         <div class="card" id="app-card"></div>

@@ -1,22 +1,16 @@
 // ============================================================
-//  MÓDULO: 🐦 SALA DE FLAPPY (todos a la vez, en tiempo real)
-//  Alguien abre una sala (con entrada opcional), los demás entran y quien
-//  la abrió pulsa «¡Empezar!». Todos juegan la misma partida a la vez y
-//  ven las caras del resto volando.
-//
-//  Cada móvil solo envía SUS TOQUES (unas pocas veces por segundo). Como la
-//  física es determinista, cada móvil reconstruye a los demás a partir de sus
-//  toques: se ven en tiempo real y sin mandar posiciones. Si alguien se
+//  MÓDULO: 🐦 FLAPPY EN TIEMPO REAL (motor de las mesas de Flappy)
+//  Todos los sentados juegan la misma partida a la vez y ven las caras del
+//  resto volando. Cada móvil solo envía SUS TOQUES; como la física es
+//  determinista, cada móvil reconstruye a los demás a partir de ellos (se
+//  ven con medio segundo de retraso para que no den saltos). Si alguien se
 //  desconecta, su pájaro deja de aletear y se cae solo.
-//
-//  Datos (fuera de las colecciones normales, en tiempo real):
-//    games/{partida}/flappy/{sala}            → la sala
-//    games/{partida}/flappy/{sala}/live/{id}  → toques y resultado de cada uno
-//  Premio: tx `flroom_<sala>` (todos ponen la entrada y el ganador se la lleva)
+//  Tiempo real: games/{partida}/flappy/{mesa}/live/{jugador} (fuera de las
+//  colecciones normales). La mesa (módulo de mesas) reparte el bote.
 // ============================================================
 (window.MNModules = window.MNModules || []).push((function () {
   'use strict';
-  let MN; let api = null; let rooms = []; let unRooms = null;
+  let MN; let api = null;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const LAG = 30; // pasos (½ s) de retraso con que se ve a los rivales
 
@@ -55,62 +49,9 @@
     };
   }
 
-  // ---------------------------------------------------------- tarjeta en ⚔️ Duelo
-  function render() {
-    const el = MN.$('#flappy-rooms'); if (!el || !MN.S) return;
-    const mine = MN.me(); const esc = MN.esc;
-    const list = rooms.slice().sort((a, b) => a.createdAt - b.createdAt);
-    const face = (id) => `<span class="fr-face" title="${esc(MN.player(id).name)}">${MN.face(MN.player(id), 'mini')}</span>`;
-    const card = (r) => {
-      const inside = mine && r.players.includes(mine.id); const host = mine && r.host === mine.id;
-      let actions = '';
-      if (r.status === 'lobby' && mine) {
-        if (!inside) actions += `<button type="button" class="btn primary" data-fr="join" data-id="${esc(r.id)}">🐦 Entrar</button>`;
-        if (inside && !host) actions += `<button type="button" class="btn ghost" data-fr="leave" data-id="${esc(r.id)}">Salir</button>`;
-        if (host) actions += `<button type="button" class="btn primary" data-fr="start" data-id="${esc(r.id)}" ${r.players.length < 2 ? 'disabled' : ''}>🚀 ¡Empezar!</button><button type="button" class="btn ghost" data-fr="close" data-id="${esc(r.id)}">Cerrar sala</button>`;
-      }
-      if (r.status === 'playing' && inside) actions += `<button type="button" class="btn primary" data-fr="play" data-id="${esc(r.id)}">▶ Volver a la partida</button>`;
-      return `<li class="challenge fr-room ${r.status}">
-        <div class="ch-head">🐦 <b>Sala de ${esc(MN.player(r.host).name)}</b><span class="ch-amount">${r.buyIn ? r.buyIn * r.players.length : '🎉'}</span></div>
-        <div class="ch-sub">${r.buyIn ? `Entrada ${r.buyIn} · el ganador se lleva el bote` : 'Por diversión (sin fichas en juego)'}${r.msg ? ` · “${esc(r.msg)}”` : ''}</div>
-        <div class="fr-faces">${r.players.map(face).join('')}</div>
-        <div class="ch-status">${r.status === 'playing' ? `🔴 Jugando ahora (${r.players.length})` : r.players.length < 2 ? '⏳ Esperando a más jugadores…' : `🪑 ${r.players.length} dentro. ${host ? 'Cuando estéis todos, ¡empieza!' : 'Esperando a que empiece…'}`}</div>
-        ${actions ? `<div class="ch-actions">${actions}</div>` : ''}</li>`;
-    };
-    el.innerHTML = `<ul class="challenges">${list.map(card).join('') || '<li class="empty">No hay ninguna sala abierta. ¡Abre una y que entren todos!</li>'}</ul>`;
-  }
-
-  // ---------------------------------------------------------- acciones
-  async function onClick(e) {
-    const b = e.target.closest('[data-fr]'); if (!b) return;
-    const mine = MN.me(); if (!mine || !api) return;
-    const r = rooms.find((x) => x.id === b.dataset.id); const act = b.dataset.fr;
-    if (act === 'join') {
-      if ((r.buyIn || 0) > (MN.balances()[mine.id] || 0)) return MN.toast(`No tienes fichas para la entrada (${r.buyIn})`, 'bad');
-      return api.join(r.id, mine.id).then(() => MN.toast('🐦 ¡Dentro! Espera a que empiece', 'ok'));
-    }
-    if (act === 'leave') return api.leave(r.id, mine.id);
-    if (act === 'close' && r.host === mine.id) return api.updateRoom(r.id, { status: 'cancelled' });
-    if (act === 'start' && r.host === mine.id && r.players.length >= 2) return api.updateRoom(r.id, { status: 'playing', startAt: Date.now() + 4000 });
-    if (act === 'play') return playRoom(r);
-  }
-
-  async function createRoom(e) {
-    e.preventDefault();
-    const mine = MN.me(); if (!mine || !api) return;
-    if (rooms.some((r) => r.players.includes(mine.id))) return MN.toast('Ya estás en una sala', 'bad');
-    const buyIn = Math.max(0, parseInt(MN.$('#fr-buyin').value, 10) || 0);
-    if (buyIn > (MN.balances()[mine.id] || 0)) return MN.toast('No tienes tantas fichas', 'bad');
-    const msg = MN.$('#fr-msg').value.trim().slice(0, 80);
-    const id = 'fr_' + Store.uid();
-    await api.setRoom({ id, host: mine.id, buyIn, msg: msg || null, seed: id, status: 'lobby', players: [mine.id], createdAt: Date.now() });
-    MN.$('#fr-msg').value = '';
-    MN.toast('🐦 Sala abierta. Avisamos a todos', 'ok');
-  }
-
   // ---------------------------------------------------------- la partida
   let playingRoom = null;
-  async function playRoom(room) {
+  async function playRoom(room, onFinish) {
     if (playingRoom === room.id) return;
     const F = MN.flappy; const mine = MN.me(); if (!F || !mine) return;
     playingRoom = room.id;
@@ -223,7 +164,7 @@
     };
     const ranking = room.players.map((id) => Object.assign({ id }, scoreOf(id))).sort((a, b) => b.score - a.score || b.steps - a.steps);
     unLive();
-    await finish(room, ranking);
+    if (onFinish) await onFinish(ranking).catch((e) => console.error(e));
     const esc = MN.esc; const medal = (i) => (i < 3 ? MN.MEDALS[i] : `${i + 1}.`);
     const res = F.frame('🐦 Sala de Flappy', `<div class="ag-score">${ranking[0].id === mine.id ? '🏆 ¡Has ganado!' : `Gana ${esc(MN.player(ranking[0].id).name)}`}</div>
       <ol class="fr-rank">${ranking.map((x, i) => `<li class="${x.id === mine.id ? 'me' : ''}"><span>${medal(i)}</span><span>${MN.face(MN.player(x.id), 'mini')} ${esc(MN.player(x.id).name)}</span><b>${x.score}</b></li>`).join('')}</ol>
@@ -234,45 +175,11 @@
     F.close(); playingRoom = null;
   }
 
-  // Cierra la sala y reparte el bote (id fijo: si lo hacen varios móviles a la vez, no se duplica)
-  async function finish(room, ranking) {
-    if (room.buyIn) {
-      const bal = MN.balances(); const payouts = {}; let pot = 0;
-      room.players.forEach((id) => { const paid = Math.min(room.buyIn, Math.max(0, bal[id] || 0)); if (paid) { payouts[id] = -paid; pot += paid; } });
-      payouts[ranking[0].id] = (payouts[ranking[0].id] || 0) + pot;
-      if (!MN.S.txs.some((t) => t.id === 'flroom_' + room.id)) {
-        await Store.put('txs', { id: 'flroom_' + room.id, type: 'payout', kind: 'flappyroom', ts: Date.now(), roomId: room.id, winner: ranking[0].id, pot, score: ranking[0].score, players: room.players.length, payouts }).catch(() => {});
-      }
-    }
-    await api.updateRoom(room.id, { status: 'done', result: ranking.map((x) => ({ id: x.id, score: x.score })) }).catch(() => {});
-  }
-
-  // ---------------------------------------------------------- avisos y arranque automático
-  let known = null;
-  function onRooms(list) {
-    const mine = MN.me();
-    if (known && mine) {
-      list.filter((r) => !known.has(r.id) && r.status === 'lobby' && r.host !== mine.id)
-        .forEach((r) => MN.notify(`🐦 ${MN.esc(MN.player(r.host).name)} abre una sala de Flappy${r.buyIn ? ` (entrada ${r.buyIn})` : ''}. ¡Entra a jugar!`));
-    }
-    known = new Set(list.map((r) => r.id));
-    rooms = list;
-    // Si mi sala empieza, se abre la partida sola
-    const go = mine && list.find((r) => r.status === 'playing' && r.players.includes(mine.id) && r.startAt && Date.now() - r.startAt < 60000);
-    if (go && playingRoom !== go.id) playRoom(go);
-    render();
-  }
-
   return {
     init(a) {
       MN = a;
-      MN.registerTx('flappyroom', { line: (t) => ({ icon: '🐦', text: `${MN.who(t.winner)} gana la sala de Flappy (${t.score} tubos) y se lleva <b>${t.pot}</b> fichas`, sub: `${t.players} jugadores` }) });
-      document.addEventListener('click', onClick);
-      const f = MN.$('#fr-form'); if (f) f.addEventListener('submit', createRoom);
+      // room: { id, seed, players, startAt, buyIn } · onFinish(clasificación) la llama al acabar
+      MN.flappyRoom = { play: (room, onFinish) => { if (!api && Store.mode) api = makeApi(); return playRoom(room, onFinish); }, isPlaying: (id) => playingRoom === id };
     },
-    onState() {
-      if (!api && Store.mode) { api = makeApi(); unRooms = api.watchRooms(onRooms); }
-    },
-    render,
   };
 })());

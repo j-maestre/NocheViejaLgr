@@ -175,6 +175,8 @@
     await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore-compat.js`);
     firebase.initializeApp(cfg);
     const db = firebase.firestore();
+    // Caché en el móvil: al volver a abrir la app solo se descargan los cambios (menos lecturas de Firebase)
+    try { await db.enablePersistence({ synchronizeTabs: true }); } catch (e) { /* navegador sin soporte u otra pestaña: sin caché */ }
     const root = db.collection('games').doc(gameId);
     const col = (n) => root.collection(n);
     const settingsRef = root.collection('meta').doc('settings');

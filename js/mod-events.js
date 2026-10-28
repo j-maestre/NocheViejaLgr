@@ -263,8 +263,10 @@
 
   // ---------------------------------------------------------- render
   function heroEvent() {
+    // Si hay alguno en marcha ya sale arriba del calendario («En marcha ahora»): aquí, el próximo
     const list = events().filter((e) => e.status !== 'done');
-    return list.find((e) => isLive(e)) || list.filter((e) => phase(e) !== 'over').sort((a, b) => a.at - b.at)[0];
+    if (list.some((e) => isLive(e))) return null;
+    return list.filter((e) => phase(e) !== 'over').sort((a, b) => a.at - b.at)[0];
   }
 
   function renderHero() {
@@ -280,7 +282,6 @@
         <div class="ev-desc">${MN.esc(T.desc(set()))}</div>
         <div class="ev-status">${statusLine(ev)}</div>
         ${actionsHtml(ev)}
-        <button type="button" class="link small" data-goto="eventos">📅 Ver calendario completo</button>
       </div></div>`;
   }
 
