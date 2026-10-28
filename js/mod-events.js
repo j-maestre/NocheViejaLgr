@@ -643,7 +643,8 @@
         ${started ? `<div class="bg-ball ${cur ? 'pop' : ''}">${cur || '…'}</div><div class="bg-count">Bola ${out} de 90</div>
         <div class="bg-last">${order.slice(Math.max(0, out - 8), Math.max(0, out - 1)).reverse().map((n) => `<span>${n}</span>`).join('')}</div>` : `<div class="bg-count">Empieza en <b class="ev-cd" data-to="${e.at}">${countdown(e.at - Date.now())}</b></div>`}
         <div class="bg-calls" id="bg-calls">${g && out > g.lineAt ? `<div class="bg-call">📣 LÍNEA: ${[...new Set(g.line.map((x) => x.player))].map(MN.who).join(', ')}</div>` : ''}${g && out > g.bingoAt ? `<div class="bg-call big">🎉 ¡BINGO!: ${[...new Set(g.bingo.map((x) => x.player))].map(MN.who).join(', ')}</div>` : ''}</div>
-        ${myCards.length ? `<div class="bg-cards">${myCards.map(card).join('')}</div>` : '<p class="hint center">No tienes cartones: estás mirando 👀</p>'}</div>`;
+        ${myCards.length ? `<div class="bg-cards">${myCards.map(card).join('')}</div>` : '<p class="hint center">No tienes cartones: estás mirando 👀</p>'}
+        <button type="button" class="btn bg-close" data-bingo="close">✕ Cerrar</button></div>`;
       if (g && out > g.lineAt && !shownLine) { shownLine = true; if (MN.fx) { MN.fx.play('event'); MN.fx.confetti({ count: 80 }); } }
       if (g && out > g.bingoAt && !shownBingo) { shownBingo = true; if (MN.fx) { MN.fx.play('win'); MN.fx.confetti({ count: 240 }); } }
       if (cur && box.dataset.last !== String(cur)) { box.dataset.last = cur; if (MN.fx) MN.fx.play('tick'); }

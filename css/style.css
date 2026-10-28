@@ -1206,3 +1206,6 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .rematch-box summary { display: flex; align-items: center; gap: 8px; }
 .badge-inline { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--red); color: #fff; font-size: 12px; font-weight: 800; }
 .rematch-box .challenges { margin-top: 10px; }
+
+.bg-close { width: auto; min-width: 160px; margin: 6px auto 0; background: #c0182f; color: #fff; border: 2px solid #fff; font-weight: 800; box-shadow: 0 4px 16px rgba(192, 24, 47, .5); }
+.bg-inner, .rl-inner { margin: 0 auto; justify-self: center; }
