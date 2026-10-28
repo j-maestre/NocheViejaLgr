@@ -626,30 +626,64 @@
     await Store.update('events', ev.id, { status: 'done', result: { at: bingoEnd(ev), pot, line: uniq(g.line), bingo: uniq(g.bingo), lineBall: g.lineAt + 1, bingoBall: g.bingoAt + 1, linePrize: linePot, bingoPrize: bingoPotV } });
   }
 
-  // Pantalla en directo: bola actual, últimas bolas y mis cartones marcándose solos
+  // Pantalla en directo: bombo girando, la bola cae al centro y los cartones se marcan solos.
+  // Se pinta una vez y luego solo se actualiza lo que cambia (para que las animaciones no se corten).
   let bingoTimer = null;
+  function drumSvg() {
+    const cols = ['#c0182f', '#1f5fbf', '#2a9d3c', '#f5c542', '#f07c1b', '#7b3fa0', '#1ab3a6'];
+    const balls = Array.from({ length: 16 }, (_, i) => { const a = i * 2.4; const r = 14 + (i % 4) * 9; return `<circle cx="${(60 + r * Math.cos(a)).toFixed(1)}" cy="${(60 + r * Math.sin(a)).toFixed(1)}" r="6.5" fill="${cols[i % cols.length]}" stroke="#fff" stroke-width="1.2"/>`; }).join('');
+    const bars = Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4; return `<line x1="60" y1="60" x2="${(60 + 52 * Math.cos(a)).toFixed(1)}" y2="${(60 + 52 * Math.sin(a)).toFixed(1)}" stroke="#e8c65a" stroke-width="2"/>`; }).join('');
+    return `<svg viewBox="0 0 120 150" class="bg-drum">
+      <rect x="52" y="104" width="16" height="36" rx="3" fill="#8a6a10"/><rect x="20" y="138" width="80" height="8" rx="4" fill="#5a4410"/>
+      <g class="bg-cage">${balls}<circle cx="60" cy="60" r="54" fill="rgba(255,255,255,.06)" stroke="#f5c542" stroke-width="4"/>${bars}<circle cx="60" cy="60" r="7" fill="#f5c542"/></g></svg>`;
+  }
   function watchBingo(ev) {
     const box = MN.$('#bingo'); if (!box) return;
     box.hidden = false; document.body.classList.add('no-scroll');
-    const mine = MN.me(); let shownLine = false; let shownBingo = false;
+    const mine = MN.me(); let shownLine = false; let shownBingo = false; let lastCur = null; let first = true;
+    const e0 = events().find((x) => x.id === ev.id) || ev;
+    const myCards = mine ? bingoCards(e0).filter((x) => x.player === mine.id) : [];
+    const card = (x) => { const c = cardNumbers(x.id); return `<div class="bg-card">${c.grid.map((row) => `<div class="bg-row">${Array.from({ length: 9 }, (_, k) => row[k] ? `<span data-n="${row[k]}">${row[k]}</span>` : '<span class="blank"></span>').join('')}</div>`).join('')}</div>`; };
+    box.innerHTML = `<div class="bg-inner"><div class="rl-top"><div class="ag-title">🎱 Bingo</div><button type="button" class="tv-exit" data-bingo="close">✕</button></div>
+      <div class="bg-stage">${drumSvg()}<div class="bg-fall" id="bg-fall"></div><div class="bg-ball" id="bg-ball">…</div></div>
+      <div class="bg-count" id="bg-count"></div><div class="bg-last" id="bg-last"></div><div class="bg-calls" id="bg-calls"></div>
+      ${myCards.length ? `<div class="bg-cards">${myCards.map(card).join('')}</div>` : '<p class="hint center">No tienes cartones: estás mirando 👀</p>'}
+      <button type="button" class="btn bg-close" data-bingo="close">✕ Cerrar</button></div>`;
+    const $ = (s) => box.querySelector(s);
+    const show = (n, animate) => {
+      const ball = $('#bg-ball'); const fall = $('#bg-fall');
+      if (!animate) { ball.textContent = n; return; }
+      // La bola sale del bombo, cae hasta el centro y aparece el número
+      ball.classList.remove('pop'); ball.textContent = ''; ball.classList.add('empty');
+      fall.classList.remove('go'); void fall.offsetWidth; fall.classList.add('go');
+      setTimeout(() => {
+        ball.classList.remove('empty'); ball.textContent = n; void ball.offsetWidth; ball.classList.add('pop');
+        if (MN.fx) MN.fx.play('tick');
+        box.querySelectorAll(`.bg-row span[data-n="${n}"]`).forEach((s) => s.classList.add('hit'));
+      }, 1100);
+    };
     const paint = () => {
       const e = events().find((x) => x.id === ev.id) || ev;
       const g = bingoGame(e); const order = drawOrder(e); const out = Math.min(ballsOut(e), g ? g.bingoAt + 1 : 90);
-      const drawn = new Set(order.slice(0, out)); const cur = out ? order[out - 1] : null;
-      const myCards = mine ? bingoCards(e).filter((x) => x.player === mine.id) : [];
-      const card = (x) => { const c = cardNumbers(x.id); return `<div class="bg-card">${c.grid.map((row) => `<div class="bg-row">${Array.from({ length: 9 }, (_, k) => row[k] ? `<span class="${drawn.has(row[k]) ? 'hit' : ''}">${row[k]}</span>` : '<span class="blank"></span>').join('')}</div>`).join('')}</div>`; };
-      const started = Date.now() >= e.at;
-      box.innerHTML = `<div class="bg-inner"><div class="rl-top"><div class="ag-title">🎱 Bingo</div><button type="button" class="tv-exit" data-bingo="close">✕</button></div>
-        ${started ? `<div class="bg-ball ${cur ? 'pop' : ''}">${cur || '…'}</div><div class="bg-count">Bola ${out} de 90</div>
-        <div class="bg-last">${order.slice(Math.max(0, out - 8), Math.max(0, out - 1)).reverse().map((n) => `<span>${n}</span>`).join('')}</div>` : `<div class="bg-count">Empieza en <b class="ev-cd" data-to="${e.at}">${countdown(e.at - Date.now())}</b></div>`}
-        <div class="bg-calls" id="bg-calls">${g && out > g.lineAt ? `<div class="bg-call">📣 LÍNEA: ${[...new Set(g.line.map((x) => x.player))].map(MN.who).join(', ')}</div>` : ''}${g && out > g.bingoAt ? `<div class="bg-call big">🎉 ¡BINGO!: ${[...new Set(g.bingo.map((x) => x.player))].map(MN.who).join(', ')}</div>` : ''}</div>
-        ${myCards.length ? `<div class="bg-cards">${myCards.map(card).join('')}</div>` : '<p class="hint center">No tienes cartones: estás mirando 👀</p>'}
-        <button type="button" class="btn bg-close" data-bingo="close">✕ Cerrar</button></div>`;
+      const cur = out ? order[out - 1] : null; const started = Date.now() >= e.at;
+      $('#bg-count').innerHTML = started ? `Bola ${out} de 90` : `Empieza en <b>${countdown(e.at - Date.now())}</b>`;
+      $('#bg-last').innerHTML = order.slice(Math.max(0, out - 8), Math.max(0, out - 1)).reverse().map((n) => `<span>${n}</span>`).join('');
+      // Marca en los cartones las bolas ya cantadas (la nueva se marca al caer)
+      const drawn = new Set(order.slice(0, out - (cur && cur !== lastCur && !first ? 1 : 0)));
+      box.querySelectorAll('.bg-row span[data-n]').forEach((s) => s.classList.toggle('hit', drawn.has(Number(s.dataset.n))));
+      if (cur && cur !== lastCur) { show(cur, !first); lastCur = cur; }
+      first = false;
+      // La línea se anuncia en grande 5 segundos; después queda como un texto pequeño y quieto
+      const lineWho = g ? [...new Set(g.line.map((x) => x.player))].map(MN.who).join(', ') : '';
+      const lineAge = g ? Date.now() - (e.at + (g.lineAt + 1) * ballMs() + 1100) : 0;
+      const calls = (g && out > g.lineAt ? (lineAge < 5000 ? `<div class="bg-call">📣 LÍNEA: ${lineWho}</div>` : `<div class="bg-call-small">📣 Línea: ${lineWho}</div>`) : '')
+        + (g && out > g.bingoAt ? `<div class="bg-call big">🎉 ¡BINGO!: ${[...new Set(g.bingo.map((x) => x.player))].map(MN.who).join(', ')}</div>` : '');
+      if ($('#bg-calls').dataset.v !== calls) { $('#bg-calls').innerHTML = calls; $('#bg-calls').dataset.v = calls; }
       if (g && out > g.lineAt && !shownLine) { shownLine = true; if (MN.fx) { MN.fx.play('event'); MN.fx.confetti({ count: 80 }); } }
       if (g && out > g.bingoAt && !shownBingo) { shownBingo = true; if (MN.fx) { MN.fx.play('win'); MN.fx.confetti({ count: 240 }); } }
-      if (cur && box.dataset.last !== String(cur)) { box.dataset.last = cur; if (MN.fx) MN.fx.play('tick'); }
+      box.querySelector('.bg-cage').classList.toggle('fast', started && !(g && out > g.bingoAt));
     };
-    clearInterval(bingoTimer); paint(); bingoTimer = setInterval(paint, 500);
+    clearInterval(bingoTimer); paint(); bingoTimer = setInterval(paint, 400);
   }
   function closeBingo() { clearInterval(bingoTimer); const box = MN.$('#bingo'); if (box) { box.hidden = true; box.innerHTML = ''; } document.body.classList.remove('no-scroll'); }
 
