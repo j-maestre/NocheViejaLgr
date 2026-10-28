@@ -159,6 +159,8 @@
     }
   }
   const isLive = (ev) => ['live', 'signup', 'playing', 'voting', 'reign', 'choosing', 'drawing'].includes(phase(ev));
+  // «En vivo» para el aviso de la pestaña y el bloque de arriba: en juego, o con la venta de boletos/cartones a punto de cerrar
+  const isHot = (ev, now = Date.now()) => ev.status === 'scheduled' && (isLive(ev) || (phase(ev, now) === 'selling' && ev.at - now <= 30 * MIN));
   const happyActiveAt = (ts) => events().some((e) => e.type === 'happyhour' && ts >= e.at && ts < happyEnd(e));
 
   function countdown(ms) {
@@ -265,7 +267,7 @@
   function heroEvent() {
     // Si hay alguno en marcha ya sale arriba del calendario («En marcha ahora»): aquí, el próximo
     const list = events().filter((e) => e.status !== 'done');
-    if (list.some((e) => isLive(e))) return null;
+    if (list.some((e) => isHot(e))) return null;
     return list.filter((e) => phase(e) !== 'over').sort((a, b) => a.at - b.at)[0];
   }
 
@@ -304,7 +306,7 @@
           </div></li>`;
     };
     // Los eventos en marcha van arriba del todo
-    const live = all.filter((ev) => ev.status === 'scheduled' && isLive(ev));
+    const live = all.filter((ev) => isHot(ev));
     const rest = all.filter((ev) => !live.includes(ev));
     const byDay = {};
     rest.forEach((e) => { const k = new Date(e.at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); (byDay[k] = byDay[k] || []).push(e); });
@@ -321,7 +323,7 @@
   // Pestaña de eventos: punto rojo si hay alguno en marcha
   function renderTab() {
     const tab = MN.$('#ev-tab-live'); if (!tab) return;
-    tab.hidden = !events().some((ev) => ev.status === 'scheduled' && isLive(ev));
+    tab.hidden = !events().some((ev) => isHot(ev));
   }
 
   function render() {
@@ -388,7 +390,7 @@
     const now = Date.now();
     MN.$$('.ev-cd').forEach((el) => { el.textContent = countdown(Number(el.dataset.to) - now); });
     // Si un evento cambia de fase, se vuelve a pintar todo
-    const key = events().map((e) => e.id + phase(e, now)).join('|');
+    const key = events().map((e) => e.id + phase(e, now) + (isHot(e, now) ? '!' : '')).join('|');
     if (key !== lastPhases) { lastPhases = key; if (MN.S) { render(); remind(); sweepSoon(); } }
     // Al empezar o acabar la censura del ranking hay que repintarlo todo
     const masked = !!(MN.S && MN.rankMask());
@@ -913,8 +915,8 @@
       });
       MN.$('#ev-surprise').addEventListener('click', async () => {
         const type = MN.$('#ev-type').value; const s = set();
-        // Lotería: 30 min de venta. Cronómetro: la inscripción abre ya.
-        const lead = type === 'lottery' ? 30 * MIN : type === 'stopwatch' ? (Number(s.stopwatchSignupMinutes) || 15) * MIN : 0;
+        // Lotería: 30 min de venta. Bingo: 15 min para comprar cartones. Cronómetro: la inscripción abre ya.
+        const lead = type === 'lottery' ? 30 * MIN : type === 'bingo' ? 15 * MIN : type === 'stopwatch' ? (Number(s.stopwatchSignupMinutes) || 15) * MIN : 0;
         const ok = await MN.modal(`<div class="modal-icon">⚡</div><p class="modal-text">¿Lanzar ${TYPES[type].icon} <b>${TYPES[type].name}</b> por sorpresa ahora mismo?</p>`, 'Lanzar');
         if (ok) MN.act(() => Store.put('events', { id: Store.uid(), type, at: Date.now() + lead, status: 'scheduled', surprise: true, createdAt: Date.now() }), '⚡ ¡Evento sorpresa lanzado!');
       });
