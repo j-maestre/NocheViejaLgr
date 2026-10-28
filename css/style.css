@@ -1122,3 +1122,20 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .fl-hud { position: absolute; top: 10px; left: 0; right: 0; text-align: center; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 44px; color: #fff; text-shadow: 0 2px 6px #000; pointer-events: none; }
 .fl-tip { position: absolute; inset: auto 0 40% 0; text-align: center; font-weight: 800; font-size: 20px; color: #fff; text-shadow: 0 2px 6px #000; pointer-events: none; animation: pulse 1.2s infinite; }
 @media (max-height: 640px) { .ag-stage { min-height: 150px; } .poke { width: 150px; height: 150px; } .logo-win { width: 160px; height: 160px; } .color-target { width: 150px; height: 150px; } }
+
+.cp-reject { margin-top: 4px; color: var(--muted); }
+
+/* Selector de dos botones (tipo de juego) */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 8px; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid var(--line); }
+.seg button { border: 0; border-radius: 10px; padding: 10px 6px; font: inherit; font-weight: 700; color: var(--muted); background: transparent; cursor: pointer; }
+.seg button.on { background: var(--gold); color: #1a1205; box-shadow: 0 2px 10px rgba(245, 197, 66, .35); }
+
+/* ---------- 🐦 Sala de Flappy ---------- */
+.fr-faces { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; font-size: 24px; }
+.fr-face img.face.mini { width: 30px; height: 30px; vertical-align: middle; }
+.fr-room.playing { border-color: var(--red); }
+.fr-alive { position: absolute; bottom: 36px; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.fr-rank { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; }
+.fr-rank li { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.05); text-align: left; }
+.fr-rank li.me { border: 1px solid var(--gold); }
+.fr-rank li b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 24px; color: var(--gold); }

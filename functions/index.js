@@ -138,6 +138,13 @@ exports.prestamos = onDocumentWritten('games/{gameId}/txs/{id}', async (e) => {
   ]);
 });
 
+// ---------------------------------------------------------- 🐦 salas de Flappy
+exports.salas = onDocumentWritten('games/{gameId}/flappy/{id}', async (e) => {
+  if (e.data.before.exists || !e.data.after.exists) return null;
+  const r = e.data.after.data(); const n = await names(e.params.gameId);
+  return send(e.params.gameId, null, `🐦 ${n[r.host] || 'Alguien'} abre una sala de Flappy${r.buyIn ? ` (entrada ${r.buyIn})` : ''}. ¡Entra a jugar!`, r.host);
+});
+
 // ---------------------------------------------------------- jugadores nuevos
 exports.registros = onDocumentWritten('games/{gameId}/players/{id}', async (e) => {
   if (e.data.before.exists || !e.data.after.exists) return null;

@@ -45,7 +45,9 @@
       return deviceMem || (deviceMem = 'dev_' + Store.uid() + Store.uid());
     }
   }
-  const me = () => S && S.players.find((p) => (p.deviceIds || []).includes(deviceId()));
+  // En el modo de pruebas local, «?local&yo=Nombre» hace de ese jugador (para probar varios a la vez en pestañas)
+  const testAs = (window.MN_CONFIG || {}).localTest ? new URLSearchParams(location.search).get('yo') : null;
+  const me = () => S && (testAs ? S.players.find((p) => p.name === testAs) : S.players.find((p) => (p.deviceIds || []).includes(deviceId())));
 
   function isSpectator() {
     try { return sessionStorage.getItem('mn_spectator') === '1' || spectatorMem; } catch (e) { return spectatorMem; }
@@ -381,10 +383,11 @@
   // ============================================================
   //  UI GENÉRICA: modal, toast, navegación
   // ============================================================
-  function modal(html, okLabel = 'Confirmar') {
+  function modal(html, okLabel = 'Confirmar', cancelLabel = 'Cancelar') {
     const m = $('#modal');
     $('#modal-body').innerHTML = html;
     $('#modal-ok').textContent = okLabel;
+    $('#modal-cancel').textContent = cancelLabel;
     m.hidden = false;
     const first = $('input, select, textarea', m);
     if (first) setTimeout(() => first.focus(), 30);
@@ -687,6 +690,7 @@
   // ============================================================
   //  RENDER: RETOS
   // ============================================================
+  let gameKind = 'app';
   function renderChallengeForm() {
     const mine = me();
     $('#challenge-noreg').hidden = !!mine;
@@ -700,11 +704,13 @@
     if ([...sel.options].some((o) => o.value === v)) sel.value = v;
 
     const g = $('#c-game'); const gv = g.value;
-    // Dos listas: juegos dentro de la app y juegos en persona
+    // Dos tipos de juego, cada uno con su botón: dentro de la app o en persona
     const app = MN.appGames ? MN.appGames.list() : [];
     const irl = (S.settings.games || []).filter((x) => !appGameOf(x));
-    g.innerHTML = (app.length ? `<optgroup label="📱 En la app">${app.map((x) => `<option value="${esc(x.name)}">${x.icon} ${esc(x.name)}</option>`).join('')}</optgroup>` : '')
-      + `<optgroup label="🍻 En persona">${irl.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}<option value="__other">Otro…</option></optgroup>`;
+    $$('#c-kind [data-kind]').forEach((b) => b.classList.toggle('on', b.dataset.kind === gameKind));
+    g.innerHTML = gameKind === 'app' && app.length
+      ? app.map((x) => `<option value="${esc(x.name)}">${x.icon} ${esc(x.name)}</option>`).join('')
+      : irl.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join('') + '<option value="__other">Otro…</option>';
     if (gv && [...g.options].some((o) => o.value === gv)) g.value = gv;
     $('#c-game-other').hidden = g.value !== '__other';
     updateChallengeForm();
@@ -765,7 +771,8 @@
       const G = MN.appGames.GAMES[agId(c)];
       const played = [c.from, c.to].filter((id) => agOver(c, id)).length;
       if (mineC && !agMine(c, myId) && agStarted(c, myId)) {
-        status = `${G.icon} Empezaste tu turno y no lo terminaste. Solo había un intento… ${agQuit(c, myId) ? 'cuenta como abandonado.' : 'si no lo acabas pronto, contará como abandonado.'}`;
+        if (agQuit(c, myId)) status = `${G.icon} Empezaste tu turno y no lo terminaste: cuenta como abandonado.`;
+        else { status = `${G.icon} Tu turno se quedó a medias. Puedes seguir por donde ibas (la ronda que estabas jugando cuenta como fallada).`; actions = btn('agplay', '▶ Continuar mi turno', 'primary'); }
       } else if (mineC && !agMine(c, myId)) {
         status = `${G.icon} ¡A jugar! Cada uno juega su turno en la app y gana quien saque más puntos.${agOver(c, rivalOf(c, myId)) ? ` <b class="who">${esc(rival.name)}</b> ya ha jugado.` : ''}`;
         actions = btn('agplay', `${G.icon} Jugar mi turno`, 'primary');
@@ -866,6 +873,8 @@
     prevCh = now;
   }
 
+  let rejectNow = false;
+  document.addEventListener('click', (e) => { if (e.target.closest('#cp-reject')) { rejectNow = true; $('#modal-cancel').click(); } });
   async function challengePopup(c) {
     if (!$('#modal').hidden || document.visibilityState !== 'visible' || !$('#app-game').hidden || !$('#sw-game').hidden) return;
     const p = player(c.from);
@@ -873,8 +882,11 @@
       <div class="cp-face">${face(p)}</div>
       <div class="cp-who">${esc(p.name)}</div>
       <div class="cp-what">${c.allIn ? '💣 te reta a un <b>ALL IN</b>' : '⚔️ te reta'} a <b>${esc(c.game)}</b></div>
-      <div class="cp-amount">${c.allIn ? allInAmount(c.from, c.to) : c.amount} <span>fichas</span></div></div>`, '✅ Aceptar');
-    if (!ok) { go('duelo'); return; }
+      <div class="cp-amount">${c.allIn ? allInAmount(c.from, c.to) : c.amount} <span>fichas</span></div>
+      <button type="button" class="link cp-reject" id="cp-reject">🐔 Rechazar el reto</button>
+      <p class="hint center">Si ahora no puedes, contéstalo luego desde ⚔️ Duelo.</p></div>`, '✅ Aceptar', '⏰ Más tarde');
+    if (rejectNow) { rejectNow = false; go('duelo'); const r = $(`[data-act="reject"][data-id="${c.id}"]`); if (r) r.click(); return; }
+    if (!ok) return; // más tarde: se queda pendiente en ⚔️ Duelo
     go('duelo');
     const b = $(`[data-act="accept"][data-id="${c.id}"]`);
     if (b) b.click();
@@ -979,7 +991,8 @@
           break;
         }
         case 'agplay': {
-          if (!isAgGame(c) || c.status !== 'accepted' || agStarted(c, myId) || !MN.appGames) return;
+          if (!isAgGame(c) || c.status !== 'accepted' || agMine(c, myId) || agQuit(c, myId) || !MN.appGames) return;
+          const resuming = agStarted(c, myId);
           if (ended()) return toast('🏁 La partida ha terminado', 'bad');
           const rid = rivalOf(c, myId);
           const ghostData = c['agx_' + rid];
@@ -988,6 +1001,8 @@
             after: agOver(c, rid) ? `${esc(player(rid).name)} ya ha jugado: ¡ahora sale el resultado!` : `El resultado sale cuando juegue ${esc(player(rid).name)}.`,
             // Al pulsar «Empezar» ya cuenta como jugado (con 0 puntos hasta que acabe)
             onStart: () => Store.updateChallenge(c.id, { ['ags_' + myId]: Date.now() }).catch(() => {}),
+            resume: resuming ? (c['agp_' + myId] || { round: 0 }) : null,
+            onProgress: (p) => Store.updateChallenge(c.id, { ['agp_' + myId]: p }).catch(() => {}),
           });
           if (!res) return;
           const at = Date.now();
@@ -1472,6 +1487,7 @@
     // --- Retos
     $('#c-rival').addEventListener('change', updateChallengeForm);
     $('#c-allin').addEventListener('change', updateChallengeForm);
+    $('#c-kind').addEventListener('click', (e) => { const b = e.target.closest('[data-kind]'); if (!b) return; gameKind = b.dataset.kind; $('#c-game').value = ''; renderChallengeForm(); });
     $('#c-game').addEventListener('change', () => { $('#c-game-other').hidden = $('#c-game').value !== '__other'; });
     $('#c-bet-range').addEventListener('input', (e) => { $('#c-bet').value = e.target.value; });
     $('#c-bet').addEventListener('input', (e) => { $('#c-bet-range').value = e.target.value; });

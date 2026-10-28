@@ -30,8 +30,9 @@
   const waitClick = (el, sel) => new Promise((res) => { el.addEventListener('click', (e) => { const b = e.target.closest(sel); if (b) res(b); }); });
 
   // Pantalla inicial: Empezar / Ahora no
-  let startHook = null;
+  let startHook = null; let resume = null; let progress = null;
   async function intro(G, desc) {
+    if (resume) return true; // continuando un turno a medias: sin pantalla inicial
     const body = frame(`${G.icon} ${G.name}`, `<p class="ag-desc">${desc}</p>
       <p class="hint center">⚠️ Solo tienes un intento: si sales a medias, cuenta lo que lleves.</p>
       <button type="button" class="btn primary ag-go" data-ag="go">¡Empezar!</button><button type="button" class="link" data-ag="no">Ahora no</button>`);
@@ -49,8 +50,10 @@
   // ---------------------------------------------------------- motor de preguntas
   // rounds: [{ show(el) → promesa, options: [..], ok: índice, reveal(el) }]
   async function quizRun(G, rounds, perRound) {
-    let correct = 0; let total = 0;
-    for (let i = 0; i < rounds.length; i++) {
+    // Si se recarga a mitad, se sigue desde la ronda siguiente (la que se estaba jugando cuenta como fallada)
+    let correct = (resume && resume.correct) || 0; let total = (resume && resume.total) || 0;
+    for (let i = (resume && resume.round) || 0; i < rounds.length; i++) {
+      if (progress) await progress({ round: i + 1, correct, total: total + perRound });
       const R = rounds[i];
       const body = frame(`${G.icon} ${G.name}`, `<div class="ag-round">Ronda ${i + 1} de ${rounds.length} · ✅ ${correct}</div>
         <div class="ag-stage" id="ag-stage"></div><div class="ag-timer"><i id="ag-bar"></i></div>
@@ -72,6 +75,7 @@
       if (picked === R.ok) { correct++; if (MN.fx) MN.fx.play('tick'); } else { if (picked >= 0) opts[picked].classList.add('wrong'); if (MN.fx) MN.fx.play('stop'); }
       if (R.reveal) R.reveal(stage);
       if (R.stop) R.stop();
+      if (progress) progress({ round: i + 1, correct, total });
       await sleep(1300);
     }
     return { score: correct * 100000 - Math.round(total), label: `${correct}/${rounds.length} · ${secs(total)} s`, correct, total };
@@ -313,11 +317,14 @@
     const [name, hex] = COLORS[Math.floor(rng(seed + 'color')() * COLORS.length)];
     if (!await intro(G, 'Te diremos un <b>color</b>. Tienes <b>60 segundos</b> para encontrar algo de ese color y hacerle una foto (que el objeto ocupe el <b>centro</b>). Cuanto más se parezca, más puntos.')) return null;
     const LIMIT = 60000;
+    const deadline = (resume && resume.deadline) || Date.now() + LIMIT;
+    if (progress && !resume) await progress({ deadline });
+    if (Date.now() > deadline) return { score: 0, label: '⏰ Se acabó el tiempo: 0 %', data: null };
     const body = frame(`${G.icon} ${G.name}`, `<div class="color-target" style="background:${hex}"><span>${name}</span></div>
       <div class="ag-timer"><i id="ag-bar"></i></div><div class="center ag-left" id="ag-left">60 s</div>
       <label class="btn primary ag-go">📸 Hacer la foto<input type="file" accept="image/*" capture="environment" hidden id="color-file"></label>
       <button type="button" class="link" id="color-give">Me rindo</button>`);
-    const t0 = performance.now(); const bar = body.querySelector('#ag-bar'); let raf;
+    const t0 = performance.now() - (LIMIT - (deadline - Date.now())); const bar = body.querySelector('#ag-bar'); let raf;
     const tick = () => { const k = (performance.now() - t0) / LIMIT; bar.style.width = `${Math.max(0, 100 - k * 100)}%`; body.querySelector('#ag-left').textContent = `${Math.max(0, Math.ceil((LIMIT - (performance.now() - t0)) / 1000))} s`; raf = requestAnimationFrame(tick); };
     tick();
     const file = await new Promise((res) => {
@@ -376,6 +383,9 @@
   }
   async function playFlappy(G, seed, opts) {
     const ghost = opts.ghost;
+    if (resume && resume.restarts >= 1) return { score: 0, label: '💥 Se cortó la partida dos veces: 0 tubos', data: { f: [] } };
+    if (progress) await progress({ restarts: resume ? (resume.restarts || 0) + 1 : 0 });
+    if (resume) MN.toast('🐦 La partida se cortó: vuelves a empezar (solo una vez)', 'ok');
     if (!await intro(G, `Toca la pantalla para que <b>tu cara</b> aletee y pase entre los tubos. Cada tubo, un punto. ${ghost ? `👻 Verás el fantasma de <b>${MN.esc(ghost.player.name)}</b> jugando la misma partida.` : 'Si tu rival juega después, te verá como fantasma 👻.'}`)) return null;
     const body = frame(`${G.icon} ${G.name}`, `<div class="fl-wrap"><canvas id="fl" width="${FL.W}" height="${FL.H}"></canvas>
       <div class="fl-hud" id="fl-hud">0</div><div class="fl-tip" id="fl-tip">Toca para empezar</div></div>`);
@@ -442,19 +452,20 @@
     const G = GAMES[id]; if (!G || !G.play) return null;
     open();
     try {
-      startHook = opts.onStart || null;
+      startHook = opts.onStart || null; resume = opts.resume || null; progress = opts.onProgress || null;
       const res = await G.play(G, seed, opts);
       if (res) await outro(G, `<div class="ag-score">${res.label}</div><p class="center">${opts.after || ''}</p>`);
       return res;
     } catch (e) {
       console.error(e); MN.toast('❌ El juego ha fallado: ' + MN.esc(e.message || e), 'bad'); return null;
-    } finally { close(); }
+    } finally { close(); resume = null; progress = null; }
   }
 
   return {
     init(api) {
       MN = api;
       MN.appGames = { GAMES, play, list: () => Object.entries(GAMES).map(([id, G]) => ({ id, ...G })) };
+      MN.flappy = { FL, flappyWorld, bird, stepBird, faceDrawer, open, close, frame, waitClick };
     },
   };
 })());
