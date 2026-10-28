@@ -378,7 +378,7 @@
       const next = Object.assign({}, s, {
         startDate: r.startDate, happyMinutes: r.happyMinutes, stopwatchSignupMinutes: r.stopwatchSignupMinutes, stopwatchPlayMinutes: r.stopwatchPlayMinutes,
         communistMaskMinutes: r.communistMaskMinutes == null || r.communistMaskMinutes === 60 ? 30 : r.communistMaskMinutes,
-        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10, kingMinutes: r.kingMinutes || 60, kingEveryMinutes: r.kingEveryMinutes || 10, dilemmaMinutes: r.dilemmaMinutes || 10, bingoBallSeconds: r.bingoBallSeconds || 6,
+        plebisciteVoteMinutes: r.plebisciteVoteMinutes || 10, kingMinutes: r.kingMinutes || 60, kingEveryMinutes: r.kingEveryMinutes || 10, dilemmaMinutes: r.dilemmaMinutes || 10, bingoBallSeconds: r.bingoBallSeconds || 4,
       });
       delete next.eventRehearsal;
       await Store.saveSettings(next);
@@ -570,7 +570,7 @@
   // ---------------------------------------------------------- 🎱 bingo (90 bolas)
   // Todo se deduce de la semilla: el orden de las bolas y los números de cada cartón.
   // La bola k sale en ev.at + (k+1)·intervalo, igual en todos los móviles.
-  const ballMs = () => Math.max(2, Number(set().bingoBallSeconds) || 6) * 1000;
+  const ballMs = () => Math.max(2, Number(set().bingoBallSeconds) || 4) * 1000;
   function evRng(seed) { let a = MN.hash(seed) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const drawCache = {};
   function drawOrder(ev) {

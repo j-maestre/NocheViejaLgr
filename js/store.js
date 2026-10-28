@@ -80,7 +80,7 @@
     // 🕵️ Misiones diarias
     missionsPerDay: 3, missionReward: 8,
     // 🎱 Bingo (evento)
-    bingoPrice: 5, bingoMaxCards: 4, bingoBallSeconds: 6, bingoBankBonus: 20, bingoLinePct: 30,
+    bingoPrice: 5, bingoMaxCards: 4, bingoBallSeconds: 4, bingoBankBonus: 20, bingoLinePct: 30,
     // 🔮 Porra del campeón y del farolillo rojo
     porraStake: 10, porraCloseDate: '2026-12-30T20:00',
     betWindowMinutes: 10,    // apuestas de espectadores abiertas X min desde que empieza el duelo
@@ -111,6 +111,8 @@
     if (Number(out.settings.plebisciteTribute) === 2) out.settings.plebisciteTribute = 5;
     // La recompensa de la diana pasó de 3 a 6 fichas por victoria
     if (Number(out.settings.bountyPerWin) === 3) out.settings.bountyPerWin = 6;
+    // Las bolas del bingo iban lentas: de 6 a 4 segundos
+    if (Number(out.settings.bingoBallSeconds) === 6) out.settings.bingoBallSeconds = 4;
     out.settings.marketPrices = Object.assign({}, DEFAULTS.marketPrices, (raw.settings || {}).marketPrices || {});
     NAMES.forEach((n) => {
       const k = COLLECTIONS[n];

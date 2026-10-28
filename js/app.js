@@ -1338,6 +1338,7 @@
     $('#s-bounty').value = s.bountyPerWin;
     $('#s-bountymin').value = s.bountyMinStreak;
     $('#s-mission').value = s.missionReward; $('#s-porra').value = s.porraStake; $('#s-lastround').value = s.lastRoundMinutes;
+    $('#s-bingoball').value = s.bingoBallSeconds;
     $('#s-kingmin').value = s.kingMinutes; $('#s-kingevery').value = s.kingEveryMinutes; $('#s-kingtrib').value = s.kingTribute;
     $('#s-porraclose').value = s.porraCloseDate || '';
     $('#s-startdate').value = s.startDate;
@@ -1651,6 +1652,7 @@
         kingMinutes: Math.max(1, parseInt($('#s-kingmin').value, 10) || Store.DEFAULTS.kingMinutes),
         kingEveryMinutes: Math.max(1, parseInt($('#s-kingevery').value, 10) || Store.DEFAULTS.kingEveryMinutes),
         kingTribute: Math.max(1, parseInt($('#s-kingtrib').value, 10) || Store.DEFAULTS.kingTribute),
+        bingoBallSeconds: Math.min(30, Math.max(2, parseFloat($('#s-bingoball').value) || Store.DEFAULTS.bingoBallSeconds)),
         startDate: $('#s-startdate').value || Store.DEFAULTS.startDate,
         endDate: $('#s-end').value || Store.DEFAULTS.endDate,
         limitSchedule: sched.length ? sched : Store.DEFAULTS.limitSchedule,
