@@ -6,7 +6,7 @@
 //  - Muestra notificaciones: las que pide la propia web y las push
 //    que envían las Cloud Functions con la app cerrada.
 // ============================================================
-const CACHE = 'mn-v33';
+const CACHE = 'mn-v35';
 const SHELL = [
   './', 'index.html', 'manifest.json',
   'css/style.css',
@@ -37,7 +37,7 @@ self.addEventListener('fetch', (e) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
       })
-      .catch(() => caches.match(req).then((r) => r || caches.match('index.html')))
+      .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('index.html')))
   );
 });
 

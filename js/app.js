@@ -119,7 +119,10 @@
   const player = (id) => S.players.find((p) => p.id === id) || { name: '¿?', emoji: '❓' };
   // Cara del jugador: su foto si tiene, si no su emoji
   const face = (p, cls = '') => (p && typeof p.photo === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(p.photo)
-    ? `<img class="face ${cls}" src="${p.photo}" alt="">` : esc((p && p.emoji) || '❓'));
+    // La versión pequeña es un círculo con la foto de fondo: así ningún navegador puede estirarla ni aplastarla
+    // (clase propia «face-mini»: la clase «mini» es la de los botones pequeños y le metía relleno y borde)
+    ? (cls === 'mini' ? `<span class="face face-mini" style="background-image:url('${p.photo}')"></span>` : `<img class="face ${cls}" src="${p.photo}" alt="">`)
+    : esc((p && p.emoji) || '❓'));
   const who = (id) => { const p = player(id); return `<b class="who">${face(p, 'mini')} ${esc(p.name)}</b>`; };
 
   // Tipos de movimiento que añaden los módulos: { tipo: { line(t) } }
