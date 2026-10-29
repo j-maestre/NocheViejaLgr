@@ -284,7 +284,9 @@
   }
 
   // what: 'all' (personal + grupo), 'me' o 'group'
-  function wrapped(what = 'all') {
+  // auto: las diapositivas pasan solas (para la tele)
+  let autoNext = null;
+  function wrapped(what = 'all', auto = false) {
     const st = gameStats(); const mine = MN.me();
     const slides = [...(what !== 'group' && mine ? personalSlides(mine.id, st) : []), ...(what !== 'me' ? groupSlides(st) : [])];
     if (!slides.length) return;
@@ -305,10 +307,12 @@
       const b = e.target.closest('[data-wr]'); if (!b) return;
       if (b.dataset.wr === 'next') i++;
       if (b.dataset.wr === 'prev') i--;
-      if (b.dataset.wr === 'close') { box.hidden = true; document.body.classList.remove('no-scroll'); return; }
+      if (b.dataset.wr === 'close') { clearInterval(autoNext); box.hidden = true; document.body.classList.remove('no-scroll'); return; }
       show();
     };
     show();
+    clearInterval(autoNext);
+    if (auto) autoNext = setInterval(() => { if (box.hidden || i >= slides.length - 1) return clearInterval(autoNext); i++; show(); }, 7000);
   }
 
   // Al cerrar la mesa: ceremonia y, después, el resumen (una vez por móvil)
@@ -327,6 +331,7 @@
       document.addEventListener('click', (e) => {
         if (e.target.closest('#tv-exit')) { history.replaceState(null, '', location.pathname); MN.renderAll(); }
         if (e.target.closest('[data-tv]')) { location.hash = 'tv'; }
+        if (e.target.closest('#tv-copy')) { const u = location.origin + location.pathname + '#tv'; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => MN.toast('📋 Dirección copiada', 'ok')).catch(() => MN.toast(u, 'ok')); }
         if (e.target.closest('[data-ceremony]')) ceremony();
         if (e.target.closest('#cer-wrapped')) { clearTimeout(autoTimer); wrapped(); }
         const w = e.target.closest('[data-wrapped]'); if (w) wrapped(w.dataset.wrapped);
@@ -335,6 +340,7 @@
     },
     render() {
       renderTV();
+      const tu = MN.$('#tv-url'); if (tu) tu.textContent = location.origin + location.pathname + '#tv';
       // Botones de la ceremonia y el wrapped en el banner final
       const fb = MN.$('#final-banner .final');
       if (fb && !fb.querySelector('[data-ceremony]')) fb.insertAdjacentHTML('beforeend', `<div class="final-actions"><button type="button" class="btn ghost" data-ceremony>🏆 Ceremonia</button>${MN.me() ? '<button type="button" class="btn ghost" data-wrapped="me">🎁 Tu resumen</button>' : ''}<button type="button" class="btn ghost" data-wrapped="group">🌍 Resumen del grupo</button></div>`);
@@ -342,7 +348,11 @@
     tick() {
       if (isTV()) tickTV();
       // En la TV, la ceremonia empieza sola al cerrar la mesa
-      if (isTV() && MN.S && MN.ended() && !ceremonyShown) { ceremonyShown = true; ceremony(); }
+      // En la tele: ceremonia, porra y resumen del grupo, todo seguido y sin tocar nada
+      if (isTV() && MN.S && MN.ended() && !ceremonyShown) {
+        ceremonyShown = true; ceremony();
+        setTimeout(() => wrapped('group', true), porra() ? 26000 : 13000);
+      }
       // En los móviles, la ceremonia y el resumen salen solos al cerrar la mesa
       if (!isTV() && !ceremonyShown && MN.S && MN.ended() && MN.me() && MN.S.players.length && MN.$('#ceremony').hidden) { ceremonyShown = true; autoFinale(); }
     },

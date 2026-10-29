@@ -145,6 +145,13 @@ exports.salas = onDocumentWritten('games/{gameId}/flappy/{id}', async (e) => {
   return send(e.params.gameId, null, `🐦 ${n[r.host] || 'Alguien'} abre una sala de Flappy${r.buyIn ? ` (entrada ${r.buyIn})` : ''}. ¡Entra a jugar!`, r.host);
 });
 
+// ---------------------------------------------------------- 📸 fotos de la fiesta
+exports.fotos = onDocumentWritten('games/{gameId}/photos/{id}', async (e) => {
+  if (e.data.before.exists || !e.data.after.exists) return null;
+  const p = e.data.after.data(); const n = await names(e.params.gameId);
+  return send(e.params.gameId, null, `📸 ${n[p.by] || 'Alguien'} ha subido una foto${p.caption ? `: «${p.caption}»` : ''}. ¡Dale ❤️ si te gusta!`, p.by);
+});
+
 // ---------------------------------------------------------- jugadores nuevos
 exports.registros = onDocumentWritten('games/{gameId}/players/{id}', async (e) => {
   if (e.data.before.exists || !e.data.after.exists) return null;
@@ -167,6 +174,18 @@ exports.peticiones = onDocumentWritten('games/{gameId}/entries/{id}', async (e) 
       if (bank && bank !== x.player) return send(g, [bank], `🙏 ${n[x.player] || 'Alguien'} pide un préstamo a la Banca${x.msg ? `: «${x.msg}»` : ''}`);
     }
     if (before && before.status === 'pending' && x.status === 'denied') return send(g, [x.player], '🏦 La Banca ha denegado tu préstamo. Suplica mejor.');
+    return null;
+  }
+  // 🔮 ¿Qué pasará?: pregunta nueva (a todos) y resuelta (a quien apostó)
+  if (x.kind === 'pred') {
+    const n = await names(g);
+    if (!before) return send(g, null, `🔮 ${n[x.by] || 'Alguien'} pregunta: «${x.q}» ¡Apuesta SÍ o NO!`, x.by);
+    if (before.status === 'open' && x.status !== 'open') {
+      const bets = await game(g).collection('entries').where('predId', '==', e.params.id).get();
+      const pids = [...new Set(bets.docs.map((d) => d.data()).filter((b) => b.kind === 'pbet').map((b) => b.player))];
+      const msg = x.status === 'void' ? `🔮 «${x.q}» se ha anulado: recuperas tu apuesta` : `🔮 «${x.q}»: ${x.status === 'yes' ? '¡SÍ pasó!' : 'NO pasó'} Entra a ver si has ganado`;
+      if (pids.length) return send(g, pids, msg);
+    }
     return null;
   }
   if (x.kind === 'card' && x.usedAt && !(before && before.usedAt)) {

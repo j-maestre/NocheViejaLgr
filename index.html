@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=35">
+  <link rel="stylesheet" href="css/style.css?v=36">
 </head>
 <body>
   <div id="mode-banner" class="banner" hidden></div>
@@ -169,6 +169,28 @@
 
     <!-- ============ EVENTOS ============ -->
     <section id="view-eventos" class="view" hidden>
+      <div class="seg seg-3" id="ev-panes"><button type="button" data-evpane="cal" class="on">📅 Eventos</button><button type="button" data-evpane="pred">🔮 ¿Qué pasará?<b class="seg-badge" id="pred-badge" hidden></b></button><button type="button" data-evpane="photos">📸 Fotos<b class="seg-badge" id="photo-badge" hidden></b></button></div>
+
+      <div data-pane="pred" hidden>
+        <p class="hint">Proponed cosas que pueden pasar en la fiesta y apostad si pasarán o no. Cuando se sepa, la Banca lo resuelve y los que acertaron se reparten el bote.</p>
+        <details id="pred-new" class="card direct">
+          <summary>➕ Proponer algo que puede pasar</summary>
+          <form id="pred-form" autocomplete="off">
+            <label>¿Qué puede pasar?<input id="pred-q" maxlength="120" placeholder="Ej.: ¿Se quedará dormido Hugo antes de las 2?"></label>
+            <label>Se puede apostar durante<select id="pred-close"><option value="30">30 minutos</option><option value="60" selected>1 hora</option><option value="120">2 horas</option><option value="240">4 horas</option><option value="0">Hasta que la Banca lo resuelva</option></select></label>
+            <button class="btn primary" type="submit">🔮 Proponer</button>
+          </form>
+        </details>
+        <ul id="pred-list" class="challenges"></ul>
+        <details id="pred-done-wrap" class="card direct" hidden><summary>✅ Ya resueltas</summary><ul id="pred-done" class="challenges"></ul></details>
+      </div>
+
+      <div data-pane="photos" hidden>
+        <p class="hint">Subid fotos de la fiesta con un comentario y dadle ❤️ a las que más os gusten. Al acabar el día, la foto con más ❤️ gana un premio de la Banca.</p>
+        <div id="photo-wall"></div>
+      </div>
+
+      <div data-pane="cal">
       <div id="next-event"></div>
       <h2 class="section-title">📅 Calendario de eventos</h2>
       <div id="calendar"></div>
@@ -196,6 +218,7 @@
 
       <h2 class="section-title">ℹ️ Tipos de evento</h2>
       <div id="cal-legend" class="cal-legend"></div>
+      </div>
     </section>
 
     <!-- ============ NORMAS ============ -->
@@ -229,6 +252,16 @@
           <h3>🛒 Mercado negro</h3>
           <ul id="market" class="market"></ul>
         </div>
+
+        <details class="card direct tv-help">
+          <summary>📺 Ponerla en la tele</summary>
+          <p>La app tiene un <b>modo TV</b> para proyectar: ranking en grande, eventos, retos en juego y, al cerrar la mesa, la ceremonia y el resumen solos.</p>
+          <ol class="tut-list">
+            <li><b>Smart TV o portátil con HDMI</b> (lo mejor): abre en su navegador esta dirección y déjalo en pantalla completa:<br><code id="tv-url"></code></li>
+            <li><b>Chromecast / «Enviar pantalla»</b> desde un Android, o <b>AirPlay</b> desde un iPhone: abre el modo TV en ese móvil y duplica la pantalla (ese móvil queda ocupado).</li>
+          </ol>
+          <div class="row wrap"><button type="button" class="btn ghost" id="tv-copy">📋 Copiar dirección</button><button type="button" class="btn primary" data-tv>📺 Abrir modo TV aquí</button></div>
+        </details>
 
         <div id="roulette-card" class="card rl-card" hidden>
           <div class="rl-card-art">🎰</div>
@@ -370,6 +403,8 @@
               <label>👑 Rey: duración (min)<input type="number" id="s-kingmin" min="1"></label>
               <label>👑 Rey: cobra cada (min)<input type="number" id="s-kingevery" min="1"></label>
               <label>👑 Rey: fichas por jugador<input type="number" id="s-kingtrib" min="1"></label>
+              <label>📸 Premio foto del día<input type="number" id="s-photoprize" min="0"></label>
+              <label>🔮 Apuesta máx. «¿qué pasará?» (%)<input type="number" id="s-predpct" min="1" max="100"></label>
               <label>🎱 Bingo: segundos por bola<input type="number" id="s-bingoball" min="2" max="30" step="0.5"></label>
             </div>
             <label>Inicio de la partida<input type="datetime-local" id="s-startdate"></label>
@@ -493,26 +528,28 @@
   <div id="show" class="show" hidden></div>
   <div id="tutorial" class="tutorial" hidden></div>
 
-  <script src="js/config.js?v=35"></script>
-  <script src="js/store.js?v=35"></script>
-  <script src="js/chart.js?v=35"></script>
-  <script src="js/mod-app.js?v=35"></script>
-  <script src="js/mod-tables.js?v=35"></script>
-  <script src="js/mod-events.js?v=35"></script>
-  <script src="js/mod-extras.js?v=35"></script>
-  <script src="js/mod-bets.js?v=35"></script>
-  <script src="js/mod-market.js?v=35"></script>
-  <script src="js/mod-fx.js?v=35"></script>
-  <script src="js/mod-tv.js?v=35"></script>
-  <script src="js/mod-shows.js?v=35"></script>
-  <script src="js/mod-photo.js?v=35"></script>
-  <script src="js/mod-tutorial.js?v=35"></script>
-  <script src="js/mod-loans.js?v=35"></script>
-  <script src="js/mod-missions.js?v=35"></script>
-  <script src="js/mod-porra.js?v=35"></script>
-  <script src="js/mod-games.js?v=35"></script>
-  <script src="js/mod-flappyroom.js?v=35"></script>
-  <script src="js/mod-roulette.js?v=35"></script>
-  <script src="js/app.js?v=35"></script>
+  <script src="js/config.js?v=36"></script>
+  <script src="js/store.js?v=36"></script>
+  <script src="js/chart.js?v=36"></script>
+  <script src="js/mod-app.js?v=36"></script>
+  <script src="js/mod-tables.js?v=36"></script>
+  <script src="js/mod-events.js?v=36"></script>
+  <script src="js/mod-extras.js?v=36"></script>
+  <script src="js/mod-bets.js?v=36"></script>
+  <script src="js/mod-market.js?v=36"></script>
+  <script src="js/mod-fx.js?v=36"></script>
+  <script src="js/mod-tv.js?v=36"></script>
+  <script src="js/mod-shows.js?v=36"></script>
+  <script src="js/mod-photo.js?v=36"></script>
+  <script src="js/mod-tutorial.js?v=36"></script>
+  <script src="js/mod-loans.js?v=36"></script>
+  <script src="js/mod-missions.js?v=36"></script>
+  <script src="js/mod-porra.js?v=36"></script>
+  <script src="js/mod-games.js?v=36"></script>
+  <script src="js/mod-flappyroom.js?v=36"></script>
+  <script src="js/mod-predict.js?v=36"></script>
+  <script src="js/mod-photowall.js?v=36"></script>
+  <script src="js/mod-roulette.js?v=36"></script>
+  <script src="js/app.js?v=36"></script>
 </body>
 </html>

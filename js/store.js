@@ -79,6 +79,8 @@
     dilemmaMinutes: 10, dilemmaCoop: 10, dilemmaTemptation: 20, dilemmaSucker: 10, dilemmaPunish: 5,
     // 🕵️ Misiones diarias
     missionsPerDay: 3, missionReward: 8,
+    // 🔮 ¿Qué pasará? y 📸 foto del día
+    predMaxPct: 20, photoPrize: 15, photoMaxPerDay: 5,
     // 🎱 Bingo (evento)
     bingoPrice: 5, bingoMaxCards: 4, bingoBallSeconds: 4, bingoBankBonus: 20, bingoLinePct: 30,
     // 🔮 Porra del campeón y del farolillo rojo
