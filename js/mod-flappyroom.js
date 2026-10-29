@@ -96,11 +96,13 @@
     const offsets = [0]; // desplazamiento del mundo en cada paso (para resimular a los demás)
     function stepBird(b, st) { while (offsets.length <= st + 1) offsets.push(offsets[offsets.length - 1] + world.speed(offsets.length - 1)); F.stepBird(b, world, st, offsets[st], false); }
 
+    // Un rival solo ha terminado cuando SU móvil avisa de que ha caído. Lo que se ve aquí es una
+    // reconstrucción con retraso: si sus toques tardan en llegar, puede parecer que cae y no es así.
     const isOver = (id) => {
-      const s = opp[id]; const d = s.live;
+      const d = opp[id].live;
       if (d && d.dead) return true;
-      if (!d && Date.now() > room.startAt + 10000) return true;          // ni llegó a entrar
-      if (d && Date.now() - (d.at || 0) > 15000 && !s.b.alive) return true; // se desconectó y ya se cayó
+      if (!d && Date.now() > room.startAt + 20000) return true;         // ni llegó a entrar
+      if (d && Date.now() - (d.at || 0) > 15000) return true;           // lleva 15 s sin dar señales: se desconectó
       return false;
     };
     const draw = () => {
@@ -133,7 +135,7 @@
       let last = performance.now(); let acc = 0;
       const loop = (t) => {
         acc += Math.min(100, t - last); last = t;
-        const anyAlive = () => me.alive || others.some((id) => !isOver(id) && opp[id].b.alive);
+        const anyAlive = () => me.alive || others.some((id) => !isOver(id));
         while (acc >= 1000 / 60) {
           acc -= 1000 / 60;
           if (!anyAlive()) break;
@@ -145,8 +147,8 @@
         }
         if (me.alive && Date.now() - lastSend > 250) { lastSend = Date.now(); send(); }
         body.querySelector('#fl-hud').textContent = me.score;
-        const vivos = (me.alive ? 1 : 0) + others.filter((id) => !isOver(id) && opp[id].b.alive).length;
-        body.querySelector('#fr-alive').textContent = `${vivos} en vuelo${me.alive ? '' : ' · estás mirando 👀'}`;
+        const vivos = (me.alive ? 1 : 0) + others.filter((id) => !isOver(id)).length;
+        body.querySelector('#fr-alive').textContent = me.alive ? `${vivos} en vuelo` : `💀 Has caído · ${vivos} ${vivos === 1 ? 'sigue' : 'siguen'} en vuelo, esperando a que terminen 👀`;
         draw();
         if (anyAlive()) requestAnimationFrame(loop); else res();
       };

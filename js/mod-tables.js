@@ -155,6 +155,14 @@
     const mine = MN.me(); const now = {};
     tables().forEach((t) => { now[t.id] = t.status; });
     autoResolve();
+    // 🎨 Mesa de caza del color terminada: lista con las fotos de todos (una vez por móvil)
+    if (mine && prev) tables().filter((t) => t.status === 'done' && prev[t.id] && prev[t.id] !== 'done' && t.appGame === 'color' && seated(t, mine.id)).forEach((t) => {
+      const key = 'mn_cg_' + t.id;
+      try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { /* nada */ }
+      const sc = (id) => (agMine(t, id) ? t['ag_' + id] : -Infinity);
+      const items = t.seats.map((x) => x.player).sort((a, b) => sc(b) - sc(a)).map((pid) => Object.assign({ pid, label: agMine(t, pid) ? t['agl_' + pid] : 'No jugó' }, t['agx_' + pid] || {}));
+      setTimeout(() => MN.appGames && MN.appGames.colorGallery(items, `Las fotos de la mesa (${t.seats.length})`), 1200);
+    });
     // Mi mesa de Flappy acaba de empezar: la partida se abre sola
     if (mine) tables().filter((t) => t.status === 'playing' && t.appGame === 'flappy' && seated(t, mine.id) && (t.startAt || 0) > Date.now() - 60000)
       .forEach((t) => { if (document.visibilityState === 'visible') playFlappy(t); });
@@ -197,7 +205,7 @@
       onProgress: (p) => Store.update('tables', t.id, { ['agp_' + myId]: p }).catch(() => {}),
     });
     if (!res) return;
-    await MN.act(() => Store.update('tables', t.id, { ['ag_' + myId]: res.score, ['agl_' + myId]: res.label, ['agAt_' + myId]: Date.now() }));
+    await MN.act(() => Store.update('tables', t.id, Object.assign({ ['ag_' + myId]: res.score, ['agl_' + myId]: res.label, ['agAt_' + myId]: Date.now() }, res.data ? { ['agx_' + myId]: res.data } : {})));
   }
   // 🐦 Flappy en tiempo real: al acabar, gana el último en caer
   function playFlappy(t) {

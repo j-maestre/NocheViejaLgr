@@ -861,7 +861,8 @@
         else if (c.status === 'cancelled' && c.cancelledBy !== id) msgs.push(`🚫 Se ha cancelado el reto con ${r}`);
         else if (c.status === 'reported' && c.reportedBy !== id) msgs.push(`⚖️ ${r} ha registrado el resultado. Confírmalo.`);
         else if (c.status === 'done' && c.swAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `⏱️ ¡Ganas el cronómetro contra ${r}! ${swSecs(c['sw_' + id])} s contra ${swSecs(c['sw_' + rivalOf(c, id)])} s` : `⏱️ ${r} te gana al cronómetro: ${swSecs(c['sw_' + rivalOf(c, id)])} s contra tus ${swSecs(c['sw_' + id])} s`);
-        else if (c.status === 'done' && c.agAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `🏆 ¡Le ganas a ${r} en ${esc(c.game)}! ${esc(agLabel(c, id))}` : `😵 ${r} te gana en ${esc(c.game)}: ${esc(agLabel(c, rivalOf(c, id)))}`);
+        if (c.status === 'done' && c.agAuto && before !== 'done') agPhotos(c, c.winner);
+        if (c.status === 'done' && c.agAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `🏆 ¡Le ganas a ${r} en ${esc(c.game)}! ${esc(agLabel(c, id))}` : `😵 ${r} te gana en ${esc(c.game)}: ${esc(agLabel(c, rivalOf(c, id)))}`);
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
         else if (before === 'reported' && c.status === 'accepted' && c.disputedBy && c.disputedBy !== id) msgs.push(`❌ ${r} no está de acuerdo con el resultado`);
       });
@@ -1053,6 +1054,15 @@
     }, msg);
   }
 
+  // 🎨 Caza del color: al acabar el duelo se enseñan las dos fotos (una vez por móvil)
+  function agPhotos(c, winner) {
+    if (agId(c) !== 'color' || !MN.appGames || !MN.appGames.colorGallery) return;
+    const key = 'mn_cg_' + c.id;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { /* nada */ }
+    const items = [winner, rivalOf(c, winner)].map((pid) => Object.assign({ pid, label: agLabel(c, pid) }, c['agx_' + pid] || {}));
+    setTimeout(() => MN.appGames.colorGallery(items, 'Las fotos del duelo'), 1200);
+  }
+
   // Duelo de un juego de la app con los dos resultados: gana la puntuación más alta (empate: quien jugó antes)
   const finishingAg = new Set();
   async function finishAg(c) {
@@ -1066,6 +1076,7 @@
     await finishChallenge(c, w, null, false, { txId: 'agduel_' + c.id, tx: { ag: labels }, challenge: { agAuto: true, finishedBy: (me() || {}).id || null } });
     const mine = me();
     if (mine && (mine.id === w || mine.id === l)) toast(mine.id === w ? `🏆 ¡Ganas el duelo! ${esc(labels[w])} contra ${esc(labels[l])}` : `😵 Pierdes: ${esc(labels[l])} contra ${esc(labels[w])} de ${esc(player(w).name)}`, mine.id === w ? 'ok' : 'bad');
+    if (mine && (mine.id === w || mine.id === l)) agPhotos(c, w);
   }
 
   // Duelo de cronómetro con las dos marcas: se resuelve solo. El id del

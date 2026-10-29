@@ -310,7 +310,10 @@
       c.getContext('2d').drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, 80, 80);
       const d = c.getContext('2d').getImageData(0, 0, 80, 80).data; const sum = [0, 0, 0];
       for (let i = 0; i < d.length; i += 4) { sum[0] += d[i]; sum[1] += d[i + 1]; sum[2] += d[i + 2]; }
-      return { rgb: sum.map((v) => v / (d.length / 4)), thumb: c.toDataURL('image/jpeg', 0.7) };
+      // Copia pequeña de la foto entera (cuadrada) para enseñársela a los demás al acabar
+      const sh = document.createElement('canvas'); sh.width = 240; sh.height = 240; const s2 = Math.min(img.naturalWidth, img.naturalHeight);
+      sh.getContext('2d').drawImage(img, (img.naturalWidth - s2) / 2, (img.naturalHeight - s2) / 2, s2, s2, 0, 0, 240, 240);
+      return { rgb: sum.map((v) => v / (d.length / 4)), thumb: c.toDataURL('image/jpeg', 0.7), share: sh.toDataURL('image/jpeg', 0.6) };
     } finally { URL.revokeObjectURL(url); }
   }
   async function playColor(G, seed) {
@@ -336,7 +339,7 @@
     if (!file) return { score: 0, label: '🏳️ Te rendiste: 0 %', data: null };
     if (ms > LIMIT) return { score: 0, label: `⏰ Fuera de tiempo (${secs(ms)} s): 0 %`, data: null };
     frame(`${G.icon} ${G.name}`, '<p class="center">Analizando colores…</p>');
-    const { rgb, thumb } = await averageColor(file);
+    const { rgb, thumb, share } = await averageColor(file);
     const [L1, a1, b1] = rgb2lab(hex2rgb(hex)); const [L2, a2, b2] = rgb2lab(rgb);
     const dE = Math.sqrt((L1 - L2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2);
     const sim = Math.max(0, 100 - dE * 1.1);
@@ -344,7 +347,7 @@
       <div><img src="${thumb}" class="color-thumb" alt=""><div class="color-sw small-sw" style="background:${rgb2hex(rgb)}"></div>Tu foto</div></div>
       <div class="ag-score">${sim.toFixed(1).replace('.', ',')} %</div><button type="button" class="btn primary" data-ag="ok">Continuar</button>`);
     await waitClick(body2, '[data-ag]');
-    return { score: Math.round(sim * 10), label: `${sim.toFixed(1).replace('.', ',')} % de parecido al ${name.toLowerCase()} (${secs(ms)} s)`, data: null };
+    return { score: Math.round(sim * 10), label: `${sim.toFixed(1).replace('.', ',')} % de parecido al ${name.toLowerCase()} (${secs(ms)} s)`, data: { ph: share, color: name, hex } };
   }
 
   // ---------------------------------------------------------- 🐦 Flappy con tu cara
@@ -525,6 +528,20 @@
     return { score: total, label: `${total.toLocaleString('es-ES')} puntos`, data: null, lines };
   }
 
+  // ---------------------------------------------------------- 📸 fotos de la caza del color al acabar
+  // items: [{ pid, ph, label }] ordenados del mejor al peor
+  function colorGallery(items, title) {
+    const withPh = items.filter((x) => x.ph);
+    if (!withPh.length) return;
+    const esc = MN.esc; const c = (items.find((x) => x.color) || {});
+    MN.modal(`<div class="cg"><div class="cg-title">📸 ${esc(title || 'Las fotos')}</div>
+      ${c.color ? `<div class="cg-target"><span style="background:${c.hex}"></span>Había que buscar: <b>${esc(c.color)}</b></div>` : ''}
+      <div class="cg-list ${items.length === 2 ? 'duo' : ''}">${items.map((x, i) => `<div class="cg-item ${i === 0 ? 'win' : ''}">
+        ${x.ph ? `<img src="${x.ph}" alt="">` : '<div class="cg-none">🙈 Sin foto</div>'}
+        <div class="cg-who">${i === 0 ? '🏆 ' : ''}${MN.face(MN.player(x.pid), 'mini')} ${esc(MN.player(x.pid).name)}</div>
+        <div class="cg-label">${esc(x.label || '')}</div></div>`).join('')}</div></div>`, 'Cerrar', '');
+  }
+
   // ---------------------------------------------------------- catálogo
   const GAMES = {
     stopwatch: { icon: '⏱️', name: 'Cronómetro (segundo exacto)' },
@@ -555,7 +572,7 @@
   return {
     init(api) {
       MN = api;
-      MN.appGames = { GAMES, play, list: () => Object.entries(GAMES).map(([id, G]) => ({ id, ...G })) };
+      MN.appGames = { GAMES, play, colorGallery, list: () => Object.entries(GAMES).map(([id, G]) => ({ id, ...G })) };
       MN.flappy = { FL, flappyWorld, bird, stepBird, faceDrawer, open, close, frame, waitClick };
     },
   };
