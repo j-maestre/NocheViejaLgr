@@ -1238,7 +1238,9 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .cg-list.duo { grid-template-columns: 1fr 1fr; max-height: none; }
 .cg-item { display: grid; gap: 4px; padding: 8px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid var(--line); text-align: center; }
 .cg-item.win { border-color: var(--gold); box-shadow: 0 0 14px rgba(245, 197, 66, .35); }
-.cg-item img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+.cg-item > img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+.cg-who { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.cg-who img.face.mini { display: inline-block; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; aspect-ratio: 1; vertical-align: middle; flex: none; }
 .cg-none { aspect-ratio: 1; display: grid; place-items: center; font-size: 28px; background: #0004; border-radius: 10px; }
 .cg-who { font-weight: 800; overflow-wrap: anywhere; }
 .cg-label { font-size: 12px; color: var(--muted); }
