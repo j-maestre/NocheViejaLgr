@@ -538,7 +538,7 @@
       ${c.color ? `<div class="cg-target"><span style="background:${c.hex}"></span>Había que buscar: <b>${esc(c.color)}</b></div>` : ''}
       <div class="cg-list ${items.length === 2 ? 'duo' : ''}">${items.map((x, i) => `<div class="cg-item ${i === 0 ? 'win' : ''}">
         ${x.ph ? `<img src="${x.ph}" alt="">` : '<div class="cg-none">🙈 Sin foto</div>'}
-        <div class="cg-who">${i === 0 ? '🏆 ' : ''}${MN.face(MN.player(x.pid), 'mini')} ${esc(MN.player(x.pid).name)}</div>
+        <div class="cg-who">${i === 0 ? '🏆 ' : ''}<span class="cg-av">${MN.face(MN.player(x.pid), 'mini')}</span> ${esc(MN.player(x.pid).name)}</div>
         <div class="cg-label">${esc(x.label || '')}</div></div>`).join('')}</div></div>`, 'Cerrar', '');
   }
 

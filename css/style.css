@@ -811,7 +811,9 @@ body.tv-mode > .top, body.tv-mode > main, body.tv-mode > .tabs, body.tv-mode > .
 
 /* ---------- Foto de perfil ---------- */
 img.face { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
-img.face.mini { display: inline-block; width: 1.25em; height: 1.25em; vertical-align: -0.25em; }
+img.face.mini { display: inline-block; width: 1.25em; height: 1.25em; vertical-align: -0.25em;
+  /* que nunca se deforme (Safari estrecha las imágenes dentro de filas flexibles) */
+  min-width: 1.25em; max-width: none; flex: 0 0 auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 50%; }
 img.face.tab { width: 26px; height: 26px; margin: 0 auto; }
 .avatar, .profile-avatar, .podium-emoji, .wr-emoji, .tv-emoji { overflow: hidden; }
 .podium-emoji img.face, .wr-emoji img.face { width: 1.3em; height: 1.3em; margin: 0 auto; }
@@ -1240,7 +1242,8 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .cg-item.win { border-color: var(--gold); box-shadow: 0 0 14px rgba(245, 197, 66, .35); }
 .cg-item > img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
 .cg-who { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
-.cg-who img.face.mini { display: inline-block; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; aspect-ratio: 1; vertical-align: middle; flex: none; }
+.cg-av { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center; font-size: 18px; line-height: 1; }
+.cg-av img.face, .cg-av img.face.mini { width: 26px; height: 26px; min-width: 26px; max-width: none; object-fit: cover; border-radius: 50%; vertical-align: top; }
 .cg-none { aspect-ratio: 1; display: grid; place-items: center; font-size: 28px; background: #0004; border-radius: 10px; }
 .cg-who { font-weight: 800; overflow-wrap: anywhere; }
 .cg-label { font-size: 12px; color: var(--muted); }
