@@ -107,7 +107,7 @@
   let known = null;
   function onPhotos(list) {
     const mine = MN.me();
-    if (known && mine) list.filter((p) => !known.has(p.id) && p.by !== mine.id).forEach((p) => MN.toast(`📸 ${MN.esc(MN.player(p.by).name)} ha subido una foto${p.caption ? `: «${MN.esc(p.caption)}»` : ''}`, 'ok'));
+    if (known && mine && MN.notifyOn('fotos')) list.filter((p) => !known.has(p.id) && p.by !== mine.id).forEach((p) => MN.toast(`📸 ${MN.esc(MN.player(p.by).name)} ha subido una foto${p.caption ? `: «${MN.esc(p.caption)}»` : ''}`, 'ok'));
     known = new Set(list.map((p) => p.id)); photos = list; render();
   }
 

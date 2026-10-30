@@ -139,7 +139,7 @@
           msgs.push(p.status === 'void' ? `🔮 «${MN.esc(p.q)}» se ha anulado: recuperas ${my.amount}` : `🔮 «${MN.esc(p.q)}»: ${p.status === 'yes' ? '¡SÍ pasó!' : 'NO pasó'} ${got ? `Cobras ${got} fichas 🤑` : `Pierdes ${my.amount} 😵`}`);
         }
       });
-      if (msgs.length) MN.notify(msgs);
+      if (msgs.length) MN.notify(msgs, 'pred');
     }
     prev = now;
   }

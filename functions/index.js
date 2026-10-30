@@ -27,9 +27,14 @@ async function names(gameId) {
   return out;
 }
 
-// Envía `body` a los jugadores `pids` (o a todos si es null), menos `except` (uno o varios)
-async function send(gameId, pids, body, except) {
+// Envía `body` a los jugadores `pids` (o a todos si es null), menos `except` (uno o varios).
+// `cat`: tipo de aviso; no llega a quien lo haya apagado en su perfil (sin tipo, llega siempre).
+async function send(gameId, pids, body, except, cat) {
   const skip = [].concat(except || []);
+  if (cat) {
+    const ps = await game(gameId).collection('players').get();
+    ps.forEach((d) => { const n = d.data().notif; if (n && n[cat] === false) skip.push(d.id); });
+  }
   const snap = await game(gameId).collection('push').get();
   const docs = snap.docs.filter((d) => {
     const pid = d.data().pid;
@@ -59,7 +64,7 @@ exports.retos = onDocumentWritten('games/{gameId}/challenges/{id}', async (e) =>
   const n = await names(e.params.gameId);
   const b = before && before.status;
   const jobs = [];
-  const to = (pid, msg) => jobs.push(send(e.params.gameId, [pid], msg));
+  const to = (pid, msg) => jobs.push(send(e.params.gameId, [pid], msg, null, 'retos'));
   const rival = (pid) => n[pid === c.from ? c.to : c.from] || '¿?';
 
   if (!b && c.status === 'pending') to(c.to, c.allIn ? `💣 ${rival(c.to)} te reta a un ALL IN a ${c.game}: ¡os jugáis todas las fichas!` : `⚔️ ${rival(c.to)} te reta a ${c.game} por ${c.amount} fichas`);
@@ -68,7 +73,7 @@ exports.retos = onDocumentWritten('games/{gameId}/challenges/{id}', async (e) =>
     // Al resto: a apostar (mismo texto que en la web)
     const set = await game(e.params.gameId).collection('meta').doc('settings').get();
     const mins = Number((set.exists && set.data().betWindowMinutes) || 10);
-    jobs.push(send(e.params.gameId, null, `${c.allIn ? '💣 ALL IN: ' : '🎰 '}${n[c.from] || '¿?'} vs ${n[c.to] || '¿?'} a ${c.game} por ${c.amount} fichas. ¡Tienes ${mins} min para apostar!`, [c.from, c.to]));
+    jobs.push(send(e.params.gameId, null, `${c.allIn ? '💣 ALL IN: ' : '🎰 '}${n[c.from] || '¿?'} vs ${n[c.to] || '¿?'} a ${c.game} por ${c.amount} fichas. ¡Tienes ${mins} min para apostar!`, [c.from, c.to], 'apuestas'));
   }
   else if (c.status === 'rejected') to(c.from, `🐔 ${rival(c.from)} ha rechazado tu reto`);
   else if (c.status === 'expired') to(c.from, `⌛ ${rival(c.from)} no contestó a tu reto y ha caducado`);
@@ -102,14 +107,14 @@ exports.mesas = onDocumentWritten('games/{gameId}/tables/{id}', async (e) => {
   const seats = (t.seats || []).map((s) => s.player);
   if (!before && t.status === 'open') {
     const n = await names(g);
-    return send(g, null, `🃏 ${n[t.createdBy] || 'Alguien'} abre una mesa de ${t.game} (entrada ${t.buyIn})${t.msg ? `: «${t.msg}»` : ''}. ¡Siéntate!`, t.createdBy);
+    return send(g, null, `🃏 ${n[t.createdBy] || 'Alguien'} abre una mesa de ${t.game} (entrada ${t.buyIn})${t.msg ? `: «${t.msg}»` : ''}. ¡Siéntate!`, t.createdBy, 'mesas');
   }
-  if (t.status === 'playing' && before && before.status === 'open') return send(g, seats, `🃏 La mesa de ${t.game} ha empezado. ¡A jugar!`, t.createdBy);
+  if (t.status === 'playing' && before && before.status === 'open') return send(g, seats, `🃏 La mesa de ${t.game} ha empezado. ¡A jugar!`, t.createdBy, 'mesas');
   if (t.status === 'reported') {
     const n = await names(g);
-    return send(g, seats, `⚖️ ${n[t.reportedBy] || 'Alguien'} ha registrado quién ganó la mesa de ${t.game}. Confírmalo.`, t.reportedBy);
+    return send(g, seats, `⚖️ ${n[t.reportedBy] || 'Alguien'} ha registrado quién ganó la mesa de ${t.game}. Confírmalo.`, t.reportedBy, 'mesas');
   }
-  if (t.status === 'cancelled') return send(g, seats, `🚫 Se ha cerrado la mesa de ${t.game}`, t.createdBy);
+  if (t.status === 'cancelled') return send(g, seats, `🚫 Se ha cerrado la mesa de ${t.game}`, t.createdBy, 'mesas');
   return null;
 });
 
@@ -129,12 +134,12 @@ exports.prestamos = onDocumentWritten('games/{gameId}/txs/{id}', async (e) => {
   if (created) {
     return Promise.all([
       send(g, [t.player], `🏦 La Banca te ha prestado ${t.amount} fichas. Tu castigo: ${t.punishment}`, bank),
-      send(g, null, `🍺 ${name} ha pedido un préstamo de ${t.amount} fichas a la Banca. Castigo: ${t.punishment}`, [t.player, bank]),
+      send(g, null, `🍺 ${name} ha pedido un préstamo de ${t.amount} fichas a la Banca. Castigo: ${t.punishment}`, [t.player, bank], 'prestamos'),
     ]);
   }
   return Promise.all([
     send(g, [t.player], '✅ Has saldado tu deuda con la Banca. Ya no eres moroso', bank),
-    send(g, null, `✅ ${name} ha cumplido su castigo (${t.punishment}) y ya no es moroso`, [t.player, bank]),
+    send(g, null, `✅ ${name} ha cumplido su castigo (${t.punishment}) y ya no es moroso`, [t.player, bank], 'prestamos'),
   ]);
 });
 
@@ -142,14 +147,14 @@ exports.prestamos = onDocumentWritten('games/{gameId}/txs/{id}', async (e) => {
 exports.salas = onDocumentWritten('games/{gameId}/flappy/{id}', async (e) => {
   if (e.data.before.exists || !e.data.after.exists) return null;
   const r = e.data.after.data(); const n = await names(e.params.gameId);
-  return send(e.params.gameId, null, `🐦 ${n[r.host] || 'Alguien'} abre una sala de Flappy${r.buyIn ? ` (entrada ${r.buyIn})` : ''}. ¡Entra a jugar!`, r.host);
+  return send(e.params.gameId, null, `🐦 ${n[r.host] || 'Alguien'} abre una sala de Flappy${r.buyIn ? ` (entrada ${r.buyIn})` : ''}. ¡Entra a jugar!`, r.host, 'mesas');
 });
 
 // ---------------------------------------------------------- 📸 fotos de la fiesta
 exports.fotos = onDocumentWritten('games/{gameId}/photos/{id}', async (e) => {
   if (e.data.before.exists || !e.data.after.exists) return null;
   const p = e.data.after.data(); const n = await names(e.params.gameId);
-  return send(e.params.gameId, null, `📸 ${n[p.by] || 'Alguien'} ha subido una foto${p.caption ? `: «${p.caption}»` : ''}. ¡Dale ❤️ si te gusta!`, p.by);
+  return send(e.params.gameId, null, `📸 ${n[p.by] || 'Alguien'} ha subido una foto${p.caption ? `: «${p.caption}»` : ''}. ¡Dale ❤️ si te gusta!`, p.by, 'fotos');
 });
 
 // ---------------------------------------------------------- jugadores nuevos
@@ -157,7 +162,7 @@ exports.registros = onDocumentWritten('games/{gameId}/players/{id}', async (e) =
   if (e.data.before.exists || !e.data.after.exists) return null;
   const p = e.data.after.data(); if (p.demo) return null;
   const all = await game(e.params.gameId).collection('players').get();
-  return send(e.params.gameId, null, `🎰 ${p.name || 'Alguien'} se ha sentado a la mesa. ¡Ya sois ${all.size}!`, e.params.id);
+  return send(e.params.gameId, null, `🎰 ${p.name || 'Alguien'} se ha sentado a la mesa. ¡Ya sois ${all.size}!`, e.params.id, 'jugadores');
 });
 
 // ---------------------------------------------------------- peticiones y cartas
@@ -179,21 +184,21 @@ exports.peticiones = onDocumentWritten('games/{gameId}/entries/{id}', async (e) 
   // 🔮 ¿Qué pasará?: pregunta nueva (a todos) y resuelta (a quien apostó)
   if (x.kind === 'pred') {
     const n = await names(g);
-    if (!before) return send(g, null, `🔮 ${n[x.by] || 'Alguien'} pregunta: «${x.q}» ¡Apuesta SÍ o NO!`, x.by);
+    if (!before) return send(g, null, `🔮 ${n[x.by] || 'Alguien'} pregunta: «${x.q}» ¡Apuesta SÍ o NO!`, x.by, 'pred');
     if (before.status === 'open' && x.status !== 'open') {
       const bets = await game(g).collection('entries').where('predId', '==', e.params.id).get();
       const pids = [...new Set(bets.docs.map((d) => d.data()).filter((b) => b.kind === 'pbet').map((b) => b.player))];
       const msg = x.status === 'void' ? `🔮 «${x.q}» se ha anulado: recuperas tu apuesta` : `🔮 «${x.q}»: ${x.status === 'yes' ? '¡SÍ pasó!' : 'NO pasó'} Entra a ver si has ganado`;
-      if (pids.length) return send(g, pids, msg);
+      if (pids.length) return send(g, pids, msg, null, 'pred');
     }
     return null;
   }
   if (x.kind === 'card' && x.usedAt && !(before && before.usedAt)) {
     const n = await names(g); const who = n[x.player] || 'Alguien';
-    if (x.power === 'heist' && x.target) return send(g, [x.target], `🦹 ${who} te ha atracado con una carta del caos: −5 fichas`);
-    if (x.power === 'gag' && x.target) return send(g, [x.target], `🤐 ${who} te ha puesto una mordaza: no puedes retar a nadie durante 1 hora`);
-    if (x.power === 'tax') return send(g, null, `💸 ${who} usa el Impuesto revolucionario: le pagas 2 fichas`, x.player);
-    if (x.power === 'ghost') return send(g, null, `👻 ${who} se vuelve fantasma: nadie puede retarle durante 1 hora`, x.player);
+    if (x.power === 'heist' && x.target) return send(g, [x.target], `🦹 ${who} te ha atracado con una carta del caos: −5 fichas`, null, 'misiones');
+    if (x.power === 'gag' && x.target) return send(g, [x.target], `🤐 ${who} te ha puesto una mordaza: no puedes retar a nadie durante 1 hora`, null, 'misiones');
+    if (x.power === 'tax') return send(g, null, `💸 ${who} usa el Impuesto revolucionario: le pagas 2 fichas`, x.player, 'misiones');
+    if (x.power === 'ghost') return send(g, null, `👻 ${who} se vuelve fantasma: nadie puede retarle durante 1 hora`, x.player, 'misiones');
   }
   return null;
 });
@@ -221,24 +226,24 @@ exports.eventos = onSchedule({ schedule: 'every 1 minutes', timeZone: 'Europe/Ma
     const s = set.exists ? set.data() : {};
     if (s.endDate && now >= new Date(s.endDate).getTime() + 30 * MIN) continue;
     // ⚡ Última ronda y 🕵️ misiones nuevas cada mañana (una vez)
-    const once = async (key, msg) => {
+    const once = async (key, msg, cat) => {
       try { await g.collection('pushlog').doc(key).create({ at: now }); } catch (err) { return; }
-      await send(g.id, null, msg);
+      await send(g.id, null, msg, null, cat);
     };
     const endTs = s.endDate ? new Date(s.endDate).getTime() : 0;
     const last = Number(s.lastRoundMinutes) || 0;
-    if (endTs && last && now >= endTs - last * MIN && now < endTs) await once(`lastround_${endTs}`, `⚡ ¡ÚLTIMA RONDA! Queda ${last >= 60 ? `${last / 60} hora` : `${last} min`}: apuesta sin límite y un 💣 ALL IN extra para todos`);
+    if (endTs && last && now >= endTs - last * MIN && now < endTs) await once(`lastround_${endTs}`, `⚡ ¡ÚLTIMA RONDA! Queda ${last >= 60 ? `${last / 60} hora` : `${last} min`}: apuesta sin límite y un 💣 ALL IN extra para todos`, 'eventos');
     const startTs = s.startDate ? new Date(s.startDate).getTime() : 0;
     const madrid = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date(now));
     const part = (t) => (madrid.find((x) => x.type === t) || {}).value;
-    if (startTs && now >= startTs && now < endTs && Number(part('hour')) >= 10) await once(`missions_${part('year')}-${part('month')}-${part('day')}_${startTs}`, '🕵️ Tienes misiones secretas nuevas para hoy. ¡Y una ☠️ Misión del caos!');
+    if (startTs && now >= startTs && now < endTs && Number(part('hour')) >= 10) await once(`missions_${part('year')}-${part('month')}-${part('day')}_${startTs}`, '🕵️ Tienes misiones secretas nuevas para hoy. ¡Y una ☠️ Misión del caos!', 'misiones');
 
     for (const d of evs.docs) {
       const ev = d.data(); const T = EVENTS[ev.type]; if (!T || ev.status === 'cancelled') continue;
       const start = ev.type === 'stopwatch' ? ev.at - (Number(s.stopwatchSignupMinutes) || 15) * MIN : ev.at;
       const fire = async (key, msg, pids = null) => {
         try { await g.collection('pushlog').doc(`${d.id}_${key}_${ev.at}`).create({ at: now }); } catch (err) { return; } // ya enviado
-        await send(g.id, pids, msg);
+        await send(g.id, pids, msg, null, 'eventos');
       };
       if (ev.status === 'scheduled') {
         if (start - now <= 15 * MIN && start - now > 2 * MIN) await fire('15', `⏰ En 15 minutos: ${T[0]} ${T[1]}`);

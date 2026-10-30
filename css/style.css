@@ -1284,3 +1284,9 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 
 .tv-help code { display: inline-block; margin-top: 4px; padding: 4px 8px; border-radius: 8px; background: #0006; font-size: 12px; overflow-wrap: anywhere; }
 .tv-help .row .btn { width: auto; }
+
+.notif-prefs { margin-top: 10px; }
+.notif-prefs summary { cursor: pointer; font-weight: 700; color: var(--gold); }
+.notif-row { align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.notif-row span { display: grid; gap: 2px; }
+.notif-row small { color: var(--muted); font-size: 12px; }

@@ -433,7 +433,7 @@
         else if (document.visibilityState !== 'visible' && !wasSeen(`${ev.id}:done:${ev.result.at}`) && !seen(`${ev.id}:done:${ev.at}`)) msgs.push(`${T.icon} ${T.name}: ¡ya ha terminado! Entra para ver qué ha pasado 👀`);
       }
     });
-    if (msgs.length) MN.notify(msgs);
+    if (msgs.length) MN.notify(msgs, 'eventos');
   }
 
   // ---------------------------------------------------------- ejecución (barrido)

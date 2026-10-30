@@ -438,9 +438,23 @@
 
   // Aviso al jugador: mensaje emergente + vibración, y notificación del sistema
   // si la web está en segundo plano (los módulos pueden engancharse a `onNotify`)
-  function notify(msgs) {
+  // Tipos de aviso que cada uno puede apagar en su perfil (lo que solo te afecta a ti llega siempre)
+  const NOTIF_TYPES = [
+    ['retos', '⚔️', 'Mis retos', 'Te retan, aceptan, resultados…'],
+    ['apuestas', '🎰', 'Apuestas en duelos ajenos', 'Duelos en los que puedes apostar y cómo acaban tus apuestas'],
+    ['pred', '🔮', '¿Qué pasará?', 'Preguntas nuevas y resueltas'],
+    ['mesas', '🃏', 'Mesas', 'Mesas abiertas, que empiezan o acaban'],
+    ['eventos', '📅', 'Eventos', 'Avisos antes, al empezar y al acabar; última ronda'],
+    ['misiones', '🕵️', 'Misiones y cartas del caos', 'Misiones cumplidas, cartas usadas'],
+    ['prestamos', '🍺', 'Préstamos de los demás', 'Quién pide préstamo y quién salda su deuda'],
+    ['jugadores', '🎰', 'Jugadores nuevos', 'Alguien se sienta a la mesa'],
+    ['fotos', '📸', 'Fotos', 'Alguien sube una foto'],
+  ];
+  const notifyOn = (cat) => { const m = me(); return !cat || !m || !m.notif || m.notif[cat] !== false; };
+
+  function notify(msgs, cat) {
     const list = [].concat(msgs);
-    if (!list.length) return;
+    if (!list.length || !notifyOn(cat)) return;
     list.forEach((m) => toast(m, 'ok'));
     try {
       const touched = !navigator.userActivation || navigator.userActivation.hasBeenActive;
@@ -876,7 +890,7 @@
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
         else if (before === 'reported' && c.status === 'accepted' && c.disputedBy && c.disputedBy !== id) msgs.push(`❌ ${r} no está de acuerdo con el resultado`);
       });
-      if (msgs.length) notify(msgs);
+      if (msgs.length) notify(msgs, 'retos');
       // Te acaban de retar: ventana con la cara de quien te reta
       const fresh = S.challenges.filter((c) => !prevCh[c.id] && c.status === 'pending' && c.to === id);
       if (fresh.length) challengePopup(fresh[fresh.length - 1]);
@@ -910,7 +924,7 @@
     if (prevPlayers && mine) {
       const msgs = S.players.filter((p) => !prevPlayers.has(p.id) && p.id !== mine.id && !p.demo)
         .map((p) => `🎰 ${esc(p.name)} se ha sentado a la mesa. ¡Ya sois ${S.players.length}!`);
-      if (msgs.length) notify(msgs);
+      if (msgs.length) notify(msgs, 'jugadores');
     }
     prevPlayers = ids;
   }
@@ -922,14 +936,16 @@
     const mine = me(); const now = {};
     S.txs.forEach((t) => { if (t.type === 'loan' && !t.voided) now[t.id] = !!t.done; });
     if (prevLoans && mine && mine.id !== bankId()) {
-      const msgs = [];
+      const msgs = []; const others = [];
       S.txs.forEach((t) => {
         if (!(t.id in now)) return;
         const name = esc(player(t.player).name); const its = t.player === mine.id;
-        if (!(t.id in prevLoans)) msgs.push(its ? `🏦 La Banca te ha prestado ${t.amount} fichas. Tu castigo: ${esc(t.punishment)}` : `🍺 ${name} ha pedido un préstamo de ${t.amount} fichas a la Banca. Castigo: ${esc(t.punishment)}`);
-        else if (!prevLoans[t.id] && now[t.id]) msgs.push(its ? '✅ Has saldado tu deuda con la Banca. Ya no eres moroso' : `✅ ${name} ha cumplido su castigo (${esc(t.punishment)}) y ya no es moroso`);
+        const push = (m) => (its ? msgs : others).push(m);
+        if (!(t.id in prevLoans)) push(its ? `🏦 La Banca te ha prestado ${t.amount} fichas. Tu castigo: ${esc(t.punishment)}` : `🍺 ${name} ha pedido un préstamo de ${t.amount} fichas a la Banca. Castigo: ${esc(t.punishment)}`);
+        else if (!prevLoans[t.id] && now[t.id]) push(its ? '✅ Has saldado tu deuda con la Banca. Ya no eres moroso' : `✅ ${name} ha cumplido su castigo (${esc(t.punishment)}) y ya no es moroso`);
       });
       if (msgs.length) notify(msgs);
+      if (others.length) notify(others, 'prestamos');
     }
     prevLoans = now;
   }
@@ -1892,7 +1908,7 @@
   const MN = {
     get S() { return S; }, get view() { return view; },
     $, $$, esc, pad, hash, shuffle, lines, HOUR, MEDALS,
-    toast, modal, act, notify, go, renderAll, sweepAll,
+    toast, modal, act, notify, notifyOn, NOTIF_TYPES, go, renderAll, sweepAll,
     me, player, who, face, deviceId, isAdmin, bankId, isSpectator, setSpectator,
     balances, balancesAt, effects, sortedPlayers, playerStats, achievements, txItem, txLine,
     maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago, lastRound, lastRoundTs,

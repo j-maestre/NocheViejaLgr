@@ -91,7 +91,15 @@
     } else {
       installHtml = '<p>📲 <b>Estás usando la app instalada.</b></p>';
     }
-    el.innerHTML = `<h3>📱 App y notificaciones</h3>${installHtml}${notifyHtml}`;
+    // Qué avisos quiere recibir cada uno (vale para los de dentro de la app y los de con la app cerrada)
+    const mine = MN.me(); const off = (mine && mine.notif) || {};
+    const prefs = mine ? `<details class="notif-prefs"><summary>⚙️ Elegir qué avisos quiero recibir</summary>
+      <p class="hint">Lo que solo te afecta a ti (que la Banca te preste, etc.) llega siempre.</p>
+      ${MN.NOTIF_TYPES.map(([k, icon, label, desc]) => `<label class="check-row notif-row"><input type="checkbox" data-notif="${k}" ${off[k] === false ? '' : 'checked'}>
+        <span><b>${icon} ${label}</b><small>${desc}</small></span></label>`).join('')}</details>` : '';
+    const wasOpen = el.querySelector('.notif-prefs') && el.querySelector('.notif-prefs').open;
+    el.innerHTML = `<h3>📱 App y notificaciones</h3>${installHtml}${notifyHtml}${prefs}`;
+    if (wasOpen) el.querySelector('.notif-prefs').open = true;
   }
 
   return {
@@ -102,6 +110,11 @@
       }
       window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; render(); });
       window.addEventListener('appinstalled', () => { installPrompt = null; MN.toast('📲 App instalada', 'ok'); render(); });
+      document.addEventListener('change', (e) => {
+        const c = e.target.closest('[data-notif]'); const mine = MN.me(); if (!c || !mine) return;
+        const notif = Object.assign({}, mine.notif || {}, { [c.dataset.notif]: c.checked });
+        MN.act(() => Store.updatePlayer(mine.id, { notif }), c.checked ? '🔔 Activado' : '🔕 Silenciado');
+      });
       document.addEventListener('click', async (e) => {
         if (e.target.closest('#notify-btn')) {
           const res = await Notification.requestPermission();

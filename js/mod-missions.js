@@ -257,7 +257,7 @@
           if (c.power === 'ghost') msgs.push(`👻 ${who} se vuelve fantasma: nadie puede retarle durante 1 hora`);
         }
       });
-      if (msgs.length) MN.notify(msgs);
+      if (msgs.length) MN.notify(msgs, 'misiones');
     }
     prevTx = txIds; prevCards = cardState;
   }

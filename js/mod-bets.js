@@ -97,7 +97,7 @@
     const st = {}; MN.S.challenges.forEach((c) => { st[c.id] = c.status; });
     if (prevCh && mine) {
       const open = MN.S.challenges.filter((c) => prevCh[c.id] === 'pending' && c.status === 'accepted' && canBet(c, mine.id));
-      if (open.length) MN.notify(open.map(betLine));
+      if (open.length) MN.notify(open.map(betLine), 'apuestas');
     }
     prevCh = st;
     MN.S.txs.filter((t) => t.kind === 'bets').forEach((t) => { now[t.id] = JSON.stringify(t.payouts); });
@@ -108,7 +108,7 @@
         const got = t.payouts[mine.id] || 0;
         msgs.push(t.refund ? `🎰 Te devolvemos tu apuesta de ${myBet.amount} fichas` : got ? `🎰 ¡Acertaste! Cobras ${got} fichas de tu apuesta` : `🎰 Fallaste la apuesta: pierdes ${myBet.amount} fichas`);
       });
-      if (msgs.length && !(MN.shows && document.visibilityState === 'visible')) MN.notify(msgs);
+      if (msgs.length && !(MN.shows && document.visibilityState === 'visible')) MN.notify(msgs, 'apuestas');
     }
     prev = now;
   }

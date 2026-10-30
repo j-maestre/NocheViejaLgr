@@ -178,7 +178,7 @@
         else if (t.status === 'done') msgs.push(`🃏 Mesa de ${MN.esc(t.game)} cerrada: gana ${MN.esc(pickLabel(t, t.pick))}`);
         else if (t.status === 'cancelled' && t.createdBy !== mine.id) msgs.push(`🚫 Se ha cerrado la mesa de ${MN.esc(t.game)}`);
       });
-      if (msgs.length) MN.notify(msgs);
+      if (msgs.length) MN.notify(msgs, 'mesas');
     }
     prev = now;
   }
