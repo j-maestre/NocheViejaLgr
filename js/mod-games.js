@@ -21,6 +21,15 @@
   }
   const shuffle = (arr, r) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const pickN = (arr, n, r, not = []) => shuffle(arr.filter((x) => !not.includes(x)), r).slice(0, n);
+  // Mazo: la lista se baraja una vez para toda la partida y la partida número k de ese juego
+  // coge los n siguientes. Así no se repite nada hasta agotar el mazo (y los rivales ven lo mismo).
+  let deckIndex = null;
+  function fromDeck(list, n, name, r) {
+    if (deckIndex == null) return pickN(list, n, r);
+    const deck = shuffle(list, rng(`${(window.MN_CONFIG || {}).gameId}|mazo|${name}`));
+    const start = (deckIndex * n) % deck.length;
+    return Array.from({ length: Math.min(n, deck.length) }, (_, i) => deck[(start + i) % deck.length]);
+  }
 
   // ---------------------------------------------------------- escenario
   const box = () => MN.$('#app-game');
@@ -89,7 +98,7 @@
   async function playPokemon(G, seed) {
     if (!await intro(G, 'Sale la <b>silueta</b> de un Pokémon de la primera generación. Elige cuál es lo más rápido que puedas. <b>5 rondas</b>, 10 segundos cada una.')) return null;
     frame(`${G.icon} ${G.name}`, '<p class="center">Cargando Pokémon…</p>');
-    const r = rng(seed + 'poke'); const nums = pickN([...Array(151).keys()].map((i) => i + 1), 5, r);
+    const r = rng(seed + 'poke'); const nums = fromDeck([...Array(151).keys()].map((i) => i + 1), 5, 'poke', r);
     await Promise.all(nums.map((n) => preload(pokeImg(n))));
     const rounds = nums.map((n) => {
       const others = pickN(POKEMON, 3, r, [POKEMON[n - 1]]);
@@ -110,7 +119,7 @@
   async function playLogo(G, seed) {
     if (!await intro(G, 'Sale un trocito <b>ampliado</b> del logo de una marca, que se va alejando poco a poco. ¿Qué marca es? <b>5 rondas</b>, 12 segundos cada una.')) return null;
     frame(`${G.icon} ${G.name}`, '<p class="center">Cargando logos…</p>');
-    const r = rng(seed + 'logo'); const slugs = pickN(Object.keys(LOGOS), 5, r);
+    const r = rng(seed + 'logo'); const slugs = fromDeck(Object.keys(LOGOS), 5, 'logo', r);
     const svgs = await Promise.all(slugs.map((s) => fetch(logoUrl(s)).then((x) => x.text()).catch(() => '')));
     const rounds = slugs.map((s, i) => {
       const name = LOGOS[s]; const others = pickN(Object.values(LOGOS), 3, r, [name]);
@@ -223,7 +232,7 @@
   ];
   async function playQuiz(G, seed) {
     if (!await intro(G, '<b>5 preguntas</b> de cultura general (y de la vida). 15 segundos cada una. Cuenta acertar y ser rápido.')) return null;
-    const r = rng(seed + 'quiz'); const qs = pickN(QUIZ, 5, r);
+    const r = rng(seed + 'quiz'); const qs = fromDeck(QUIZ, 5, 'quiz', r);
     const rounds = qs.map(([q, ok, ...bad]) => {
       const options = shuffle([ok, ...bad], r);
       return { options: options.map(MN.esc), ok: options.indexOf(ok), show: (el) => { el.innerHTML = `<div class="quiz-q">${MN.esc(q)}</div>`; } };
@@ -262,7 +271,9 @@
   async function playSong(G, seed) {
     if (!await intro(G, 'Suenan <b>3 canciones</b>. Adivina el título lo antes posible: tienes 20 segundos por canción. <b>Sube el volumen</b> 🔊')) return null;
     frame(`${G.icon} ${G.name}`, '<p class="center">Buscando canciones…</p>');
-    const r = rng(seed + 'song'); const order = shuffle(SONGS, r);
+    // Canciones: se buscan en el orden del mazo (empezando por las de esta partida) hasta tener 3
+    const r = rng(seed + 'song'); let order = shuffle(SONGS, r);
+    if (deckIndex != null) { const d = shuffle(SONGS, rng(`${(window.MN_CONFIG || {}).gameId}|mazo|song`)); const st = (deckIndex * 3) % d.length; order = d.slice(st).concat(d.slice(0, st)); }
     const chosen = [];
     for (const s of order) { if (chosen.length >= 3) break; const p = await findPreview(s); if (p) chosen.push({ s, p }); }
     if (!chosen.length) { await outro(G, '<p>😢 No se han podido cargar las canciones (¿sin conexión?). Inténtalo luego.</p>'); return null; }
@@ -453,7 +464,7 @@
   async function playObject(G, seed) {
     if (!await intro(G, 'Sale un trocito <b>muy ampliado</b> de un objeto, que se va alejando poco a poco. ¿Qué es? <b>5 rondas</b>, 12 segundos cada una.')) return null;
     frame(`${G.icon} ${G.name}`, '<p class="center">Cargando objetos…</p>');
-    const r = rng(seed + 'obj'); const picks = pickN(Object.keys(OBJECTS), 5, r);
+    const r = rng(seed + 'obj'); const picks = fromDeck(Object.keys(OBJECTS), 5, 'obj', r);
     await Promise.all(picks.map((e) => preload(emojiUrl(e))));
     const rounds = picks.map((e) => {
       const name = OBJECTS[e]; const options = shuffle([name, ...pickN(Object.values(OBJECTS), 3, r, [name])], r);
@@ -497,7 +508,7 @@
     if (!await intro(G, 'Verás un sitio famoso <b>desde el satélite</b> (sin nombres). Márcalo en el mapa del mundo: cuanto más cerca, más puntos (hasta 5.000). <b>3 rondas</b>, 45 segundos cada una.')) return null;
     frame(`${G.icon} ${G.name}`, '<p class="center">Cargando mapas…</p>');
     const L = await leaflet();
-    const r = rng(seed + 'geo'); const picks = pickN(PLACES, 3, r);
+    const r = rng(seed + 'geo'); const picks = fromDeck(PLACES, 3, 'geo', r);
     let total = 0; const lines = [];
     for (let i = 0; i < picks.length; i++) {
       const [name, lat, lng, z] = picks[i];
@@ -561,6 +572,7 @@
     open();
     try {
       startHook = opts.onStart || null; resume = opts.resume || null; progress = opts.onProgress || null;
+      deckIndex = Number.isInteger(opts.deck) ? opts.deck : null;
       const res = await G.play(G, seed, opts);
       if (res) await outro(G, `<div class="ag-score">${res.label}</div><p class="center">${opts.after || ''}</p>`);
       return res;

@@ -247,6 +247,11 @@
   const appGameOf = (name) => { const g = MN.appGames && MN.appGames.list().find((x) => x.name === name); return g ? g.id : (/cron[oó]metro/i.test(name || '') ? 'stopwatch' : null); };
   const agId = (c) => c.appGame || appGameOf(c.game);
   const isAgGame = (c) => { const id = agId(c); return !!id && id !== 'stopwatch'; };
+  // Número de partida de un juego de la app (retos y mesas, por orden de creación): elige su tramo del mazo
+  function deckNumber(game, createdAt, id) {
+    const before = (x) => (x.createdAt || 0) < createdAt || ((x.createdAt || 0) === createdAt && x.id < id);
+    return S.challenges.filter((x) => agId(x) === game && before(x)).length + (S.tables || []).filter((x) => x.appGame === game && before(x)).length;
+  }
   const agMine = (c, id) => c['ag_' + id] != null;
   // Un solo intento: quien empezó y no terminó en 15 min se da por abandonado
   const agStarted = (c, id) => !!c['ags_' + id];
@@ -1004,6 +1009,7 @@
             ghost: ghostData && ghostData.f ? { flaps: ghostData.f, player: player(rid) } : null,
             after: agOver(c, rid) ? `${esc(player(rid).name)} ya ha jugado: ¡ahora sale el resultado!` : `El resultado sale cuando juegue ${esc(player(rid).name)}.`,
             // Al pulsar «Empezar» ya cuenta como jugado (con 0 puntos hasta que acabe)
+            deck: deckNumber(agId(c), c.createdAt || 0, c.id),
             onStart: () => Store.updateChallenge(c.id, { ['ags_' + myId]: Date.now() }).catch(() => {}),
             resume: resuming ? (c['agp_' + myId] || { round: 0 }) : null,
             onProgress: (p) => Store.updateChallenge(c.id, { ['agp_' + myId]: p }).catch(() => {}),
@@ -1888,7 +1894,7 @@
     me, player, who, face, deviceId, isAdmin, bankId, isSpectator, setSpectator,
     balances, balancesAt, effects, sortedPlayers, playerStats, achievements, txItem, txLine,
     maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago, lastRound, lastRoundTs,
-    activeChallenges, challengeBlock, fillPlayerSelect, rankMask,
+    activeChallenges, challengeBlock, fillPlayerSelect, rankMask, deckNumber,
     registerTx: (type, def) => { TX[type] = def; },
   };
   window.MN = MN;

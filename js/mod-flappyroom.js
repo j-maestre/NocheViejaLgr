@@ -168,11 +168,13 @@
     unLive();
     if (onFinish) await onFinish(ranking).catch((e) => console.error(e));
     const esc = MN.esc; const medal = (i) => (i < 3 ? MN.MEDALS[i] : `${i + 1}.`);
-    const res = F.frame('🐦 Sala de Flappy', `<div class="ag-score">${ranking[0].id === mine.id ? '🏆 ¡Has ganado!' : `Gana ${esc(MN.player(ranking[0].id).name)}`}</div>
+    const top = ranking.filter((x) => x.score === ranking[0].score).map((x) => x.id);
+    const iWin = top.includes(mine.id); const tie = top.length > 1;
+    const res = F.frame('🐦 Sala de Flappy', `<div class="ag-score">${tie ? `🤝 ¡Empate${iWin ? '' : ` entre ${top.map((id) => esc(MN.player(id).name)).join(' y ')}`}!` : iWin ? '🏆 ¡Has ganado!' : `Gana ${esc(MN.player(ranking[0].id).name)}`}</div>
       <ol class="fr-rank">${ranking.map((x, i) => `<li class="${x.id === mine.id ? 'me' : ''}"><span>${medal(i)}</span><span>${MN.face(MN.player(x.id), 'mini')} ${esc(MN.player(x.id).name)}</span><b>${x.score}</b></li>`).join('')}</ol>
-      ${room.buyIn ? `<p class="center">${ranking[0].id === mine.id ? `Te llevas el bote: <b>${room.buyIn * room.players.length}</b> fichas` : `Pierdes la entrada (${room.buyIn})`}</p>` : ''}
+      ${room.buyIn ? `<p class="center">${iWin ? (tie ? `Os repartís el bote: <b>${Math.floor((room.buyIn * room.players.length) / top.length)}</b> fichas para cada uno` : `Te llevas el bote: <b>${room.buyIn * room.players.length}</b> fichas`) : `Pierdes la entrada (${room.buyIn})`}</p>` : ''}
       <button type="button" class="btn primary" data-ag="ok">Cerrar</button>`);
-    if (MN.fx && ranking[0].id === mine.id) { MN.fx.play('win'); MN.fx.confetti({ count: 200 }); }
+    if (MN.fx && iWin) { MN.fx.play('win'); MN.fx.confetti({ count: 200 }); }
     await F.waitClick(res, '[data-ag]');
     F.close(); playingRoom = null;
   }

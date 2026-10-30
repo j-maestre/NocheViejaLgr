@@ -183,8 +183,9 @@
     prev = now;
   }
 
-  async function finish(t, pick, byBank, result) {
-    const winners = winnersOf(t, pick);
+  // tied: lista de ganadores empatados (se reparten el bote a partes iguales)
+  async function finish(t, pick, byBank, result, tied) {
+    const winners = tied && tied.length ? tied : winnersOf(t, pick);
     const { out, pot } = payouts(t, winners);
     const txId = 'table_' + t.id; const now = Date.now();
     return MN.act(async () => {
@@ -199,6 +200,7 @@
   // 📱 Jugar mi turno en una mesa de la app (no Flappy)
   async function playTurn(t, myId) {
     const res = await MN.appGames.play(t.appGame, t.id, {
+      deck: MN.deckNumber(t.appGame, t.createdAt || 0, t.id),
       after: 'El ganador sale cuando hayan jugado todos.',
       onStart: () => Store.update('tables', t.id, { ['ags_' + myId]: Date.now() }).catch(() => {}),
       resume: agStarted(t, myId) ? (t['agp_' + myId] || { round: 0 }) : null,
@@ -215,7 +217,9 @@
       const cur = tables().find((x) => x.id === t.id) || t;
       if (cur.status !== 'playing') return;
       await Store.update('tables', t.id, { flappy: ranking.map((x) => ({ id: x.id, score: x.score })) }).catch(() => {});
-      await finish(cur, ranking[0].id, false, ranking[0].score);
+      // Empate a tubos: se reparten el bote entre todos los que hicieron la puntuación máxima
+      const top = ranking.filter((x) => x.score === ranking[0].score).map((x) => x.id);
+      await finish(cur, ranking[0].id, false, ranking[0].score, top);
     });
   }
   // Cuando todos han jugado su turno, la mesa se resuelve sola (gana la puntuación más alta)
@@ -295,10 +299,11 @@
       MN = api;
       MN.registerTx('table', {
         line(t) {
-          const label = t.mode === 'teams' ? `El <b>equipo ${MN.esc(t.pick)}</b> (${t.winners.map((id) => MN.who(id)).join(', ')})` : MN.who(t.winners[0]);
+          const label = t.mode === 'teams' ? `El <b>equipo ${MN.esc(t.pick)}</b> (${t.winners.map((id) => MN.who(id)).join(', ')})`
+            : t.winners.length > 1 ? `Empate: ${t.winners.map((id) => MN.who(id)).join(' y ')}` : MN.who(t.winners[0]);
           return {
             icon: '🃏',
-            text: `${label} gana la mesa de <b>${MN.esc(t.game)}</b> y se lleva <b>${t.pot}</b> fichas`,
+            text: t.mode !== 'teams' && t.winners.length > 1 ? `${label} en la mesa de <b>${MN.esc(t.game)}</b>: se reparten <b>${t.pot}</b> fichas` : `${label} gana la mesa de <b>${MN.esc(t.game)}</b> y se lleva <b>${t.pot}</b> fichas`,
             sub: `${Object.keys(t.payouts).length} jugadores` + (t.bank === 'resolved' ? ' · 🏦 decidido por la Banca' : ''),
           };
         },
