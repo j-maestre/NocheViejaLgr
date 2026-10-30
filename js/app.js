@@ -209,7 +209,9 @@
 
   // Anti-spam: ¿puede `from` retar ahora a `to`? Devuelve el motivo si no.
   // Reto en juego (aceptado o esperando confirmar el resultado) de un jugador, si lo tiene
-  const playingNow = (id, except) => activeChallenges().find((c) => c.id !== except && ['accepted', 'reported'].includes(c.status) && (c.from === id || c.to === id));
+  // (en los juegos de la app y el cronómetro, si ya has jugado tu turno ese reto ya no te ocupa: solo falta el rival)
+  const turnDone = (c, id) => (isAgGame(c) && agMine(c, id)) || (isSwGame(c) && c['sw_' + id] != null);
+  const playingNow = (id, except) => activeChallenges().find((c) => c.id !== except && ['accepted', 'reported'].includes(c.status) && (c.from === id || c.to === id) && !turnDone(c, id));
 
   function challengeBlock(from, to) {
     for (const m of MODULES) { const r = m.challengeBlock && m.challengeBlock(from, to); if (r) return r; }
