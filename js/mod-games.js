@@ -240,6 +240,228 @@
     return quizRun(G, rounds, 15000);
   }
 
+  // ---------------------------------------------------------- 💻 Quiz de C++ (nivel experto)
+  // [pregunta, código o null, correcta, incorrecta, incorrecta, incorrecta]
+  const CPP = [
+    // --- ¿Qué imprime?
+    ['¿Qué imprime?', `struct S { S() { cout << "A"; } };
+int main() { S s(); }`, 'Nada', 'A', 'AA', 'No compila'],
+    ['¿Qué imprime?', `struct B {
+  B() { f(); }
+  virtual void f() { cout << "B"; }
+};
+struct D : B {
+  void f() override { cout << "D"; }
+};
+int main() { D d; }`, 'B', 'D', 'BD', 'Nada'],
+    ['¿Qué imprime?', `struct B {
+  virtual void f(int x = 1) { cout << x; }
+};
+struct D : B {
+  void f(int x = 2) override { cout << x; }
+};
+int main() { B* p = new D; p->f(); }`, '1', '2', '0', '12'],
+    ['¿Qué imprime?', `struct B {
+  void f(double) { cout << "B"; }
+};
+struct D : B {
+  void f(int) { cout << "D"; }
+};
+int main() { D d; d.f(1.5); }`, 'D', 'B', 'BD', 'DB'],
+    ['¿Qué imprime?', `template<class T> void f(T) { cout << "A"; }
+template<> void f<int*>(int*) { cout << "C"; }
+template<class T> void f(T*) { cout << "B"; }
+int main() { int* p = nullptr; f(p); }`, 'B', 'A', 'C', 'BC'],
+    ['¿Qué imprime?', `template<class T> void f(T) { cout << "A"; }
+template<class T> void f(T*) { cout << "B"; }
+template<> void f<int>(int*) { cout << "C"; }
+int main() { int* p = nullptr; f(p); }`, 'C', 'A', 'B', 'AC'],
+    ['¿Qué imprime?', `void g(int&) { cout << "L"; }
+void g(int&&) { cout << "R"; }
+void f(int&& x) { g(x); }
+int main() { f(1); }`, 'L', 'R', 'LR', 'RL'],
+    ['¿Qué imprime?', `struct M { ~M() { cout << "M"; } };
+struct S {
+  M m;
+  S() { throw 1; }
+  ~S() { cout << "S"; }
+};
+int main() {
+  try { S s; } catch (int) {}
+}`, 'M', 'S', 'SM', 'Nada'],
+    ['¿Qué imprime?', `int main() {
+  vector<int> v{1, 2, 3, 2};
+  remove(v.begin(), v.end(), 2);
+  cout << v.size();
+}`, '4', '2', '3', '1'],
+    ['¿Qué imprime?', `int main() {
+  vector<double> v{0.5, 0.5, 0.5};
+  cout << accumulate(v.begin(), v.end(), 0);
+}`, '0', '1', '1.5', '2'],
+    ['¿Qué imprime?', `int main() { cout << (-1 < 1u); }`, '0', '1', '-1', 'false'],
+    ['¿Qué imprime? (C++17)', `int main() {
+  int i = 1;
+  i = i++ + 1;
+  cout << i;
+}`, '2', '3', '1', 'Da igual, es UB'],
+    ['¿Qué imprime?', `int main() {
+  auto f = [x = 0]() mutable { return ++x; };
+  auto g = f;
+  f(); f();
+  cout << g();
+}`, '1', '3', '0', '2'],
+    ['¿Qué imprime?', `int main() {
+  cout << is_same_v<decltype("a"),
+                    const char*>;
+}`, '0', '1', 'No compila', 'a'],
+    ['¿Qué imprime?', `int main() {
+  int x = 0;
+  cout << is_same_v<decltype((x)), int>;
+  cout << is_same_v<decltype(x), int>;
+}`, '01', '11', '10', '00'],
+    ['¿Qué imprime?', `int main() { cout << 1["abc"]; }`, 'b', 'a', '1', 'No compila'],
+    ['¿Qué imprime?', `struct B {
+  virtual void f() { cout << "B"; }
+};
+struct D : B {
+  void f() override { cout << "D"; }
+};
+int main() { B b = D{}; b.f(); }`, 'B', 'D', 'BD', 'No compila'],
+    ['¿Qué imprime?', `int main() {
+  vector<int> a(3, 1), b{3, 1};
+  cout << a.size() << b.size();
+}`, '32', '33', '23', '22'],
+    ['¿Qué imprime?', `struct V {
+  V() { cout << "b"; }
+};
+struct A : virtual V {};
+struct B : virtual V {};
+struct C : A, B {};
+int main() { C c; }`, 'b', 'bb', 'bbb', 'Nada'],
+    ['¿Qué imprime?', `template<class... T>
+bool all(T... x) { return (x && ...); }
+int main() { cout << all(); }`, '1', '0', 'No compila', 'UB'],
+    ['¿Qué imprime?', `using R = int&;
+int main() {
+  cout << is_same_v<const R, int&>;
+}`, '1', '0', 'No compila', 'UB'],
+    ['¿Qué imprime?', `struct S { char c; double d; char e; };
+int main() { cout << sizeof(S); } // x86-64`, '24', '10', '16', '12'],
+    ['¿Qué imprime?', `void f(int a[10]) { cout << sizeof(a); }
+int main() { int a[10]; f(a); } // x86-64`, '8', '40', '10', '4'],
+    ['¿Qué imprime? (C++17)', `int a() { cout << "a"; return 0; }
+int b() { cout << "b"; return 0; }
+int main() { cout << a() << b(); }`, 'a0b0', 'b0a0', 'ab00', 'ba00'],
+
+    // --- Comportamiento indefinido y trampas
+    ['¿Qué pasa con «a»?', `struct S {
+  int a, b;
+  S() : b(1), a(b + 1) {}
+};`, 'Lee b sin inicializar', 'Vale 2', 'Vale 1', 'No compila'],
+    ['¿Qué pasa al leer r?', `int a = 1;
+const int& r = std::max(a, 2);`, 'UB: referencia colgante', 'Vale 2', 'Vale 1', 'No compila'],
+    ['¿Qué hace este código?', `vector<string> v{{"a", "b"}};`, 'UB: toma los punteros como iteradores', 'Un vector con "a" y "b"', 'Un vector con "ab"', 'No compila'],
+    ['Antes de C++23, ¿qué pasa aquí? get() devuelve const vector<int>&', `for (int x : make().get()) use(x);`, 'UB: el temporal muere antes del bucle', 'Va bien: se alarga su vida', 'No compila', 'Copia el vector'],
+    ['¿Qué pasa?', `struct S { ~S() { throw 1; } };
+int main() {
+  try { S s; }
+  catch (...) { cout << "c"; }
+}`, 'std::terminate', 'Imprime c', 'UB silencioso', 'No compila'],
+    ['¿Qué pasa al usar p->shared_from_this() en C++17?', `struct S : enable_shared_from_this<S> {};
+S* p = new S;`, 'Lanza std::bad_weak_ptr', 'Devuelve un puntero vacío', 'Crea un nuevo dueño', 'No compila'],
+    ['¿Cuál de estas es UB si ~Base() NO es virtual?', null, 'unique_ptr<Base> p(new Derived)', 'shared_ptr<Base> p(new Derived)', 'Ninguna de las dos', 'Las dos'],
+    ['¿Qué es esto?', `float f = 1.0f;
+int i = *reinterpret_cast<int*>(&f);`, 'UB por strict aliasing', 'Legal desde C++11', 'Solo no portable', 'Convierte 1.0 en 1'],
+    ['¿Forma correcta de leer los bits de un float como int (C++20)?', null, 'std::bit_cast', 'reinterpret_cast', 'static_cast', 'Una union'],
+    ['Comparador de std::sort con <= en vez de <', null, 'UB: no es orden débil estricto', 'Solo pierde estabilidad', 'Ordena igual, más lento', 'No compila'],
+    ['¿Qué pasa si escribes v[0] = 1 aquí?', `vector<int> v;
+v.reserve(10);`, 'UB: el tamaño sigue siendo 0', 'Correcto: hay capacidad', 'Lanza out_of_range', 'Crece a tamaño 1'],
+    ['¿Qué devuelve INT_MIN / -1?', null, 'UB', 'INT_MIN', 'INT_MAX', '0'],
+    ['Dos hilos escriben a la vez un volatile int', null, 'Data race: UB', 'Seguro: volatile lo protege', 'Seguro en x86-64 por el estándar', 'Atómico pero sin orden'],
+    ['¿Qué pasa con sv?', `string_view sv = string("a") + "b";
+cout << sv;`, 'UB: el string ya no existe', 'Se alarga su vida', 'Imprime ab siempre', 'No compila'],
+
+    // --- Semántica de movimiento y vida de los objetos
+    ['¿Qué hace?', `const string s = "x";
+string t = std::move(s);`, 'Copia', 'Mueve', 'No compila', 'UB'],
+    ['«return std::move(local);» en una función que devuelve por valor', null, 'Impide la NRVO', 'Es lo más eficiente', 'Es UB', 'No compila'],
+    ['vector al crecer, si T tiene copia y su move NO es noexcept', null, 'Copia los elementos', 'Los mueve igualmente', 'Lanza una excepción', 'No compila'],
+    ['Si declaras tu propio destructor, el move constructor implícito…', null, 'No se genera: se usa la copia', 'Se genera igual', 'Queda deleted y no compila', 'Se genera si es trivial'],
+    ['Si T tiene copia y move eliminados, ¿qué pasa? (C++17)', `T f() { return T{}; }
+T x = f();`, 'Compila: elisión obligatoria', 'Error: no se puede mover', 'Solo compila con -O2', 'Compila, pero es UB'],
+    ['Con T no copiable ni movible (C++17)', `T f() { T t; return t; }`, 'No compila: NRVO no es obligatoria', 'Compila: elisión obligatoria', 'Compila solo con -O2', 'Compila, pero es UB'],
+    ['Estado de un std::string tras moverlo', null, 'Válido pero no especificado', 'Siempre vacío', 'Inválido: ni asignarle', 'Igual que antes'],
+    ['¿Qué genera std::move por sí solo en ejecución?', null, 'Nada: es solo un cast', 'Una llamada al move ctor', 'Un swap', 'Una copia superficial'],
+    ['Pimpl con unique_ptr<Impl> y Impl incompleto en el .h', null, 'Hay que definir ~T() en el .cpp', 'Funciona sin hacer nada', 'Hay que incluir Impl en cada .cpp', 'Hay que hacer Impl virtual'],
+    ['Con make_shared y un weak_ptr vivo, al morir el último shared_ptr…', null, 'Se destruye el objeto, no se libera la memoria', 'Se libera todo', 'El objeto sigue vivo', 'Es UB'],
+    ['¿Qué es thread-safe en shared_ptr?', null, 'Solo el contador de referencias', 'También el objeto apuntado', 'También reasignar el mismo shared_ptr', 'Nada en absoluto'],
+    ['En C++17, ¿puede filtrar memoria si g() lanza?', `f(unique_ptr<T>(new T), g());`, 'No: los argumentos no se intercalan', 'Sí: new y g() se intercalan', 'Solo con -O3', 'Sí, siempre'],
+    ['¿Quién construye una base virtual?', null, 'La clase más derivada', 'La primera base', 'La última base', 'Cada base intermedia'],
+    ['¿Para qué sirve std::launder?', null, 'Puntero válido a un objeto recreado en ese almacenamiento', 'Borrar memoria de forma segura', 'Evitar una data race', 'Convertir entre tipos sin UB'],
+    ['Tras «new (buf) T», ¿cómo se destruye?', null, 'p->~T()', 'delete p', 'delete[] buf', 'Solo, al salir del ámbito'],
+
+    // --- Plantillas y tipos
+    ['En «template<class T> void f(T&&)», con int i; f(i), T es…', null, 'int&', 'int', 'int&&', 'const int&'],
+    ['En «template<class T> void f(vector<T>&&)», el parámetro es…', null, 'Referencia a rvalue', 'Referencia universal', 'Referencia a lvalue', 'Copia'],
+    ['Error de tipos dentro del CUERPO de una plantilla instanciada', null, 'Error duro: no es SFINAE', 'SFINAE: se descarta', 'Warning', 'UB'],
+    ['¿Qué falta para que compile con x dependiente?', `x.___ get<0>();`, 'template', 'typename', 'auto', 'using'],
+    ['¿Compila? B<T> tiene f()', `template<class T>
+struct D : B<T> {
+  void g() { f(); }
+};`, 'No: hace falta this->f()', 'Sí, siempre', 'Solo si T es int', 'Solo en C++20'],
+    ['Rama descartada de if constexpr FUERA de una plantilla', null, 'Se comprueba igualmente', 'Se ignora por completo', 'No se permite if constexpr', 'Da UB'],
+    ['std::decay_t<int[3]> es…', null, 'int*', 'int[3]', 'int', 'int(&)[3]'],
+    ['¿Tipo de x?', `auto x = {1};`, 'initializer_list<int>', 'int', 'int[1]', 'No compila'],
+    ['¿Tipo de x? (C++17)', `auto x{1};`, 'int', 'initializer_list<int>', 'int[1]', 'No compila'],
+    ['¿Tipo de x?', `vector<bool> v{true};
+auto x = v[0];`, 'vector<bool>::reference', 'bool', 'bool&', 'const bool&'],
+    ['¿Qué devuelve +[]{}?', null, 'Un puntero a función', 'El propio lambda', 'void', 'No compila'],
+    ['¿Cómo se encuentra una «hidden friend»?', null, 'Solo por ADL', 'Con búsqueda normal', 'Con el operador ::', 'Con using'],
+    ['Dos overloads con concepts válidos, uno subsume al otro', null, 'Gana el más restringido', 'Es ambiguo', 'Gana el primero declarado', 'Gana el menos restringido'],
+    ['Si defines «auto operator<=>(const T&) const = default;»', null, 'También se declara == por defecto', 'Hay que escribir == a mano', 'Solo funciona <', 'Se generan copia y move'],
+    ['Con un operator<=> escrito a mano (no default), ¿a == b?', null, 'No compila: no se genera ==', 'Usa <=> por dentro', 'Compara bit a bit', 'Compara miembro a miembro'],
+    ['¿Cuál debe evaluarse siempre en compilación?', null, 'consteval', 'constexpr', 'constinit', 'const'],
+    ['¿Qué garantiza constinit?', null, 'Inicialización estática, sin hacerla const', 'Que es inmutable', 'Evaluar solo en compilación', 'Que es inline'],
+    ['Inicializadores designados en C++20', `S s{.b = 1, .a = 2}; // a va antes que b`, 'No compila: importa el orden', 'Compila sin problema', 'Compila con warning', 'UB'],
+    ['Una función es coroutine si contiene…', null, 'co_await, co_yield o co_return', 'Devolver std::future', 'La palabra coroutine', 'Devolver std::generator'],
+    ['¿Qué nombre busca el compilador en el tipo de una coroutine?', null, 'promise_type', 'coroutine_handle', 'awaiter', 'task_type'],
+    ['¿Qué estándar introduce «deducing this»?', null, 'C++23', 'C++20', 'C++17', 'C++26'],
+
+    // --- Concurrencia
+    ['memory_order_relaxed garantiza…', null, 'Atomicidad y orden en esa variable', 'Orden total global', 'Sincronizar con otros hilos', 'Nada de nada'],
+    ['Un load acquire sincroniza con un store release si…', null, 'Lee el valor de ese store', 'Sucede después en el tiempo', 'Comparten núcleo', 'Están en el mismo hilo'],
+    ['¿Qué añade seq_cst sobre acquire-release?', null, 'Un orden total único', 'Atomicidad', 'Menos coste', 'Nada en x86-64 ni en ARM'],
+    ['compare_exchange_weak frente a strong', null, 'Puede fallar sin motivo', 'No es atómica', 'Bloquea el hilo', 'Solo vale con enteros'],
+    ['¿Cuántas funciones corren a la vez?', `std::async(launch::async, f);
+std::async(launch::async, g);`, 'Una: el future temporal bloquea', 'Dos, en paralelo', 'Ninguna: son diferidas', 'Depende del planificador'],
+    ['Destruir un std::thread aún joinable', null, 'std::terminate', 'Hace join', 'Hace detach', 'UB silencioso'],
+    ['Un static local en C++11 se inicializa…', null, 'Una vez y de forma thread-safe', 'Una vez por hilo', 'Sin garantías entre hilos', 'Antes de main'],
+    ['Dos atómicos independientes en la misma línea de caché', null, 'False sharing', 'Data race', 'ABA', 'Deadlock'],
+    ['std::function frente a std::move_only_function (C++23)', null, 'function exige callable copiable', 'function es solo para lambdas', 'function no permite estado', 'Son lo mismo'],
+
+    // --- Biblioteca
+    ['deque::push_back invalida…', null, 'Iteradores, no referencias', 'Referencias, no iteradores', 'Ambos', 'Ninguno'],
+    ['Un rehash de unordered_map invalida…', null, 'Iteradores, no referencias', 'Referencias, no iteradores', 'Ambos', 'Ninguno'],
+    ['std::lower_bound sobre std::list', null, 'O(log n) comparaciones, O(n) avances', 'O(log n) en todo', 'O(n) comparaciones', 'No compila'],
+    ['map<string, int, less<>> permite…', null, 'find(string_view) sin crear string', 'Ordenar al revés', 'Claves duplicadas', 'Búsqueda en O(1)'],
+    ['variant::valueless_by_exception() es true si…', null, 'Falló un cambio de alternativa', 'Está sin inicializar', 'Contiene monostate', 'Se movió desde él'],
+    ['¿Para qué sirve [[no_unique_address]]?', null, 'Que un miembro vacío no ocupe', 'Prohibir tomar su dirección', 'Alinearlo a la caché', 'Evitar el aliasing'],
+    ['Los miembros static constexpr de una clase, desde C++17…', null, 'Son implícitamente inline', 'Necesitan definición en el .cpp', 'Tienen enlace interno', 'No pueden ser ODR-used'],
+    ['Un const global de ámbito de namespace tiene enlace…', null, 'Interno', 'Externo', 'Ninguno', 'Débil'],
+    ['El destructor virtual puro…', null, 'Debe tener definición', 'No puede tener definición', 'No está permitido', 'Lo genera el compilador'],
+    ['¿Se puede sobrescribir un virtual privado de la base?', null, 'Sí', 'No', 'Solo siendo friend', 'Solo si es puro'],
+    ['Lanzar de nuevo con «throw e;» en vez de «throw;»', null, 'Copia y puede cortar el tipo', 'Es exactamente igual', 'Es UB', 'std::terminate'],
+  ];
+  async function playCpp(G, seed) {
+    if (!await intro(G, '<b>5 preguntas</b> de C++ para gente que sufre a diario: trampas del lenguaje, plantillas, memoria y concurrencia. <b>30 segundos</b> cada una. Cuenta acertar y ser rápido.')) return null;
+    const r = rng(seed + 'cpp'); const qs = fromDeck(CPP, 5, 'cpp', r);
+    const rounds = qs.map(([q, code, ok, ...bad]) => {
+      const options = shuffle([ok, ...bad], r);
+      return { options: options.map(MN.esc), ok: options.indexOf(ok), show: (el) => { el.innerHTML = `<div class="quiz-q cpp-q">${MN.esc(q)}</div>${code ? `<pre class="cpp-code">${MN.esc(code)}</pre>` : ''}`; } };
+    });
+    return quizRun(G, rounds, 30000);
+  }
+
   // ---------------------------------------------------------- 🎵 Adivina la canción
   const SONGS = [
     ['Despacito', 'Luis Fonsi'], ['Macarena', 'Los del Río'], ['Aserejé', 'Las Ketchup'], ['Bohemian Rhapsody', 'Queen'], ['Billie Jean', 'Michael Jackson'],
@@ -560,6 +782,7 @@
     pokemon: { icon: '⚫', name: '¿Quién es ese Pokémon?', play: playPokemon },
     logo: { icon: '🏷️', name: 'Logo misterioso', play: playLogo },
     quiz: { icon: '🧠', name: 'Quiz', play: playQuiz },
+    cpp: { icon: '💻', name: 'Quiz de C++ (expertos)', play: playCpp },
     song: { icon: '🎵', name: 'Adivina la canción', play: playSong },
     flappy: { icon: '🐦', name: 'Flappy con tu cara', play: (G, s, o) => playFlappy(G, s, o) },
     object: { icon: '🔍', name: '¿Qué es esto?', play: playObject },
