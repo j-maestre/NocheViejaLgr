@@ -1290,3 +1290,23 @@ input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; }
 .notif-row { align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .notif-row span { display: grid; gap: 2px; }
 .notif-row small { color: var(--muted); font-size: 12px; }
+
+/* ---------- Desplegables: cada pantalla enseña lo justo y el resto se abre al tocar ---------- */
+.fold { margin: 10px 0; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.fold > summary { display: flex; align-items: center; gap: 8px; padding: 14px; font-weight: 800; cursor: pointer; list-style: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '▾'; margin-left: auto; color: var(--muted); transition: transform .2s; }
+.fold[open] > summary::after { transform: rotate(180deg); }
+.fold-body { padding: 0 14px 14px; display: grid; gap: 10px; min-width: 0; }
+.fold-body > * { min-width: 0; }
+.fold-n { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; display: grid; place-items: center; font-size: 12px; background: var(--card-2); color: var(--text); border: 1px solid var(--line); }
+.fold-n:empty { display: none; }
+.fold-n.hot { background: var(--red); border-color: var(--red); color: #fff; }
+.fold.sub { margin: 0; background: var(--card-2); }
+.fold .challenges { margin: 0; }
+.float-badge.live { background: var(--red); color: #fff; box-shadow: 0 0 12px rgba(255, 77, 109, .7); }
+.me-btn { position: relative; overflow: visible; }
+.me-btn #tab-me { overflow: hidden; border-radius: 50%; }
+.me-btn .badge { top: -6px; left: auto; right: -6px; }
+
+.cal-day-t { text-transform: capitalize; }

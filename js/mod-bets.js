@@ -85,6 +85,7 @@
     const mine = MN.me(); const myId = mine && mine.id;
     const list = MN.activeChallenges().filter((c) => (c.status === 'accepted' || c.status === 'reported') && (isOpen(c) || betsOf(c.id).length));
     MN.$('#bets-wrap').hidden = !list.length;
+    MN.foldCount('du-bets', list.length);
     el.innerHTML = list.map((c) => card(c, myId)).join('');
     renderTab();
   }

@@ -55,7 +55,9 @@
   function render() {
     const el = MN.$('#porra-card'); if (!el) return;
     const mine = MN.me();
-    if (!mine || !MN.S || !MN.started() || MN.ended()) { el.innerHTML = ''; return; }
+    const off = !mine || !MN.S || !MN.started() || MN.ended();
+    el.closest('details').hidden = off;
+    if (off) { el.innerHTML = ''; return; }
     const all = bets(); const isOpen = open();
     const opts = (sel) => MN.sortedPlayers(MN.balances()).map((p) => `<option value="${MN.esc(p.id)}" ${sel === p.id ? 'selected' : ''}>${MN.esc(p.emoji)} ${MN.esc(p.name)}</option>`).join('');
     const side = (k) => {
@@ -66,8 +68,7 @@
     : isOpen ? `<div class="row"><select class="porra-sel" data-side="${k}">${opts()}</select><button type="button" class="btn primary" data-porra="${k}">Apostar ${stake()}</button></div>`
       : '<div class="muted small">No apostaste.</div>'}</div>`;
     };
-    el.innerHTML = `<div class="card porra">
-      <h3>🔮 La porra</h3>
+    el.innerHTML = `<div class="porra">
       <p class="hint">${isOpen ? `Apuesta <b>${stake()} fichas</b> a quién acabará primero y quién último. Cierra el <b>${MN.esc(MN.fmtDate(closeTs()))}</b>. Los que acierten se reparten el bote al cerrar la mesa… ¡y el premio puede cambiar la clasificación!` : 'Las apuestas están cerradas. Los premios se reparten al cerrar la mesa.'}</p>
       ${side('win')}${side('lose')}</div>`;
   }

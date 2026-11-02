@@ -31,14 +31,14 @@ async function names(gameId) {
 // `cat`: tipo de aviso; no llega a quien lo haya apagado en su perfil (sin tipo, llega siempre).
 async function send(gameId, pids, body, except, cat) {
   const skip = [].concat(except || []);
-  if (cat) {
-    const ps = await game(gameId).collection('players').get();
-    ps.forEach((d) => { const n = d.data().notif; if (n && n[cat] === false) skip.push(d.id); });
-  }
+  // Solo jugadores que existen: quien se borró al reiniciar la mesa ya no recibe nada
+  const ps = await game(gameId).collection('players').get();
+  const alive = new Set();
+  ps.forEach((d) => { alive.add(d.id); const n = d.data().notif; if (cat && n && n[cat] === false) skip.push(d.id); });
   const snap = await game(gameId).collection('push').get();
   const docs = snap.docs.filter((d) => {
     const pid = d.data().pid;
-    return pid && !skip.includes(pid) && (!pids || pids.includes(pid));
+    return pid && alive.has(pid) && !skip.includes(pid) && (!pids || pids.includes(pid));
   });
   if (!docs.length) return;
   const tokens = docs.map((d) => d.id);
@@ -155,6 +155,29 @@ exports.fotos = onDocumentWritten('games/{gameId}/photos/{id}', async (e) => {
   if (e.data.before.exists || !e.data.after.exists) return null;
   const p = e.data.after.data(); const n = await names(e.params.gameId);
   return send(e.params.gameId, null, `📸 ${n[p.by] || 'Alguien'} ha subido una foto${p.caption ? `: «${p.caption}»` : ''}. ¡Dale ❤️ si te gusta!`, p.by, 'fotos');
+});
+
+// ---------------------------------------------------------- 🧨 mesa reiniciada («Borrar todo»)
+// Último aviso a todos los móviles; después se olvidan los de jugadores que ya no existen
+// (al volver a sentarse se apuntan solos) y el registro de avisos de eventos ya enviados.
+exports.reinicio = onDocumentWritten('games/{gameId}/meta/settings', async (e) => {
+  const before = e.data.before.exists ? e.data.before.data() : {};
+  const after = e.data.after.exists ? e.data.after.data() : {};
+  if (!after.resetAt || before.resetAt === after.resetAt) return null;
+  const g = game(e.params.gameId);
+  const [tokens, ps, log] = await Promise.all([g.collection('push').get(), g.collection('players').get(), g.collection('pushlog').get()]);
+  if (!tokens.empty) {
+    const body = '🧨 La mesa se ha reiniciado. Entra de nuevo para sentarte.';
+    await admin.messaging().sendEachForMulticast({
+      tokens: tokens.docs.map((d) => d.id),
+      data: { title: 'Mercado Negro', body, tag: 'mn-' + hash(body), url: './' },
+      webpush: { headers: { Urgency: 'high', TTL: '3600' } },
+    });
+  }
+  const alive = new Set(ps.docs.map((d) => d.id));
+  const dead = tokens.docs.filter((d) => !alive.has(d.data().pid)).map((d) => d.ref.delete());
+  await Promise.all([...dead, ...log.docs.map((d) => d.ref.delete())]);
+  return null;
 });
 
 // ---------------------------------------------------------- jugadores nuevos

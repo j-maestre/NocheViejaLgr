@@ -210,7 +210,9 @@
   function render() {
     const el = MN.$('#missions-card'); if (!el) return;
     const mine = MN.me();
-    if (!mine || !MN.S || !MN.started() || MN.ended()) { el.innerHTML = ''; return; }
+    const off = !mine || !MN.S || !MN.started() || MN.ended();
+    el.closest('details').hidden = off;
+    if (off) { el.innerHTML = ''; MN.$('#me-badge').hidden = true; return; }
     const key = dayKey(Date.now()); const data = dayData(mine.id, key);
     const list = missionsFor(mine.id, key);
     const normal = list.filter((m) => !m.chaos); const chaos = list.find((m) => m.chaos);
@@ -219,8 +221,12 @@
       <span class="ms-text">${m.def.text(m)}</span>${m.def.goal > 1 ? `<span class="ms-prog">${st.p}/${m.def.goal}</span>` : ''}</li>`; };
     const cst = status(chaos, data);
     const unused = myCards(mine.id).filter((c) => !c.usedAt);
-    el.innerHTML = `<div class="card missions">
-      <h3>🕵️ Tus misiones secretas de hoy</h3>
+    MN.foldCount('pf-missions', `${normal.filter((m) => status(m, data).done).length}/${normal.length}`);
+    // Número sobre tu foto: misiones del día sin mirar y cartas del caos sin usar
+    const seenKey = `mn_ms_seen_${mine.id}`; let seen = null;
+    try { if (MN.view === 'perfil') localStorage.setItem(seenKey, key); seen = localStorage.getItem(seenKey); } catch (e) { seen = key; }
+    const nb = (seen === key ? 0 : 1) + unused.length; const bd = MN.$('#me-badge'); bd.hidden = !nb; bd.textContent = nb;
+    el.innerHTML = `<div class="missions">
       <p class="hint">Solo las ves tú. Cada una cumplida: <b>+${reward}</b> fichas de la Banca. Mañana, misiones nuevas.</p>
       <ul class="ms-list">${normal.map(row).join('')}</ul>
       <div class="chaos ${cst.done ? 'done' : ''}">
@@ -281,6 +287,7 @@
     render,
     sweep,
     onState,
+    onView(v) { if (v === 'perfil') render(); },
     // 🤐 Mordaza y 👻 Fantasma
     challengeBlock(from, to) {
       if (activeCard('gag', (c) => c.target === from)) return '🤐 Llevas una mordaza: no puedes retar a nadie durante un rato.';
@@ -295,7 +302,7 @@
       const s = MN.S.settings;
       return section('🕵️', 'Misiones secretas y cartas del caos', `
         <ul>
-          <li>Cada día tienes <b>${s.missionsPerDay} misiones secretas</b> (en la portada, solo las ves tú). Cada una cumplida paga <b>${s.missionReward} fichas</b> de la Banca.</li>
+          <li>Cada día tienes <b>${s.missionsPerDay} misiones secretas</b> (en tu perfil, solo las ves tú). Cada una cumplida paga <b>${s.missionReward} fichas</b> de la Banca.</li>
           <li>Además hay una <b>☠️ Misión del caos</b>, más difícil. Si la cumples, ganas una <b>🃏 carta del caos</b> con un poder de un solo uso:</li>
         </ul>
         <ul class="small">${Object.values(POWERS).map((P) => `<li>${P.icon} <b>${P.name}</b>: ${P.desc}</li>`).join('')}</ul>`);

@@ -141,6 +141,7 @@
 
   function render() {
     const mine = MN.me(); const myId = mine && mine.id; const admin = MN.isAdmin();
+    MN.foldCount('du-tables', activeTables().length, activeTables().some((t) => needsMe(t, myId)));
     const list = activeTables().slice().reverse().sort((a, b) => needsMe(b, myId) - needsMe(a, myId) || seated(b, myId) - seated(a, myId));
     MN.$('#tables-list').innerHTML = list.length ? list.map((t) => card(t, myId, admin)).join('')
       : '<li class="empty">No hay mesas abiertas. ¿Una partidita de póker?</li>';

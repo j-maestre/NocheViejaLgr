@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=39">
+  <link rel="stylesheet" href="css/style.css?v=41">
 </head>
 <body>
   <div id="mode-banner" class="banner" hidden></div>
@@ -29,7 +29,7 @@
         <small>Casino clandestino · Nochevieja 2026</small>
         <button type="button" id="rules-btn" class="rules-btn">📖 Normas</button>
       </div>
-      <button type="button" id="me-btn" class="me-btn" data-view="perfil" title="Mi perfil" aria-label="Mi perfil"><span id="tab-me">👤</span></button>
+      <button type="button" id="me-btn" class="me-btn" data-view="perfil" title="Mi perfil" aria-label="Mi perfil"><span id="tab-me">👤</span><b id="me-badge" class="badge" hidden></b></button>
     </div>
     <div class="countdown" id="countdown"></div>
   </header>
@@ -44,21 +44,15 @@
       <div id="limit-info" class="limit-info"></div>
       <div id="slot-pending-banner" hidden></div>
       <div id="loanreq-card"></div>
-      <div id="missions-card"></div>
-      <div id="ranking-stats" class="stats"></div>
-      <div id="porra-card"></div>
+      <details class="fold" data-fold="rk-stats"><summary><span>📊 Estadísticas de la partida</span><b class="fold-n" data-fold-n="rk-stats"></b></summary><div class="fold-body"><div id="ranking-stats" class="stats"></div></div></details>
+      <details class="fold" data-fold="rk-porra"><summary><span>🔮 La porra</span><b class="fold-n" data-fold-n="rk-porra"></b></summary><div class="fold-body"><div id="porra-card"></div></div></details>
 
-      <div class="card chart-card">
-        <h3>📈 Evolución de fichas</h3>
+      <details class="fold" data-fold="rk-chart"><summary><span>📈 Evolución de fichas</span><b class="fold-n" data-fold-n="rk-chart"></b></summary><div class="fold-body">
         <div id="rank-chart" class="chart"></div>
         <p class="hint">Toca un nombre para destacarlo (máx. 3).</p>
         <div id="rank-chart-legend" class="chart-legend"></div>
-      </div>
-
-      <div class="card">
-        <h3>🎮 Minijuegos</h3>
-        <div id="games-stats"></div>
-      </div>
+      </div></details>
+      <details class="fold" data-fold="rk-games"><summary><span>🎮 Minijuegos</span><b class="fold-n" data-fold-n="rk-games"></b></summary><div class="fold-body"><div id="games-stats"></div></div></details>
     </section>
 
     <!-- ============ DUELO ============ -->
@@ -95,16 +89,14 @@
         <ul id="my-challenges" class="challenges"></ul>
       </div>
 
-      <h2 class="section-title">🔥 En la mesa ahora</h2>
-      <ul id="live-challenges" class="challenges"></ul>
+      <details class="fold" data-fold="du-live"><summary><span>🔥 En la mesa ahora</span><b class="fold-n" data-fold-n="du-live"></b></summary><div class="fold-body"><ul id="live-challenges" class="challenges"></ul></div></details>
 
-      <div id="bets-wrap" hidden>
-        <h2 class="section-title">🎰 Apuestas</h2>
+      <details class="fold" data-fold="du-bets" id="bets-wrap" hidden><summary><span>🎰 Apuestas</span><b class="fold-n" data-fold-n="du-bets"></b></summary><div class="fold-body">
         <p class="hint">Apuesta por quién gana un duelo ajeno. Si aciertas, te repartes lo que pusieron los que fallaron.</p>
         <ul id="bets-list" class="challenges"></ul>
-      </div>
+      </div></details>
 
-      <h2 class="section-title">🃏 Mesas y salas</h2>
+      <details class="fold" data-fold="du-tables"><summary><span>🃏 Mesas y salas</span><b class="fold-n" data-fold-n="du-tables"></b></summary><div class="fold-body">
       <p class="hint">Para jugar varios a la vez: en persona (póker, Dixit, por equipos…) o en la app (Flappy en tiempo real, quiz, canciones…). Cada uno pone la entrada y el ganador se lleva el bote.</p>
       <ul id="tables-list" class="challenges"></ul>
       <details id="table-new" class="card direct">
@@ -123,11 +115,11 @@
           <button class="btn primary" type="submit">🃏 Abrir</button>
         </form>
       </details>
+      </div></details>
 
-      <details id="rematches" class="card direct rematch-box" hidden>
-        <summary>🔁 Revanchas pendientes <span class="badge-inline" id="rematch-count"></span></summary>
+      <details id="rematches" class="fold" data-fold="du-rematch" hidden><summary><span>🔁 Revanchas pendientes</span><b class="fold-n" id="rematch-count"></b></summary><div class="fold-body">
         <ul id="rematch-list" class="challenges"></ul>
-      </details>
+      </div></details>
 
       <details id="direct-duel" class="card direct" hidden>
         <summary>🏦 Registro directo (solo Banca)</summary>
@@ -195,8 +187,7 @@
       <h2 class="section-title">📅 Calendario de eventos</h2>
       <div id="calendar"></div>
 
-      <div id="cal-admin" class="card bank-card" hidden>
-        <h3>🏦 Gestionar eventos</h3>
+      <details id="cal-admin" class="fold" data-fold="ev-admin" hidden><summary><span>🏦 Gestionar eventos</span></summary><div class="fold-body">
         <form id="ev-form" autocomplete="off">
           <label>Evento<select id="ev-type"></select></label>
           <label>Fecha y hora<input type="datetime-local" id="ev-at"></label>
@@ -214,10 +205,9 @@
             <button type="button" class="btn ghost" id="ev-restore" hidden>↺ Restaurar fechas reales</button>
           </div>
         </div>
-      </div>
+      </div></details>
 
-      <h2 class="section-title">ℹ️ Tipos de evento</h2>
-      <div id="cal-legend" class="cal-legend"></div>
+      <details class="fold" data-fold="ev-types"><summary><span>ℹ️ Tipos de evento</span><b class="fold-n" data-fold-n="ev-types"></b></summary><div class="fold-body"><div id="cal-legend" class="cal-legend"></div></div></details>
       </div>
     </section>
 
@@ -246,22 +236,7 @@
           <div class="chips"><div class="amount" id="pf-chips"></div><div class="delta">fichas</div></div>
         </div>
 
-        <div id="pf-stats" class="stats stats-grid"></div>
-
-        <div class="card">
-          <h3>🛒 Mercado negro</h3>
-          <ul id="market" class="market"></ul>
-        </div>
-
-        <details class="card direct tv-help">
-          <summary>📺 Ponerla en la tele</summary>
-          <p>La app tiene un <b>modo TV</b> para proyectar: ranking en grande, eventos, retos en juego y, al cerrar la mesa, la ceremonia y el resumen solos.</p>
-          <ol class="tut-list">
-            <li><b>Smart TV o portátil con HDMI</b> (lo mejor): abre en su navegador esta dirección y déjalo en pantalla completa:<br><code id="tv-url"></code></li>
-            <li><b>Chromecast / «Enviar pantalla»</b> desde un Android, o <b>AirPlay</b> desde un iPhone: abre el modo TV en ese móvil y duplica la pantalla (ese móvil queda ocupado).</li>
-          </ol>
-          <div class="row wrap"><button type="button" class="btn ghost" id="tv-copy">📋 Copiar dirección</button><button type="button" class="btn primary" data-tv>📺 Abrir modo TV aquí</button></div>
-        </details>
+        <details class="fold" data-fold="pf-missions" open><summary><span>🕵️ Misiones de hoy</span><b class="fold-n" data-fold-n="pf-missions"></b></summary><div class="fold-body"><div id="missions-card"></div></div></details>
 
         <div id="roulette-card" class="card rl-card" hidden>
           <div class="rl-card-art">🎰</div>
@@ -269,24 +244,36 @@
           <button type="button" class="btn primary" data-roulette-open>Jugar</button>
         </div>
 
-        <div class="card" id="app-card"></div>
+        <details class="fold" data-fold="pf-market"><summary><span>🛒 Mercado negro</span><b class="fold-n" data-fold-n="pf-market"></b></summary><div class="fold-body">
+          <ul id="market" class="market"></ul>
+        </div></details>
 
-        <div class="card">
-          <label class="check-row"><input type="checkbox" id="sound-toggle" checked> 🔊 Sonidos y confeti al ganar</label>
-        </div>
+        <details class="fold" data-fold="pf-stats"><summary><span>📊 Mis estadísticas</span><b class="fold-n" data-fold-n="pf-stats"></b></summary><div class="fold-body">
+        <div id="pf-stats" class="stats stats-grid"></div>
+        <h3>📈 Tu evolución</h3>
+        <div id="pf-chart" class="chart"></div>
+        </div></details>
 
-        <div class="card">
-          <h3>🏅 Insignias</h3>
+        <details class="fold" data-fold="pf-badges"><summary><span>🏅 Insignias</span><b class="fold-n" data-fold-n="pf-badges"></b></summary><div class="fold-body">
           <ul id="pf-badges" class="badges-list"></ul>
-        </div>
+        </div></details>
 
-        <div class="card chart-card">
-          <h3>📈 Tu evolución</h3>
-          <div id="pf-chart" class="chart"></div>
-        </div>
+        <details class="fold" data-fold="pf-history"><summary><span>📜 Tus movimientos</span><b class="fold-n" data-fold-n="pf-history"></b></summary><div class="fold-body"><ul id="pf-history" class="feed"></ul></div></details>
 
-        <div class="card">
-          <h3>✏️ Editar perfil</h3>
+        <details class="fold" data-fold="pf-settings"><summary><span>⚙️ Ajustes</span><b class="fold-n" data-fold-n="pf-settings"></b></summary><div class="fold-body">
+        <div id="app-card"></div>
+          <label class="check-row"><input type="checkbox" id="sound-toggle" checked> 🔊 Sonidos y confeti al ganar</label>
+        <details class="fold sub tv-help" data-fold="pf-tv">
+          <summary><span>📺 Ponerla en la tele</span></summary><div class="fold-body">
+          <p>La app tiene un <b>modo TV</b> para proyectar: ranking en grande, eventos, retos en juego y, al cerrar la mesa, la ceremonia y el resumen solos.</p>
+          <ol class="tut-list">
+            <li><b>Smart TV o portátil con HDMI</b> (lo mejor): abre en su navegador esta dirección y déjalo en pantalla completa:<br><code id="tv-url"></code></li>
+            <li><b>Chromecast / «Enviar pantalla»</b> desde un Android, o <b>AirPlay</b> desde un iPhone: abre el modo TV en ese móvil y duplica la pantalla (ese móvil queda ocupado).</li>
+          </ol>
+          <div class="row wrap"><button type="button" class="btn ghost" id="tv-copy">📋 Copiar dirección</button><button type="button" class="btn primary" data-tv>📺 Abrir modo TV aquí</button></div>
+        </div></details>
+
+        <details class="fold sub" data-fold="pf-edit"><summary><span>✏️ Editar perfil</span><b class="fold-n" data-fold-n="pf-edit"></b></summary><div class="fold-body">
           <form id="profile-form" autocomplete="off">
             <label>Nombre<input id="pf-name-input" maxlength="24"></label>
             <label>Foto</label>
@@ -300,30 +287,26 @@
             <div id="pf-emojis" class="emoji-grid"></div>
             <button class="btn primary" type="submit">Guardar cambios</button>
           </form>
-        </div>
-
-        <div class="card">
-          <h3>🔑 Código de recuperación</h3>
+        </div></details>
+        <details class="fold sub" data-fold="pf-code"><summary><span>🔑 Código de recuperación</span><b class="fold-n" data-fold-n="pf-code"></b></summary><div class="fold-body">
           <p class="hint">Si cambias de móvil o borras los datos del navegador, con este código recuperas tu jugador. No se lo enseñes a nadie.</p>
           <div class="row">
             <div class="code-display" id="pf-code">••••</div>
             <button type="button" id="pf-code-btn" class="btn ghost">Mostrar</button>
           </div>
-        </div>
-
-        <h2 class="section-title">📜 Tus movimientos</h2>
-        <ul id="pf-history" class="feed"></ul>
-
+        </div></details>
         <button type="button" class="btn ghost wide" data-tutorial-open>📖 Ver el tutorial</button>
         <button type="button" id="unlink-btn" class="btn ghost wide">🚪 Desvincular este dispositivo</button>
+        </div></details>
       </div>
     </section>
 
     <!-- ============ BANCA ============ -->
     <section id="view-banca" class="view" hidden>
-      <h2 class="section-title">🍺 Muro de la vergüenza</h2>
+      <details class="fold" data-fold="ba-shame"><summary><span>🍺 Muro de la vergüenza</span><b class="fold-n" data-fold-n="ba-shame"></b></summary><div class="fold-body">
       <p class="hint">Castigos pendientes por préstamos de la Banca. Mientras no se cumplan, el deudor aparece como <span class="tag moroso">MOROSO</span>.</p>
       <ul id="shame-list" class="feed"></ul>
+      </div></details>
 
       <div id="admin-locked" class="card">
         <h3>🔒 Zona de la Banca</h3>
@@ -343,8 +326,7 @@
 
         <div class="card bank-card" id="loanreq-admin" hidden></div>
 
-        <div class="card">
-          <h3>💸 Conceder préstamo</h3>
+        <details class="fold" data-fold="ba-loan"><summary><span>💸 Conceder préstamo</span><b class="fold-n" data-fold-n="ba-loan"></b></summary><div class="fold-body">
           <p class="hint">Solo para quien está en la ruina (menos fichas que la apuesta mínima).</p>
           <form id="loan-form" autocomplete="off">
             <label>Jugador<select id="l-player"></select></label>
@@ -357,10 +339,9 @@
             <datalist id="punish-list"></datalist>
             <button class="btn primary" type="submit">Prestar fichas</button>
           </form>
-        </div>
+        </div></details>
 
-        <div class="card">
-          <h3>🪑 Sentar a un jugador</h3>
+        <details class="fold" data-fold="ba-seat"><summary><span>🪑 Sentar a un jugador</span><b class="fold-n" data-fold-n="ba-seat"></b></summary><div class="fold-body">
           <form id="player-form" autocomplete="off">
             <div class="row">
               <input id="p-emoji" class="emoji-input" maxlength="4" aria-label="Emoji">
@@ -370,10 +351,9 @@
             <button class="btn primary" type="submit">Sentar en la mesa</button>
           </form>
           <ul id="admin-players" class="mini-list"></ul>
-        </div>
+        </div></details>
 
-        <div class="card">
-          <h3>✏️ Ajuste manual</h3>
+        <details class="fold" data-fold="ba-adjust"><summary><span>✏️ Ajuste manual</span><b class="fold-n" data-fold-n="ba-adjust"></b></summary><div class="fold-body">
           <p class="hint">Para corregir errores o premiar/castigar con fichas. Usa negativo para quitar.</p>
           <form id="adjust-form" autocomplete="off">
             <label>Jugador<select id="a-player"></select></label>
@@ -381,10 +361,9 @@
             <label>Motivo<input id="a-reason" maxlength="80" placeholder="Ej: hizo trampas en el trivial"></label>
             <button class="btn primary" type="submit">Aplicar ajuste</button>
           </form>
-        </div>
+        </div></details>
 
-        <div class="card">
-          <h3>⚙️ Reglas de la casa</h3>
+        <details class="fold" data-fold="ba-rules"><summary><span>⚙️ Reglas de la casa</span><b class="fold-n" data-fold-n="ba-rules"></b></summary><div class="fold-body">
           <form id="settings-form" autocomplete="off">
             <div class="grid-2">
               <label>Fichas iniciales<input type="number" id="s-start" min="1"></label>
@@ -418,18 +397,16 @@
             <label>Castigos (uno por línea)<textarea id="s-punish" rows="5"></textarea></label>
             <button class="btn primary" type="submit">Guardar reglas</button>
           </form>
-        </div>
+        </div></details>
 
-        <div class="card">
-          <h3>💾 Copia de seguridad</h3>
+        <details class="fold" data-fold="ba-backup"><summary><span>💾 Copia de seguridad</span><b class="fold-n" data-fold-n="ba-backup"></b></summary><div class="fold-body">
           <div class="row">
             <button type="button" id="export-btn" class="btn ghost">⬇️ Exportar</button>
             <label class="btn ghost file-btn">⬆️ Importar<input type="file" id="import-file" accept="application/json" hidden></label>
           </div>
-        </div>
+        </div></details>
 
-        <div class="card test-card">
-          <h3>🧪 Pruebas</h3>
+        <details class="fold" data-fold="ba-tests"><summary><span>🧪 Pruebas</span><b class="fold-n" data-fold-n="ba-tests"></b></summary><div class="fold-body">
           <p class="hint">Herramientas para probar antes de la partida de verdad.</p>
           <div class="row wrap">
             <button type="button" id="seed-btn" class="btn ghost">➕ 6 jugadores de prueba</button>
@@ -440,7 +417,7 @@
             <button type="button" class="btn ghost" data-wrapped>🎁 Probar resumen</button>
             <button type="button" id="wipe-btn" class="btn ghost danger-btn">🧨 Borrar todo</button>
           </div>
-        </div>
+        </div></details>
 
         <button type="button" id="lock-btn" class="btn ghost wide">🔒 Cerrar la Banca</button>
       </div>
@@ -451,7 +428,7 @@
     <button data-view="ranking"><span>🏆</span>Ranking</button>
     <button data-view="duelo"><span>⚔️</span>Duelo<b id="duel-badge" class="badge" hidden></b><b id="bet-tab-live" class="badge float-badge" hidden>🎰 APUESTA</b></button>
     <button data-view="historial"><span>📜</span>Historial</button>
-    <button data-view="eventos" class="tab-events"><span>📅</span>Eventos<b id="ev-tab-live" class="badge live-badge" hidden>EN VIVO</b></button>
+    <button data-view="eventos" class="tab-events"><span>📅</span>Eventos<b id="ev-tab-new" class="badge" hidden></b><b id="ev-tab-live" class="badge float-badge live" hidden>EN VIVO</b></button>
     <button data-view="banca"><span>🏦</span>Banca</button>
   </nav>
 
@@ -528,28 +505,28 @@
   <div id="show" class="show" hidden></div>
   <div id="tutorial" class="tutorial" hidden></div>
 
-  <script src="js/config.js?v=39"></script>
-  <script src="js/store.js?v=39"></script>
-  <script src="js/chart.js?v=39"></script>
-  <script src="js/mod-app.js?v=39"></script>
-  <script src="js/mod-tables.js?v=39"></script>
-  <script src="js/mod-events.js?v=39"></script>
-  <script src="js/mod-extras.js?v=39"></script>
-  <script src="js/mod-bets.js?v=39"></script>
-  <script src="js/mod-market.js?v=39"></script>
-  <script src="js/mod-fx.js?v=39"></script>
-  <script src="js/mod-tv.js?v=39"></script>
-  <script src="js/mod-shows.js?v=39"></script>
-  <script src="js/mod-photo.js?v=39"></script>
-  <script src="js/mod-tutorial.js?v=39"></script>
-  <script src="js/mod-loans.js?v=39"></script>
-  <script src="js/mod-missions.js?v=39"></script>
-  <script src="js/mod-porra.js?v=39"></script>
-  <script src="js/mod-games.js?v=39"></script>
-  <script src="js/mod-flappyroom.js?v=39"></script>
-  <script src="js/mod-predict.js?v=39"></script>
-  <script src="js/mod-photowall.js?v=39"></script>
-  <script src="js/mod-roulette.js?v=39"></script>
-  <script src="js/app.js?v=39"></script>
+  <script src="js/config.js?v=41"></script>
+  <script src="js/store.js?v=41"></script>
+  <script src="js/chart.js?v=41"></script>
+  <script src="js/mod-app.js?v=41"></script>
+  <script src="js/mod-tables.js?v=41"></script>
+  <script src="js/mod-events.js?v=41"></script>
+  <script src="js/mod-extras.js?v=41"></script>
+  <script src="js/mod-bets.js?v=41"></script>
+  <script src="js/mod-market.js?v=41"></script>
+  <script src="js/mod-fx.js?v=41"></script>
+  <script src="js/mod-tv.js?v=41"></script>
+  <script src="js/mod-shows.js?v=41"></script>
+  <script src="js/mod-photo.js?v=41"></script>
+  <script src="js/mod-tutorial.js?v=41"></script>
+  <script src="js/mod-loans.js?v=41"></script>
+  <script src="js/mod-missions.js?v=41"></script>
+  <script src="js/mod-porra.js?v=41"></script>
+  <script src="js/mod-games.js?v=41"></script>
+  <script src="js/mod-flappyroom.js?v=41"></script>
+  <script src="js/mod-predict.js?v=41"></script>
+  <script src="js/mod-photowall.js?v=41"></script>
+  <script src="js/mod-roulette.js?v=41"></script>
+  <script src="js/app.js?v=41"></script>
 </body>
 </html>

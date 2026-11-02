@@ -93,14 +93,22 @@
       <input name="caption" maxlength="100" placeholder="💬 Ponle un comentario (opcional)">`, 'Subir');
     if (!res) return;
     const now = Date.now();
-    await MN.act(() => ensureApi().add({ id: 'ph_' + Store.uid(), by: mine.id, ph, caption: (res.caption || '').trim() || null, ts: now, day: dayKey(now), likes: [] }), '📸 ¡Foto subida!');
+    const id = 'ph_' + Store.uid();
+    await MN.act(async () => {
+      await ensureApi().add({ id, by: mine.id, ph, caption: (res.caption || '').trim() || null, ts: now, day: dayKey(now), likes: [] });
+      // Rastro ligero (sin la imagen) para el número de «fotos sin ver»
+      await Store.put('entries', { id: 'pm_' + id, kind: 'photometa', eventId: null, by: mine.id, ts: now });
+    }, '📸 ¡Foto subida!');
   }
   async function onClick(e) {
     const d = e.target.closest('[data-pwday]'); if (d) { day = d.dataset.pwday; return render(); }
     const l = e.target.closest('[data-pwlike]');
     if (l && !l.disabled) { const mine = MN.me(); const p = photos.find((x) => x.id === l.dataset.pwlike); if (!mine || !p) return; const on = !(p.likes || []).includes(mine.id); if (MN.fx && on) MN.fx.play('tick'); return ensureApi().like(p.id, mine.id, on).catch(() => {}); }
     const x = e.target.closest('[data-pwdel]');
-    if (x && await MN.modal('<div class="modal-icon">🗑️</div><p class="modal-text">¿Borrar esta foto?</p>', 'Borrar')) ensureApi().remove(x.dataset.pwdel).catch(() => {});
+    if (x && await MN.modal('<div class="modal-icon">🗑️</div><p class="modal-text">¿Borrar esta foto?</p>', 'Borrar')) {
+      ensureApi().remove(x.dataset.pwdel).catch(() => {});
+      Store.update('entries', 'pm_' + x.dataset.pwdel, { withdrawn: true }).catch(() => {});
+    }
   }
 
   // Avisos de fotos nuevas (solo con el apartado abierto, para no descargar fotos de más)
@@ -141,6 +149,8 @@
     init(a) {
       MN = a;
       MN.photoWall = {
+        // «Borrar todo»: las fotos van en su propia colección
+        async clearAll() { if (!ensureApi()) return; const all = await api.all(); await Promise.all(all.map((p) => api.remove(p.id))); photos = []; known = null; checked = new Set(); },
         visible(v) {
           visible = v;
           if (v && !unsub && ensureApi()) unsub = api.watch(onPhotos);

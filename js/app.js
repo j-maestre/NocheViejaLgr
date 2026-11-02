@@ -857,6 +857,7 @@
 
     $('#my-challenges-wrap').hidden = !mineList.length;
     $('#my-challenges').innerHTML = mineList.map((c) => challengeCard(c, myId, admin)).join('');
+    foldCount('du-live', others.length);
     $('#live-challenges').innerHTML = others.length ? others.map((c) => challengeCard(c, myId, admin)).join('')
       : '<li class="empty">Nadie se está jugando nada ahora mismo. Qué aburrimiento…</li>';
 
@@ -1842,7 +1843,11 @@
       const r = s.eventRehearsal;
       if (r) ['startDate', 'happyMinutes', 'stopwatchSignupMinutes', 'stopwatchPlayMinutes', 'communistMaskMinutes', 'plebisciteVoteMinutes', 'kingMinutes', 'kingEveryMinutes', 'dilemmaMinutes', 'bingoBallSeconds'].forEach((k) => { if (r[k] != null) s[k] = r[k]; });
       ['eventRehearsal', 'eventsSeeded', 'eventsSeeded2', 'seededDefaults', 'bankPlayerId'].forEach((k) => delete s[k]);
-      act(() => Store.replaceAll({ settings: s }), '🧨 Mesa limpia');
+      s.resetAt = Date.now(); // el servidor avisa del reinicio y olvida los móviles de jugadores que ya no existen
+      act(async () => {
+        if (MN.photoWall) await MN.photoWall.clearAll().catch(() => {});
+        await Store.replaceAll({ settings: s });
+      }, '🧨 Mesa limpia');
     });
 
     // Refresca textos relativos ("hace 5 min") y límites por fecha
@@ -1905,10 +1910,21 @@
   //  API PARA LOS MÓDULOS (js/mod-*.js)
   // ============================================================
   const MODULES = window.MNModules || [];
+  // Desplegables: cada uno recuerda en este móvil si lo dejaste abierto
+  const foldStore = () => { try { return JSON.parse(localStorage.getItem('mn_folds')) || {}; } catch (e) { return {}; } };
+  const foldOpen = (id, def = false) => { const v = foldStore()[id]; return v == null ? def : v; };
+  function foldCount(id, n, hot = false) { const el = $(`[data-fold-n="${id}"]`); if (el) { el.textContent = n || ''; el.classList.toggle('hot', !!hot && !!n); } }
+  $$('details[data-fold]').forEach((d) => { d.open = foldOpen(d.dataset.fold, d.open); });
+  document.addEventListener('toggle', (e) => {
+    const d = e.target; if (!d.dataset || !d.dataset.fold) return;
+    const st = foldStore(); st[d.dataset.fold] = d.open;
+    try { localStorage.setItem('mn_folds', JSON.stringify(st)); } catch (err) { /* nada */ }
+    if (d.open && d.querySelector('.chart')) window.dispatchEvent(new Event('resize')); // la gráfica se dibuja con el ancho real
+  }, true);
   const MN = {
     get S() { return S; }, get view() { return view; },
     $, $$, esc, pad, hash, shuffle, lines, HOUR, MEDALS,
-    toast, modal, act, notify, notifyOn, NOTIF_TYPES, go, renderAll, sweepAll,
+    foldOpen, foldCount, toast, modal, act, notify, notifyOn, NOTIF_TYPES, go, renderAll, sweepAll,
     me, player, who, face, deviceId, isAdmin, bankId, isSpectator, setSpectator,
     balances, balancesAt, effects, sortedPlayers, playerStats, achievements, txItem, txLine,
     maxBetFor, pairMax, currentPct, started, ended, startTs, endTs, fmtDate, ago, lastRound, lastRoundTs,

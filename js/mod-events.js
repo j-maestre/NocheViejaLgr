@@ -307,13 +307,17 @@
     };
     // Los eventos en marcha van arriba del todo
     const live = all.filter((ev) => isHot(ev));
-    const rest = all.filter((ev) => !live.includes(ev));
+    const rest = all.filter((ev) => !live.includes(ev) && ev.status === 'scheduled');
+    const past = all.filter((ev) => !live.includes(ev) && ev.status !== 'scheduled').reverse();
+    const pastHtml = past.length ? `<details class="fold" data-fold="ev-past" ${MN.foldOpen('ev-past') ? 'open' : ''}><summary><span>✅ Ya celebrados</span><b class="fold-n">${past.length}</b></summary><div class="fold-body"><ul class="cal-list">${past.map(item).join('')}</ul></div></details>` : '';
     const byDay = {};
     rest.forEach((e) => { const k = new Date(e.at).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); (byDay[k] = byDay[k] || []).push(e); });
     el.innerHTML = (live.length ? `<div class="cal-live"><h3 class="cal-day cal-live-title">🔴 En marcha ahora</h3><ul class="cal-list">${live.map(item).join('')}</ul></div>` : '')
-      + (rest.length ? Object.entries(byDay).map(([day, list]) => `
-      <h3 class="cal-day">${MN.esc(day)}</h3>
-      <ul class="cal-list">${list.map(item).join('')}</ul>`).join('') : (live.length ? '' : '<p class="empty">No hay eventos programados.</p>'));
+      // Cada día, plegado; de entrada solo se ve abierto el más próximo
+      + (rest.length ? Object.entries(byDay).map(([day, list], i) => { const fid = 'ev-day-' + MN.esc(day); return `
+      <details class="fold" data-fold="${fid}" ${MN.foldOpen(fid, i === 0) ? 'open' : ''}><summary><span class="cal-day-t">${MN.esc(day)}</span><b class="fold-n">${list.length}</b></summary>
+      <div class="fold-body"><ul class="cal-list">${list.map(item).join('')}</ul></div></details>`; }).join('') : (live.length || past.length ? '' : '<p class="empty">No hay eventos programados.</p>'))
+      + pastHtml;
 
     MN.$('#cal-admin').hidden = !admin;
     MN.$('#cal-legend').innerHTML = Object.entries(TYPES).map(([k, T]) => `

@@ -69,8 +69,29 @@
     MN.$('#pred-done-wrap').hidden = !done.length;
     MN.$('#pred-done').innerHTML = done.map((p) => card(p, mine)).join('');
     MN.$('#pred-new').hidden = !mine || MN.ended();
-    const n = mine ? open.filter((p) => isOpen(p) && !betsOf(p.id).some((b) => b.player === mine.id)).length : 0;
-    const badge = MN.$('#pred-badge'); badge.hidden = !n; badge.textContent = n;
+    renderUnseen();
+  }
+
+  // Números de «hay algo nuevo que no has visto» (apartados y botón del menú)
+  const seenKey = (p, id) => `mn_seen_${p}_${id}`;
+  const newItems = {
+    pred: () => preds().map((p) => ({ by: p.by, ts: p.ts })),
+    photos: () => (MN.S.entries || []).filter((x) => x.kind === 'photometa' && !x.withdrawn).map((x) => ({ by: x.by, ts: x.ts })),
+  };
+  function renderUnseen() {
+    const mine = MN.me(); let total = 0;
+    ['pred', 'photos'].forEach((k) => {
+      let n = 0;
+      if (mine) {
+        try {
+          if (MN.view === 'eventos' && pane === k && document.visibilityState === 'visible') localStorage.setItem(seenKey(k, mine.id), Date.now());
+          const seen = Number(localStorage.getItem(seenKey(k, mine.id))) || 0;
+          n = newItems[k]().filter((x) => x.by !== mine.id && x.ts > seen).length;
+        } catch (e) { n = 0; }
+      }
+      const b = MN.$(k === 'pred' ? '#pred-badge' : '#photo-badge'); b.hidden = !n; b.textContent = n; total += n;
+    });
+    const t = MN.$('#ev-tab-new'); t.hidden = !total; t.textContent = total;
   }
 
   // ---------------------------------------------------------- acciones
@@ -122,6 +143,7 @@
     MN.$$('#ev-panes [data-evpane]').forEach((b) => b.classList.toggle('on', b.dataset.evpane === p));
     MN.$$('#view-eventos [data-pane]').forEach((el) => { el.hidden = el.dataset.pane !== p; });
     if (MN.photoWall) MN.photoWall.visible(p === 'photos');
+    renderUnseen();
   }
 
   // ---------------------------------------------------------- avisos
@@ -160,6 +182,7 @@
     render,
     sweep,
     onState,
+    onView() { renderUnseen(); },
     rules(section) {
       return section('🔮', '¿Qué pasará?', `<ul>
         <li>En <b>📅 Eventos → 🔮 ¿Qué pasará?</b> cualquiera propone algo que puede pasar en la fiesta, y los demás apuestan <b>SÍ</b> o <b>NO</b> (una vez, hasta el ${MN.S.settings.predMaxPct || 20}% de sus fichas).</li>
