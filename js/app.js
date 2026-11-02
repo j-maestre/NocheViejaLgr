@@ -370,7 +370,7 @@
     switch (t.type) {
       case 'duel':
         return { icon: t.allIn ? '💣' : '⚔️', text: (t.allIn ? '<b>ALL IN</b> · ' : '') + DUEL_LINES[Math.abs(hash(t.id)) % DUEL_LINES.length](who(t.winner), who(t.loser), t.amount),
-          sub: esc(t.game) + (t.tag ? ` · ${esc(t.tag)}` : '') + (t.bank === 'resolved' ? ' · 🏦 decidido por la Banca' : t.bank === 'direct' ? ' · 🏦 registrado por la Banca' : '')
+          sub: esc(t.game) + (t.sw ? ` · ${esc(player(t.winner).name)} ${swSecs(t.sw[t.winner])} s, ${esc(player(t.loser).name)} ${swSecs(t.sw[t.loser])} s` : '') + (t.tag ? ` · ${esc(t.tag)}` : '') + (t.bank === 'resolved' ? ' · 🏦 decidido por la Banca' : t.bank === 'direct' ? ' · 🏦 registrado por la Banca' : '')
             + (t.dedication ? `<div class="dedication">💬 “${esc(t.dedication)}”</div>` : '') };
       case 'loan':
         return { icon: '🏦', text: `La Banca presta <b>${t.amount}</b> fichas a ${who(t.player)}`, sub: `Castigo: ${esc(t.punishment)} · ${t.done ? '✅ cumplido' : '⏳ pendiente'}` };
@@ -885,7 +885,7 @@
         else if (c.status === 'expired' && c.from === id) msgs.push(`⌛ ${r} no contestó a tu reto y ha caducado`);
         else if (c.status === 'cancelled' && c.cancelledBy !== id) msgs.push(`🚫 Se ha cancelado el reto con ${r}`);
         else if (c.status === 'reported' && c.reportedBy !== id) msgs.push(`⚖️ ${r} ha registrado el resultado. Confírmalo.`);
-        else if (c.status === 'done' && c.swAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `⏱️ ¡Ganas el cronómetro contra ${r}! ${swSecs(c['sw_' + id])} s contra ${swSecs(c['sw_' + rivalOf(c, id)])} s` : `⏱️ ${r} te gana al cronómetro: ${swSecs(c['sw_' + rivalOf(c, id)])} s contra tus ${swSecs(c['sw_' + id])} s`);
+        else if (c.status === 'done' && c.swAuto && c.finishedBy !== id && !(MN.shows && document.visibilityState === 'visible')) msgs.push(c.winner === id ? `⏱️ ¡Ganas el cronómetro contra ${r}! ${swSecs(c['sw_' + id])} s contra ${swSecs(c['sw_' + rivalOf(c, id)])} s` : `⏱️ ${r} te gana al cronómetro: ${swSecs(c['sw_' + rivalOf(c, id)])} s contra tus ${swSecs(c['sw_' + id])} s`);
         if (c.status === 'done' && c.agAuto && before !== 'done') agPhotos(c, c.winner);
         if (c.status === 'done' && c.agAuto && c.finishedBy !== id) msgs.push(c.winner === id ? `🏆 ¡Le ganas a ${r} en ${esc(c.game)}! ${esc(agLabel(c, id))}` : `😵 ${r} te gana en ${esc(c.game)}: ${esc(agLabel(c, rivalOf(c, id)))}`);
         else if (c.status === 'done' && c.reportedBy === id) msgs.push(`💰 ${r} ha confirmado el resultado`);
@@ -1049,7 +1049,7 @@
           MN.stopwatchGame({
             title: '⏱️ Duelo de cronómetro',
             sub: `contra ${who(rivalOf(c, myId))} · ${c.amount} fichas`,
-            after: c['sw_' + rivalOf(c, myId)] != null ? `${esc(player(rivalOf(c, myId)).name)} ya ha jugado: ¡ahora sale el resultado!` : `El resultado sale cuando juegue ${esc(player(rivalOf(c, myId)).name)}.`,
+            after: c['sw_' + rivalOf(c, myId)] != null ? `${esc(player(rivalOf(c, myId)).name)} ya ha jugado: cierra para ver el resultado.` : `El resultado sale cuando juegue ${esc(player(rivalOf(c, myId)).name)}.`,
             save: async (ms) => {
               const at = Date.now();
               await act(() => Store.updateChallenge(c.id, { ['sw_' + myId]: ms, ['swAt_' + myId]: at }));
@@ -1116,10 +1116,6 @@
     const w = swWinner(c); const l = rivalOf(c, w);
     const marks = { [c.from]: c['sw_' + c.from], [c.to]: c['sw_' + c.to] };
     await finishChallenge(c, w, null, false, { txId: 'swduel_' + c.id, tx: { sw: marks }, challenge: { swAuto: true, finishedBy: (me() || {}).id || null } });
-    const mine = me();
-    if (mine && (mine.id === w || mine.id === l)) {
-      toast(mine.id === w ? `⏱️ ¡Ganas el duelo! ${swSecs(marks[w])} s contra ${swSecs(marks[l])} s` : `⏱️ Pierdes: ${swSecs(marks[l])} s contra ${swSecs(marks[w])} s de ${esc(player(w).name)}`, mine.id === w ? 'ok' : 'bad');
-    }
   }
 
   // ============================================================

@@ -222,10 +222,13 @@
     const cst = status(chaos, data);
     const unused = myCards(mine.id).filter((c) => !c.usedAt);
     MN.foldCount('pf-missions', `${normal.filter((m) => status(m, data).done).length}/${normal.length}`);
-    // Número sobre tu foto: misiones del día sin mirar y cartas del caos sin usar
-    const seenKey = `mn_ms_seen_${mine.id}`; let seen = null;
-    try { if (MN.view === 'perfil') localStorage.setItem(seenKey, key); seen = localStorage.getItem(seenKey); } catch (e) { seen = key; }
-    const nb = (seen === key ? 0 : 1) + unused.length; const bd = MN.$('#me-badge'); bd.hidden = !nb; bd.textContent = nb;
+    // Número sobre tu foto: misiones del día y cartas del caos que aún no has visto. Se borra al entrar en tu perfil.
+    const seenKey = `mn_ms_seen_${mine.id}`; const cardsKey = `mn_ms_cards_${mine.id}`; let seen = key; let seenCards = unused.map((c) => c.id);
+    try {
+      if (MN.view === 'perfil') { localStorage.setItem(seenKey, key); localStorage.setItem(cardsKey, JSON.stringify(seenCards)); }
+      seen = localStorage.getItem(seenKey); seenCards = JSON.parse(localStorage.getItem(cardsKey) || '[]');
+    } catch (e) { /* nada */ }
+    const nb = (seen === key ? 0 : 1) + unused.filter((c) => !seenCards.includes(c.id)).length; const bd = MN.$('#me-badge'); bd.hidden = !nb; bd.textContent = nb;
     el.innerHTML = `<div class="missions">
       <p class="hint">Solo las ves tú. Cada una cumplida: <b>+${reward}</b> fichas de la Banca. Mañana, misiones nuevas.</p>
       <ul class="ms-list">${normal.map(row).join('')}</ul>

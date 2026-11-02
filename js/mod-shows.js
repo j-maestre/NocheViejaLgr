@@ -91,8 +91,37 @@
   const boom = (opts) => MN.fx && MN.fx.confetti(opts);
   const closeBtn = '<button type="button" class="btn primary show-close" data-show-close hidden>¡Vamos!</button>';
 
+  // ---------------------------------------------------------- ⏱️ resultado del duelo de cronómetro
+  async function swDuelStage(box, duel, withSlot) {
+    const fmt = (ms) => (ms / 1000).toFixed(2).replace('.', ',');
+    const target = (Number(MN.S.settings.stopwatchTarget) || 10) * 1000;
+    const mine = MN.me(); const iWon = mine && duel.winner === mine.id; const iLost = mine && duel.loser === mine.id;
+    box.innerHTML = `<div class="show-inner stopwatch-show">
+      <div class="show-title">⏱️ DUELO DE CRONÓMETRO</div>
+      <div class="show-kicker">Objetivo: ${fmt(target)} s · ${duel.amount} fichas</div>
+      <ol class="sw-reveal" id="sw-reveal"></ol>
+      <div class="show-big" id="sw-duel-out"></div>
+      ${withSlot ? '<button type="button" class="btn primary show-close" id="sw-duel-next" hidden>🎰 Seguir</button>' : closeBtn}</div>`;
+    sfx('drum'); await sleep(700);
+    [duel.loser, duel.winner].forEach((id, k) => setTimeout(() => {
+      const won = id === duel.winner; const ms = duel.sw[id];
+      MN.$('#sw-reveal').insertAdjacentHTML('afterbegin', `<li class="${won ? 'winner' : ''}"><span>${won ? '🏆' : '😵'}</span>
+        <span>${MN.esc(name(id))}</span><b>${fmt(ms)} s</b><span class="muted small">±${fmt(Math.abs(ms - target))}</span></li>`);
+      sfx(won ? 'win' : 'tick');
+    }, k * 1100));
+    await sleep(1500);
+    const out = MN.$('#sw-duel-out');
+    out.textContent = iWon ? '¡HAS GANADO!' : iLost ? 'HAS PERDIDO' : `GANA ${name(duel.winner)}`;
+    if (iWon || iLost) out.classList.add(iWon ? 'win' : 'lose');
+    if (iLost) sfx('lose'); else boom({ count: 160 });
+    if (!withSlot) return;
+    const next = MN.$('#sw-duel-next'); next.hidden = false;
+    await new Promise((resolve) => { const t = setTimeout(resolve, 12000); next.onclick = () => { clearTimeout(t); resolve(); }; });
+  }
+
   // ---------------------------------------------------------- 🎰 tragaperras
   async function slotShow(box, duel) {
+    if (duel.sw) await swDuelStage(box, duel, true);
     const o = outcomeOf(duel);
     const syms = o.sym ? [o.sym, o.sym, o.sym] : (() => { const s = MN.shuffle(FILLER.slice()); return [s[0], s[1], s[2]]; })();
     const strip = (target) => Array.from({ length: 24 }, () => FILLER[Math.floor(Math.random() * FILLER.length)]).concat([target]);
@@ -471,7 +500,7 @@
         return `<li class="challenge status-reported needs-me slot-pending">
           <div class="ch-head">${MN.who(d.winner)}<span class="ch-vs">VS</span>${MN.who(d.loser)}<span class="ch-amount">${d.amount}</span></div>
           <div class="ch-sub">${MN.esc(d.game)} · ${MN.ago(d.ts)}</div>
-          <div class="ch-status">${won ? '🏆 ¡Ganaste!' : '😵 Perdiste…'} Falta ver qué dice la tragaperras.</div>
+          <div class="ch-status">${won ? '🏆 ¡Ganaste!' : '😵 Perdiste…'} ${d.sw ? `⏱️ Tú ${(d.sw[mine.id] / 1000).toFixed(2).replace('.', ',')} s, rival ${(d.sw[won ? d.loser : d.winner] / 1000).toFixed(2).replace('.', ',')} s. ` : ''}Falta ver qué dice la tragaperras.</div>
           <div class="ch-actions"><button type="button" class="btn primary" data-slot-play="${MN.esc(d.id)}">🎰 Girar</button></div></li>`;
       }).join('') + (total > 3 ? `<li class="pending-more">${total > MAXV ? `…y ${total - MAXV} más · ` : ''}<button type="button" class="link" data-seen-all>Marcar todas como vistas</button></li>` : '');
     }
@@ -496,6 +525,9 @@
         else if (mineDuel) { if (!slotSeen(d, mine.id)) playSlot(d); }
         else if (bet && !seen(slotKey(d, mine.id))) enqueue((box) => slotShow(box, d));
       });
+      // Sin tragaperras, el resultado del cronómetro sale igual
+      MN.S.txs.filter((t) => t.type === 'duel' && t.sw && !eligible(t) && !t.voided && !known.has(t.id) && now - t.ts < 5 * 60000 && mine && (t.winner === mine.id || t.loser === mine.id))
+        .forEach((d) => enqueue((box) => swDuelStage(box, d, false)));
     }
     if (known) pendingBets().filter((x) => !known.has(x.pay.id)).forEach(playBet);
     known = ids;
