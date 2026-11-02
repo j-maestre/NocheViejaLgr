@@ -240,7 +240,7 @@
     return quizRun(G, rounds, 15000);
   }
 
-  // ---------------------------------------------------------- 💻 Quiz de C++ de bajo nivel (x86-64, Linux, g++)
+  // ---------------------------------------------------------- 💻 Quiz de C++ de bajo nivel (x86-64 y ARM64)
   // [pregunta, código o null, correcta, incorrecta, incorrecta, incorrecta]
   const CPP = [
     // --- Memoria y disposición de los objetos
@@ -361,12 +361,6 @@ int main() {
 }`, '3F800000', '1', '40000000', '00000001'],
     ['¿Qué imprime?', `int main() { printf("%d", (int)-1.9); }`, '-1', '-2', '-1.9', '0'],
     ['uint16_t a = 65535; ¿qué es a * a?', null, 'UB: se promueve a int y desborda', '1', '0', '4294836225'],
-    ['En x86, shl eax, cl con cl = 32…', null, 'No cambia: el contador se enmascara a 5 bits', 'Deja eax a 0', 'Lanza una excepción', 'Rellena con unos'],
-    ['En x86-64, ejecutar idiv con INT_MIN / -1 produce…', null, 'SIGFPE', 'INT_MIN', 'INT_MAX', '0'],
-    ['Tras «mov eax, 1», los 32 bits altos de rax…', null, 'Se ponen a 0', 'No cambian', 'Se extienden con signo', 'Quedan indefinidos'],
-    ['Tras «mov ax, 1», los bits altos de rax…', null, 'No cambian', 'Se ponen a 0', 'Se extienden con signo', 'Quedan indefinidos'],
-    ['Por qué un compilador prefiere «xor eax, eax» a «mov eax, 0»', null, 'Más corto y rompe dependencias', 'Es la única forma legal', 'No toca los flags', 'Va a otro puerto de memoria'],
-    ['Una división entera por una constante suele compilarse a…', null, 'Multiplicación y desplazamiento', 'idiv siempre', 'Un bucle de restas', 'Una tabla'],
 
     // --- Vtables, this y objetos por dentro
     ['¿Qué imprime?', `struct B {
@@ -411,25 +405,134 @@ int main() { C c; }`, 'b', 'bb', 'bbb', 'Nada'],
     ['En una vtable Itanium, ¿qué hay en vptr[-1]?', null, 'El typeinfo (RTTI)', 'El offset-to-top', 'El destructor', 'Nada'],
     ['Un destructor virtual ocupa en la vtable Itanium…', null, 'Dos entradas: completo y deleting', 'Una entrada', 'Tres entradas', 'Ninguna'],
     ['¿Qué es un thunk en la vtable con herencia múltiple?', null, 'Código que ajusta this y salta', 'Una copia de la función', 'Una entrada nula', 'El RTTI de la base'],
-    ['Una llamada a una función virtual pura desde el constructor acaba en…', null, '__cxa_pure_virtual', 'SIGFPE', 'La versión de la base', '__cxa_throw'],
+    ['En la vtable de una clase abstracta, ¿qué hay en la entrada de una virtual pura?', null, '__cxa_pure_virtual', 'Un puntero nulo', 'La versión de la base', '__cxa_throw'],
     ['«undefined reference to vtable for X» suele significar que…', null, 'Falta definir la key function', 'Falta un #include', 'X no tiene virtuales', 'Falta -lstdc++ siempre'],
     ['¿Qué permite marcar una clase como final, a nivel de código generado?', null, 'Desvirtualizar llamadas', 'Quitar el vptr', 'Reducir sizeof', 'Nada en absoluto'],
     ['Accesos a memoria para resolver una llamada virtual típica', null, 'Dos: vptr y entrada de la vtable', 'Ninguno', 'Uno: la función', 'Uno por cada base'],
     ['Un puntero a función miembro Itanium marca una virtual con…', null, 'El bit bajo de ptr a 1', 'ptr a nulo', 'adj negativo', 'Un flag aparte'],
 
-    // --- ABI y llamadas (System V x86-64)
-    ['¿En qué registro llega this?', null, 'rdi', 'rcx', 'rax', 'rbp'],
-    ['Tercer argumento entero', null, 'rdx', 'rcx', 'r8', 'rsi'],
-    ['Un método devuelve por valor una clase NO trivial. ¿Dónde llega this?', null, 'rsi', 'rdi', 'rdx', 'En la pila'],
-    ['struct { long a, b; } devuelto por valor', null, 'rax y rdx', 'xmm0', 'Puntero oculto', 'rdi y rsi'],
-    ['struct { long a; double b; } pasado por valor, primer argumento', null, 'rdi y xmm0', 'rdi y rsi', 'xmm0 y xmm1', 'En la pila'],
-    ['Un struct de 24 bytes de enteros, trivial, pasado por valor', null, 'En la pila', 'rdi, rsi y rdx', 'Puntero oculto en rdi', 'xmm0 a xmm2'],
-    ['Al entrar en una función, rsp % 16 vale…', null, '8', '0', '4', 'Cualquier valor'],
-    ['¿Qué es la red zone?', null, '128 bytes bajo rsp', 'La página de guarda', 'El espacio tras el canario', 'Registros reservados'],
-    ['¿Cuál de estos registros es callee-saved?', null, 'rbx', 'rcx', 'rax', 'r11'],
-    ['¿Qué hace la instrucción call?', null, 'Apila la dirección de retorno y salta', 'Guarda rbp y salta', 'Guarda todos los registros', 'Reserva el frame'],
-    ['¿Hacia dónde crece la pila en x86-64?', null, 'Hacia direcciones bajas', 'Hacia direcciones altas', 'Depende del compilador', 'Depende de la función'],
-    ['¿Dónde pone gcc el canario de pila respecto al frame?', null, 'Entre locales y retorno', 'Tras la dirección de retorno', 'En un registro', 'En el heap'],
+    // --- Ensamblador x86-64 (sintaxis Intel)
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 0x12345678
+mov ax, 0`, '0x12340000', '0', '0x5678', '0x12345678'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, -1
+mov eax, 0`, '0', '-1', '0xFFFFFFFF', '-4294967296'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 0x1FF
+add al, 1`, '0x100', '0x200', '0', '0x1FF'],
+    ['¿Cuánto vale rax? (x86-64)', `mov eax, -1`, '4294967295', '-1', '65535', '255'],
+    ['¿Cuánto vale rdx? (x86-64)', `mov rax, 100
+mov rdx, 0
+mov rcx, 7
+div rcx`, '2', '14', '0', '7'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 100
+mov rdx, 0
+mov rcx, 7
+div rcx`, '14', '2', '100', '7'],
+    ['¿Qué pasa? (x86-64)', `mov rax, 10
+mov rdx, 2
+mov rcx, 2
+div rcx`, 'SIGFPE', 'rax = 5', 'rax = 6', 'rdx = 0'],
+    ['¿Cuánto vale edx? (x86-64)', `mov eax, -7
+cdq
+mov ecx, 2
+idiv ecx`, '-1', '1', '-3', '-4'],
+    ['¿Cuánto vale eax? (x86-64)', `mov eax, -7
+cdq
+mov ecx, 2
+idiv ecx`, '-3', '-4', '3', '-1'],
+    ['¿Cuánto vale rdx? (x86-64)', `mov rax, -1
+mov rcx, 2
+mul rcx`, '1', '0', '-1', '2'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rcx, 5
+lea rax, [rcx + rcx*4]`, '25', '5', '20', '9'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 1
+mov cl, 64
+shl rax, cl`, '1', '0', '64', '-1'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, -8
+sar rax, 1`, '-4', '4', '-16', '-8'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, -8
+shr rax, 60`, '15', '-1', '0', '1'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 5
+cmp rax, 5`, '5', '0', '1', '-1'],
+    ['¿Cuánto vale rax? (x86-64)', `xor eax, eax
+mov rcx, 3
+cmp rcx, 3
+sete al`, '1', '0', '3', '-1'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 1
+mov rcx, 2
+cmp rax, rcx
+cmovl rax, rcx`, '2', '1', '-1', '0'],
+    ['¿Cuánto vale rax? (x86-64)', `mov rax, 1
+mov rcx, 2
+push rax
+push rcx
+pop rax
+pop rcx`, '2', '1', '3', '0'],
+    ['¿Cuánto vale eax? (x86-64)', `mov ecx, 0xFF
+movsx eax, cl`, '-1', '255', '0', '127'],
+    ['¿Cuánto vale eax? (x86-64)', `mov ecx, 0xFF
+movzx eax, cl`, '255', '-1', '0', '127'],
+    ['¿Cuánto vale rcx? (x86-64)', `mov rax, -1
+add rax, 1
+mov rcx, 0
+adc rcx, 0`, '1', '0', '-1', '2'],
+    ['¿Cuánto vale eax? (x86-64)', `mov eax, 0x80000000
+rol eax, 1`, '1', '0', '2', '-1'],
+    ['¿Cuánto vale rax? (x86-64)', `mov dword ptr [rsp-8], 0x01020304
+movzx eax, byte ptr [rsp-8]`, '4', '1', '2', '3'],
+    ['¿Qué hace cdq?', null, 'Extiende el signo de eax a edx', 'Divide eax entre edx', 'Pone edx a 0', 'Copia edx en eax'],
+    ['Tras «div cl» en x86, ¿dónde queda el resto?', null, 'ah', 'al', 'dl', 'cl'],
+    ['¿Qué hace lea con la memoria?', null, 'No la toca: solo calcula', 'La lee', 'La escribe', 'La bloquea'],
+    ['¿Qué flag NO modifica inc?', null, 'CF', 'ZF', 'SF', 'OF'],
+    ['¿Cuál NO existe en x86?', null, 'mov [rax], [rcx]', 'mov rax, [rcx]', 'add rax, [rcx]', 'add [rax], rcx'],
+    ['¿Qué hace la instrucción call en x86?', null, 'Apila el retorno y salta', 'Guarda rbp y salta', 'Guarda el retorno en un registro', 'Reserva el frame'],
+
+    // --- Ensamblador ARM64 (AArch64)
+    ['¿Cuánto vale x2? (ARM64)', `mov x0, #17
+mov x1, #5
+udiv x2, x0, x1`, '3', '2', '85', '5'],
+    ['¿Cuánto vale x3? (ARM64)', `mov x0, #17
+mov x1, #5
+udiv x2, x0, x1
+msub x3, x2, x1, x0`, '2', '3', '15', '-13'],
+    ['¿Cuánto vale x2? (ARM64)', `mov x0, #10
+mov x1, #0
+udiv x2, x0, x1`, '0', 'SIGFPE', '10', '-1'],
+    ['¿Cuánto vale x0? (ARM64)', `mov x1, #1
+mov x2, #2
+add x0, x1, x2, lsl #3`, '17', '24', '3', '10'],
+    ['¿Cuánto vale x0? (ARM64)', `mov x0, #-1
+mov w0, #0`, '0', '-1', '0xFFFFFFFF', '-4294967296'],
+    ['¿Cuánto vale x0? (ARM64)', `mov x1, #5
+add x0, x1, xzr`, '5', '0', '6', 'SIGILL'],
+    ['¿Cuánto vale x0? (ARM64)', `mov x1, #3
+cmp x1, #3
+cset x0, eq`, '1', '0', '3', '-1'],
+    ['¿Cuánto vale x0? (ARM64)', `mov x1, #7
+mov x2, #9
+cmp x1, x2
+csel x0, x1, x2, lt`, '7', '9', '1', '0'],
+    ['¿Qué significa «sub x0, x1, x2» en ARM64?', null, 'x0 = x1 − x2', 'x0 = x2 − x1', 'x2 = x0 − x1', 'x0 = x0 − x1 − x2'],
+    ['ARM64 divide un entero entre 0 con udiv', null, 'Devuelve 0, sin excepción', 'SIGFPE, como x86', 'Devuelve -1', 'Instrucción ilegal'],
+    ['¿Qué instrucción de resto tiene ARM64?', null, 'Ninguna: se usa msub', 'rem', 'mod', 'udiv deja el resto en x1'],
+    ['Diferencia clave entre add x0, x1, x2 y adds x0, x1, x2', null, 'adds actualiza los flags', 'adds es con signo', 'adds lee memoria', 'Ninguna'],
+    ['¿Qué registro guarda la dirección de retorno tras bl?', null, 'x30', 'x0', 'sp', 'x29'],
+    ['¿Dónde deja el retorno «call» en x86 y «bl» en ARM64?', null, 'Pila / registro x30', 'Registro / pila', 'Pila en los dos', 'Registro en los dos'],
+    ['¿Qué lee «ldr x0, [x1, #8]»?', null, 'De x1 + 8, sin cambiar x1', 'De x1, y suma 8 a x1', 'De x1 + 8, y actualiza x1', 'De x1 + 8 × 8'],
+    ['¿Qué hace «ldr x0, [x1], #8»?', null, 'Lee de x1 y suma 8 a x1', 'Lee de x1 + 8', 'Lee de x1 + 8 y actualiza x1', 'Escribe en x1'],
+    ['¿Qué hace «stp x29, x30, [sp, #-16]!»?', null, 'Baja sp 16 y guarda los dos', 'Guarda y luego baja sp', 'Sube sp 16 y guarda', 'Carga x29 y x30'],
+    ['¿Cómo se carga una constante de 64 bits en ARM64 con instrucciones de inmediato?', null, 'movz y varios movk', 'Un solo mov', 'lea', 'add repetido'],
+    ['Tamaño de cada instrucción en ARM64', null, '4 bytes siempre', 'De 1 a 15 bytes', '2 u 8 bytes', '8 bytes siempre'],
+    ['Tamaño de una instrucción en x86-64', null, 'De 1 a 15 bytes', '4 bytes siempre', '8 bytes siempre', '2 o 4 bytes'],
+    ['¿Cuál existe en x86 pero no en ARM64?', null, 'add rax, [rcx]: opera sobre memoria', 'Sumar dos registros', 'Dividir enteros', 'Mover entre registros'],
+    ['ARM64 accede a memoria con…', null, 'Solo ldr/str y similares', 'Cualquier instrucción', 'Solo mov', 'add y sub'],
+    ['Registros de propósito general en ARM64 frente a x86-64', null, '31 y 16', '16 y 16', '32 y 8', '16 y 31'],
+    ['Para el producto completo de 64×64 bits en ARM64', null, 'mul y umulh', 'Solo mul', 'mul deja lo alto en x1', 'madd'],
+    ['¿Qué modelo de memoria es más débil?', null, 'ARM64', 'x86-64', 'Son iguales', 'Depende del compilador'],
+    ['¿Qué hace dmb ish en ARM64?', null, 'Barrera de memoria', 'Divide', 'Vacía la caché a disco', 'Un salto'],
+    ['Equivalente a «lock cmpxchg» clásico en ARM64 (sin LSE)', null, 'Bucle ldxr y stxr', 'lock mov', 'dmb', 'cmp y csel'],
+    ['Lectura con semántica acquire en ARM64', null, 'ldar', 'ldr', 'ldp', 'mov'],
+    ['En ARM64, ¿qué tiene de especial xzr?', null, 'Siempre lee 0', 'Guarda el retorno', 'Es el puntero de pila', 'Guarda los flags'],
+    ['Argumentos enteros de una función en ARM64', null, 'x0 a x7', 'x1 a x8', 'En la pila siempre', 'x19 a x28'],
 
     // --- Compilador, UB y optimización
     ['¿Qué es esto?', `float f = 1.0f;
@@ -488,11 +591,13 @@ p[0] = 'x';`, 'Suele dar SIGSEGV: .rodata', 'Cambia la cadena', 'No compila', 'C
     ['¿Qué pasa la primera vez que tocas una página recién obtenida con mmap?', null, 'Fallo de página menor', 'SIGSEGV', 'Nada, ya está mapeada', 'Un fallo de TLB fatal'],
     ['fork() y la memoria del padre', null, 'Copy-on-write', 'Se copia entera', 'Se comparte siempre', 'Se pierde en el hijo'],
     ['¿Qué ocurre al desbordar la pila?', null, 'SIGSEGV en la página de guarda', 'Lanza una excepción C++', 'Crece sin límite', 'Devuelve nullptr'],
+    ['¿Hacia dónde crece la pila en x86-64 y ARM64?', null, 'Hacia direcciones bajas', 'Hacia direcciones altas', 'Depende del compilador', 'Depende de la función'],
+    ['¿Dónde pone gcc el canario de pila respecto al frame?', null, 'Entre locales y retorno', 'Tras la dirección de retorno', 'En un registro', 'En el heap'],
     ['Ancho de un registro ymm', null, '256 bits', '128 bits', '512 bits', '64 bits'],
     ['Con cmpxchg, un puntero que pasa de A a B y vuelve a A causa…', null, 'Problema ABA', 'False sharing', 'Una data race', 'Un fallo de TLB'],
   ];
   async function playCpp(G, seed) {
-    if (!await intro(G, '<b>5 preguntas</b> de C++ de bajo nivel: memoria, vtables, ABI, ensamblador, enlazador y CPU. Todo en <b>x86-64, Linux y g++</b>. <b>30 segundos</b> cada una. Cuenta acertar y ser rápido.')) return null;
+    if (!await intro(G, '<b>5 preguntas</b> de C++ de bajo nivel: memoria, vtables, ensamblador, enlazador y CPU. C++ en <b>x86-64, Linux y g++</b>; ensamblador <b>x86-64</b> (sintaxis Intel) y <b>ARM64</b>. <b>30 segundos</b> cada una. Cuenta acertar y ser rápido.')) return null;
     const r = rng(seed + 'cpp'); const qs = fromDeck(CPP, 5, 'cpp', r);
     const rounds = qs.map(([q, code, ok, ...bad]) => {
       const options = shuffle([ok, ...bad], r);
