@@ -240,220 +240,259 @@
     return quizRun(G, rounds, 15000);
   }
 
-  // ---------------------------------------------------------- 💻 Quiz de C++ (nivel experto)
+  // ---------------------------------------------------------- 💻 Quiz de C++ de bajo nivel (x86-64, Linux, g++)
   // [pregunta, código o null, correcta, incorrecta, incorrecta, incorrecta]
   const CPP = [
-    // --- ¿Qué imprime?
-    ['¿Qué imprime?', `struct S { S() { cout << "A"; } };
-int main() { S s(); }`, 'Nada', 'A', 'AA', 'No compila'],
+    // --- Memoria y disposición de los objetos
+    ['¿Qué imprime?', `struct S { char c; double d; char e; };
+int main() { printf("%zu", sizeof(S)); }`, '24', '10', '16', '12'],
+    ['¿Qué imprime?', `struct S { double d; char c; char e; };
+int main() { printf("%zu", sizeof(S)); }`, '16', '10', '24', '12'],
+    ['¿Qué imprime?', `struct S {
+  virtual void f();
+  int x;
+};
+int main() { printf("%zu", sizeof(S)); }`, '16', '12', '8', '24'],
+    ['¿Qué imprime?', `struct E {};
+struct D : E { int x; };
+int main() { printf("%zu", sizeof(D)); }`, '4', '5', '8', '1'],
+    ['¿Qué imprime?', `struct E {};
+struct D : E { E e; };
+int main() { printf("%zu", sizeof(D)); }`, '2', '1', '0', '4'],
+    ['¿Qué imprime?', `struct V { int v; };
+struct A : virtual V { int a; };
+struct B : virtual V { int b; };
+struct C : A, B { int c; };
+int main() { printf("%zu", sizeof(C)); }`, '40', '16', '24', '48'],
+    ['¿Qué imprime?', `struct S { int a : 3; int b : 5; int c : 25; };
+int main() { printf("%zu", sizeof(S)); }`, '8', '4', '12', '5'],
+    ['¿Qué imprime?', `union U { int i; char c[7]; };
+int main() { printf("%zu", sizeof(U)); }`, '8', '7', '11', '4'],
+    ['¿Qué imprime?', `struct alignas(64) S { char c; };
+int main() { printf("%zu", sizeof(S)); }`, '64', '1', '8', '65'],
+    ['¿Qué imprime?', `#pragma pack(1)
+struct S { char c; int i; };
+int main() { printf("%zu", sizeof(S)); }`, '5', '8', '4', '1'],
+    ['¿Qué imprime?', `struct S { char c; double d; };
+int main() {
+  printf("%zu", offsetof(S, d));
+}`, '8', '1', '4', '16'],
+    ['¿Qué imprime?', `struct A { int a; };
+struct B { int b; };
+struct C : A, B {};
+int main() {
+  C c;
+  B* p = &c;
+  printf("%td", (char*)p - (char*)&c);
+}`, '4', '0', '8', '-4'],
+    ['¿Qué imprime?', `void f(int a[10]) { printf("%zu", sizeof(a)); }
+int main() { int a[10]; f(a); }`, '8', '40', '10', '4'],
+    ['¿Qué imprime?', `int main() {
+  int a[4];
+  printf("%td", (char*)(&a + 1) - (char*)a);
+}`, '16', '4', '1', '8'],
+    ['¿Qué imprime?', `int main() {
+  int m[2][3] = {1, 2, 3, 4, 5, 6};
+  printf("%d", *(*(m + 1) + 1));
+}`, '5', '2', '4', '3'],
+    ['¿Qué imprime?', `int main() {
+  char a[] = "abc";
+  printf("%zu", sizeof(a));
+}`, '4', '3', '8', '1'],
+    ['¿Qué imprime?', `int main() { printf("%c", 1["abc"]); }`, 'b', 'a', '1', 'c'],
+    ['¿Qué imprime?', `int main() {
+  int i = 0;
+  (void)sizeof(i++);
+  printf("%d", i);
+}`, '0', '1', '4', '8'],
+    ['¿Qué imprime?', `struct S {};
+int main() {
+  printf("%zu", sizeof(void (S::*)()));
+}`, '16', '8', '4', '24'],
+    ['¿Qué imprime?', `struct S { int a; int b; };
+int main() {
+  int S::* p = &S::b;
+  long d;
+  memcpy(&d, &p, 8);
+  printf("%ld", d);
+}`, '4', '0', '8', '1'],
+    ['Un puntero a miembro de datos nulo, en el ABI Itanium, vale…', null, '-1', '0', 'Una dirección de la vtable', '1'],
+    ['¿Dónde está el vptr en una clase polimórfica sin bases (ABI Itanium)?', null, 'Desplazamiento 0', 'Al final del objeto', 'Tras los miembros', 'Fuera del objeto'],
+    ['malloc en glibc x86-64 devuelve punteros alineados a…', null, '16 bytes', '8 bytes', '4 bytes', '64 bytes'],
+    ['¿Qué hay justo antes del array devuelto por new T[n], si ~T() no es trivial?', null, 'Una cookie con n', 'La vtable', 'Nada', 'Un canario'],
+
+    // --- Enteros, bits y coma flotante
+    ['¿Qué imprime en x86-64?', `int main() {
+  unsigned x = 0x01020304;
+  printf("%d", *(unsigned char*)&x);
+}`, '4', '1', '2', '3'],
+    ['¿Qué imprime?', `int main() {
+  unsigned char a = 200, b = 100;
+  printf("%d", (a + b) >> 1);
+}`, '150', '22', '44', '278'],
+    ['¿Qué imprime en x86-64?', `int main() {
+  char c = 200;
+  printf("%d", c);
+}`, '-56', '200', '56', '-200'],
+    ['¿Qué imprime?', `int main() { printf("%d", (short)70000); }`, '4464', '70000', '-4464', '32767'],
+    ['¿Qué imprime?', `int main() { printf("%d", -1 < 1u); }`, '0', '1', '-1', '2'],
+    ['¿Qué imprime? (C++20)', `int main() { printf("%d", -1 >> 1); }`, '-1', '0', '2147483647', '1'],
+    ['¿Qué imprime?', `int main() { printf("%d", -7 % 2); }`, '-1', '1', '-3', '0'],
+    ['¿Qué imprime?', `int main() {
+  int x = 12;
+  printf("%d", x & (x - 1));
+}`, '8', '4', '12', '11'],
+    ['¿Qué imprime?', `int main() {
+  int x = 12;
+  printf("%d", x & -x);
+}`, '4', '8', '12', '0'],
+    ['¿Qué imprime?', `int main() { printf("%u", ~0u >> 28); }`, '15', '16', '0', '28'],
+    ['¿Qué imprime?', `int main() { printf("%d", 0.1f == 0.1); }`, '0', '1', 'Depende de -O', '0.1'],
+    ['¿Qué imprime?', `int main() {
+  volatile double z = 0;
+  double n = z / z;
+  printf("%d", n == n);
+}`, '0', '1', '-1', 'nan'],
+    ['¿Qué imprime?', `int main() {
+  float f = 1.0f;
+  unsigned u;
+  memcpy(&u, &f, 4);
+  printf("%X", u);
+}`, '3F800000', '1', '40000000', '00000001'],
+    ['¿Qué imprime?', `int main() { printf("%d", (int)-1.9); }`, '-1', '-2', '-1.9', '0'],
+    ['uint16_t a = 65535; ¿qué es a * a?', null, 'UB: se promueve a int y desborda', '1', '0', '4294836225'],
+    ['En x86, shl eax, cl con cl = 32…', null, 'No cambia: el contador se enmascara a 5 bits', 'Deja eax a 0', 'Lanza una excepción', 'Rellena con unos'],
+    ['En x86-64, ejecutar idiv con INT_MIN / -1 produce…', null, 'SIGFPE', 'INT_MIN', 'INT_MAX', '0'],
+    ['Tras «mov eax, 1», los 32 bits altos de rax…', null, 'Se ponen a 0', 'No cambian', 'Se extienden con signo', 'Quedan indefinidos'],
+    ['Tras «mov ax, 1», los bits altos de rax…', null, 'No cambian', 'Se ponen a 0', 'Se extienden con signo', 'Quedan indefinidos'],
+    ['Por qué un compilador prefiere «xor eax, eax» a «mov eax, 0»', null, 'Más corto y rompe dependencias', 'Es la única forma legal', 'No toca los flags', 'Va a otro puerto de memoria'],
+    ['Una división entera por una constante suele compilarse a…', null, 'Multiplicación y desplazamiento', 'idiv siempre', 'Un bucle de restas', 'Una tabla'],
+
+    // --- Vtables, this y objetos por dentro
     ['¿Qué imprime?', `struct B {
   B() { f(); }
-  virtual void f() { cout << "B"; }
+  virtual void f() { printf("B"); }
 };
 struct D : B {
-  void f() override { cout << "D"; }
+  void f() override { printf("D"); }
 };
 int main() { D d; }`, 'B', 'D', 'BD', 'Nada'],
     ['¿Qué imprime?', `struct B {
-  virtual void f(int x = 1) { cout << x; }
+  virtual void f(int x = 1) { printf("%d", x); }
 };
 struct D : B {
-  void f(int x = 2) override { cout << x; }
+  void f(int x = 2) override { printf("%d", x); }
 };
 int main() { B* p = new D; p->f(); }`, '1', '2', '0', '12'],
     ['¿Qué imprime?', `struct B {
-  void f(double) { cout << "B"; }
+  virtual void f() { printf("B"); }
 };
 struct D : B {
-  void f(int) { cout << "D"; }
+  void f() override { printf("D"); }
 };
-int main() { D d; d.f(1.5); }`, 'D', 'B', 'BD', 'DB'],
-    ['¿Qué imprime?', `template<class T> void f(T) { cout << "A"; }
-template<> void f<int*>(int*) { cout << "C"; }
-template<class T> void f(T*) { cout << "B"; }
-int main() { int* p = nullptr; f(p); }`, 'B', 'A', 'C', 'BC'],
-    ['¿Qué imprime?', `template<class T> void f(T) { cout << "A"; }
-template<class T> void f(T*) { cout << "B"; }
-template<> void f<int>(int*) { cout << "C"; }
-int main() { int* p = nullptr; f(p); }`, 'C', 'A', 'B', 'AC'],
-    ['¿Qué imprime?', `void g(int&) { cout << "L"; }
-void g(int&&) { cout << "R"; }
-void f(int&& x) { g(x); }
-int main() { f(1); }`, 'L', 'R', 'LR', 'RL'],
-    ['¿Qué imprime?', `struct M { ~M() { cout << "M"; } };
+int main() { B b = D{}; b.f(); }`, 'B', 'D', 'BD', 'Nada'],
+    ['¿Qué imprime?', `struct M { ~M() { printf("M"); } };
 struct S {
   M m;
   S() { throw 1; }
-  ~S() { cout << "S"; }
+  ~S() { printf("S"); }
 };
 int main() {
   try { S s; } catch (int) {}
 }`, 'M', 'S', 'SM', 'Nada'],
-    ['¿Qué imprime?', `int main() {
-  vector<int> v{1, 2, 3, 2};
-  remove(v.begin(), v.end(), 2);
-  cout << v.size();
-}`, '4', '2', '3', '1'],
-    ['¿Qué imprime?', `int main() {
-  vector<double> v{0.5, 0.5, 0.5};
-  cout << accumulate(v.begin(), v.end(), 0);
-}`, '0', '1', '1.5', '2'],
-    ['¿Qué imprime?', `int main() { cout << (-1 < 1u); }`, '0', '1', '-1', 'false'],
-    ['¿Qué imprime? (C++17)', `int main() {
-  int i = 1;
-  i = i++ + 1;
-  cout << i;
-}`, '2', '3', '1', 'Da igual, es UB'],
-    ['¿Qué imprime?', `int main() {
-  auto f = [x = 0]() mutable { return ++x; };
-  auto g = f;
-  f(); f();
-  cout << g();
-}`, '1', '3', '0', '2'],
-    ['¿Qué imprime?', `int main() {
-  cout << is_same_v<decltype("a"),
-                    const char*>;
-}`, '0', '1', 'No compila', 'a'],
-    ['¿Qué imprime?', `int main() {
-  int x = 0;
-  cout << is_same_v<decltype((x)), int>;
-  cout << is_same_v<decltype(x), int>;
-}`, '01', '11', '10', '00'],
-    ['¿Qué imprime?', `int main() { cout << 1["abc"]; }`, 'b', 'a', '1', 'No compila'],
-    ['¿Qué imprime?', `struct B {
-  virtual void f() { cout << "B"; }
-};
-struct D : B {
-  void f() override { cout << "D"; }
-};
-int main() { B b = D{}; b.f(); }`, 'B', 'D', 'BD', 'No compila'],
-    ['¿Qué imprime?', `int main() {
-  vector<int> a(3, 1), b{3, 1};
-  cout << a.size() << b.size();
-}`, '32', '33', '23', '22'],
     ['¿Qué imprime?', `struct V {
-  V() { cout << "b"; }
+  V() { printf("b"); }
 };
 struct A : virtual V {};
 struct B : virtual V {};
 struct C : A, B {};
 int main() { C c; }`, 'b', 'bb', 'bbb', 'Nada'],
-    ['¿Qué imprime?', `template<class... T>
-bool all(T... x) { return (x && ...); }
-int main() { cout << all(); }`, '1', '0', 'No compila', 'UB'],
-    ['¿Qué imprime?', `using R = int&;
-int main() {
-  cout << is_same_v<const R, int&>;
-}`, '1', '0', 'No compila', 'UB'],
-    ['¿Qué imprime?', `struct S { char c; double d; char e; };
-int main() { cout << sizeof(S); } // x86-64`, '24', '10', '16', '12'],
-    ['¿Qué imprime?', `void f(int a[10]) { cout << sizeof(a); }
-int main() { int a[10]; f(a); } // x86-64`, '8', '40', '10', '4'],
-    ['¿Qué imprime? (C++17)', `int a() { cout << "a"; return 0; }
-int b() { cout << "b"; return 0; }
-int main() { cout << a() << b(); }`, 'a0b0', 'b0a0', 'ab00', 'ba00'],
+    ['¿Por qué una virtual llamada en el constructor de B no llega a D?', null, 'Durante ~B y B(), el vptr apunta a la vtable de B', 'La vtable aún no existe en memoria', 'El compilador prohíbe virtuales ahí', 'D aún no tiene dirección'],
+    ['En una vtable Itanium, ¿qué hay en vptr[-1]?', null, 'El typeinfo (RTTI)', 'El offset-to-top', 'El destructor', 'Nada'],
+    ['Un destructor virtual ocupa en la vtable Itanium…', null, 'Dos entradas: completo y deleting', 'Una entrada', 'Tres entradas', 'Ninguna'],
+    ['¿Qué es un thunk en la vtable con herencia múltiple?', null, 'Código que ajusta this y salta', 'Una copia de la función', 'Una entrada nula', 'El RTTI de la base'],
+    ['Una llamada a una función virtual pura desde el constructor acaba en…', null, '__cxa_pure_virtual', 'SIGFPE', 'La versión de la base', '__cxa_throw'],
+    ['«undefined reference to vtable for X» suele significar que…', null, 'Falta definir la key function', 'Falta un #include', 'X no tiene virtuales', 'Falta -lstdc++ siempre'],
+    ['¿Qué permite marcar una clase como final, a nivel de código generado?', null, 'Desvirtualizar llamadas', 'Quitar el vptr', 'Reducir sizeof', 'Nada en absoluto'],
+    ['Accesos a memoria para resolver una llamada virtual típica', null, 'Dos: vptr y entrada de la vtable', 'Ninguno', 'Uno: la función', 'Uno por cada base'],
+    ['Un puntero a función miembro Itanium marca una virtual con…', null, 'El bit bajo de ptr a 1', 'ptr a nulo', 'adj negativo', 'Un flag aparte'],
 
-    // --- Comportamiento indefinido y trampas
-    ['¿Qué pasa con «a»?', `struct S {
-  int a, b;
-  S() : b(1), a(b + 1) {}
-};`, 'Lee b sin inicializar', 'Vale 2', 'Vale 1', 'No compila'],
-    ['¿Qué pasa al leer r?', `int a = 1;
-const int& r = std::max(a, 2);`, 'UB: referencia colgante', 'Vale 2', 'Vale 1', 'No compila'],
-    ['¿Qué hace este código?', `vector<string> v{{"a", "b"}};`, 'UB: toma los punteros como iteradores', 'Un vector con "a" y "b"', 'Un vector con "ab"', 'No compila'],
-    ['Antes de C++23, ¿qué pasa aquí? get() devuelve const vector<int>&', `for (int x : make().get()) use(x);`, 'UB: el temporal muere antes del bucle', 'Va bien: se alarga su vida', 'No compila', 'Copia el vector'],
-    ['¿Qué pasa?', `struct S { ~S() { throw 1; } };
-int main() {
-  try { S s; }
-  catch (...) { cout << "c"; }
-}`, 'std::terminate', 'Imprime c', 'UB silencioso', 'No compila'],
-    ['¿Qué pasa al usar p->shared_from_this() en C++17?', `struct S : enable_shared_from_this<S> {};
-S* p = new S;`, 'Lanza std::bad_weak_ptr', 'Devuelve un puntero vacío', 'Crea un nuevo dueño', 'No compila'],
-    ['¿Cuál de estas es UB si ~Base() NO es virtual?', null, 'unique_ptr<Base> p(new Derived)', 'shared_ptr<Base> p(new Derived)', 'Ninguna de las dos', 'Las dos'],
+    // --- ABI y llamadas (System V x86-64)
+    ['¿En qué registro llega this?', null, 'rdi', 'rcx', 'rax', 'rbp'],
+    ['Tercer argumento entero', null, 'rdx', 'rcx', 'r8', 'rsi'],
+    ['Un método devuelve por valor una clase NO trivial. ¿Dónde llega this?', null, 'rsi', 'rdi', 'rdx', 'En la pila'],
+    ['struct { long a, b; } devuelto por valor', null, 'rax y rdx', 'xmm0', 'Puntero oculto', 'rdi y rsi'],
+    ['struct { long a; double b; } pasado por valor, primer argumento', null, 'rdi y xmm0', 'rdi y rsi', 'xmm0 y xmm1', 'En la pila'],
+    ['Un struct de 24 bytes de enteros, trivial, pasado por valor', null, 'En la pila', 'rdi, rsi y rdx', 'Puntero oculto en rdi', 'xmm0 a xmm2'],
+    ['Al entrar en una función, rsp % 16 vale…', null, '8', '0', '4', 'Cualquier valor'],
+    ['¿Qué es la red zone?', null, '128 bytes bajo rsp', 'La página de guarda', 'El espacio tras el canario', 'Registros reservados'],
+    ['¿Cuál de estos registros es callee-saved?', null, 'rbx', 'rcx', 'rax', 'r11'],
+    ['¿Qué hace la instrucción call?', null, 'Apila la dirección de retorno y salta', 'Guarda rbp y salta', 'Guarda todos los registros', 'Reserva el frame'],
+    ['¿Hacia dónde crece la pila en x86-64?', null, 'Hacia direcciones bajas', 'Hacia direcciones altas', 'Depende del compilador', 'Depende de la función'],
+    ['¿Dónde pone gcc el canario de pila respecto al frame?', null, 'Entre locales y retorno', 'Tras la dirección de retorno', 'En un registro', 'En el heap'],
+
+    // --- Compilador, UB y optimización
     ['¿Qué es esto?', `float f = 1.0f;
-int i = *reinterpret_cast<int*>(&f);`, 'UB por strict aliasing', 'Legal desde C++11', 'Solo no portable', 'Convierte 1.0 en 1'],
-    ['¿Forma correcta de leer los bits de un float como int (C++20)?', null, 'std::bit_cast', 'reinterpret_cast', 'static_cast', 'Una union'],
-    ['Comparador de std::sort con <= en vez de <', null, 'UB: no es orden débil estricto', 'Solo pierde estabilidad', 'Ordena igual, más lento', 'No compila'],
-    ['¿Qué pasa si escribes v[0] = 1 aquí?', `vector<int> v;
-v.reserve(10);`, 'UB: el tamaño sigue siendo 0', 'Correcto: hay capacidad', 'Lanza out_of_range', 'Crece a tamaño 1'],
-    ['¿Qué devuelve INT_MIN / -1?', null, 'UB', 'INT_MIN', 'INT_MAX', '0'],
-    ['Dos hilos escriben a la vez un volatile int', null, 'Data race: UB', 'Seguro: volatile lo protege', 'Seguro en x86-64 por el estándar', 'Atómico pero sin orden'],
-    ['¿Qué pasa con sv?', `string_view sv = string("a") + "b";
-cout << sv;`, 'UB: el string ya no existe', 'Se alarga su vida', 'Imprime ab siempre', 'No compila'],
+int i = *(int*)&f;`, 'UB por strict aliasing', 'Legal desde C++11', 'Solo no portable', 'Convierte 1.0 en 1'],
+    ['¿Qué tipo puede acceder legalmente a los bytes de cualquier objeto?', null, 'unsigned char', 'void', 'uint32_t', 'long'],
+    ['A -O2, ¿qué puede devolver? a y b apuntan a lo mismo', `int f(int* a, float* b) {
+  *a = 1;
+  *b = 2;
+  return *a;
+}`, '1, por strict aliasing', 'Siempre los bits de 2.0f', 'No compila', 'Siempre 0'],
+    ['A -O2, con x entero con signo, ¿qué hace gcc?', `bool f(int x) { return x + 1 > x; }`, 'Devuelve siempre true', 'Compara de verdad', 'Falla en INT_MAX siempre', 'No compila'],
+    ['¿Qué puede hacer gcc a -O2?', `int f(int* p) {
+  int v = *p;
+  if (!p) return 0;
+  return v;
+}`, 'Quitar el if', 'Quitar *p', 'Mover el if antes', 'Nada: es correcto'],
+    ['¿Qué puede pasar a -O2?', `void f() {
+  char k[32];
+  leer(k);
+  usar(k);
+  memset(k, 0, 32);
+}`, 'Quitar el memset', 'Nada, memset es sagrado', 'Mover k al heap', 'No compila'],
+    ['Una escritura en este puntero…', `char* p = (char*)"abc";
+p[0] = 'x';`, 'Suele dar SIGSEGV: .rodata', 'Cambia la cadena', 'No compila', 'Copia al heap'],
+    ['Leer *(int*)p con p desalineado', null, 'UB, aunque x86 suele tragar', 'Siempre correcto en x86', 'Siempre SIGBUS en x86', 'No compila'],
+    ['¿Qué instrucción falla con un operando no alineado a 16?', null, 'movaps', 'movups', 'mov', 'lea'],
+    ['¿Qué garantiza volatile en C++?', null, 'Que el compilador haga los accesos', 'Una barrera de CPU', 'Atomicidad', 'Evitar data races'],
+    ['asm volatile("" : : : "memory") es…', null, 'Barrera de compilador', 'Barrera de CPU', 'Una instrucción nop', 'Un flush de caché'],
+    ['¿Para qué sirve __restrict__?', null, 'Prometer que no hay aliasing', 'Hacer el puntero constante', 'Alinear', 'Proteger la memoria'],
+    ['¿Cómo se destruye lo creado con placement new?', `T* p = new (buf) T;`, 'p->~T()', 'delete p', 'delete[] buf', 'free(p)'],
 
-    // --- Semántica de movimiento y vida de los objetos
-    ['¿Qué hace?', `const string s = "x";
-string t = std::move(s);`, 'Copia', 'Mueve', 'No compila', 'UB'],
-    ['«return std::move(local);» en una función que devuelve por valor', null, 'Impide la NRVO', 'Es lo más eficiente', 'Es UB', 'No compila'],
-    ['vector al crecer, si T tiene copia y su move NO es noexcept', null, 'Copia los elementos', 'Los mueve igualmente', 'Lanza una excepción', 'No compila'],
-    ['Si declaras tu propio destructor, el move constructor implícito…', null, 'No se genera: se usa la copia', 'Se genera igual', 'Queda deleted y no compila', 'Se genera si es trivial'],
-    ['Si T tiene copia y move eliminados, ¿qué pasa? (C++17)', `T f() { return T{}; }
-T x = f();`, 'Compila: elisión obligatoria', 'Error: no se puede mover', 'Solo compila con -O2', 'Compila, pero es UB'],
-    ['Con T no copiable ni movible (C++17)', `T f() { T t; return t; }`, 'No compila: NRVO no es obligatoria', 'Compila: elisión obligatoria', 'Compila solo con -O2', 'Compila, pero es UB'],
-    ['Estado de un std::string tras moverlo', null, 'Válido pero no especificado', 'Siempre vacío', 'Inválido: ni asignarle', 'Igual que antes'],
-    ['¿Qué genera std::move por sí solo en ejecución?', null, 'Nada: es solo un cast', 'Una llamada al move ctor', 'Un swap', 'Una copia superficial'],
-    ['Pimpl con unique_ptr<Impl> y Impl incompleto en el .h', null, 'Hay que definir ~T() en el .cpp', 'Funciona sin hacer nada', 'Hay que incluir Impl en cada .cpp', 'Hay que hacer Impl virtual'],
-    ['Con make_shared y un weak_ptr vivo, al morir el último shared_ptr…', null, 'Se destruye el objeto, no se libera la memoria', 'Se libera todo', 'El objeto sigue vivo', 'Es UB'],
-    ['¿Qué es thread-safe en shared_ptr?', null, 'Solo el contador de referencias', 'También el objeto apuntado', 'También reasignar el mismo shared_ptr', 'Nada en absoluto'],
-    ['En C++17, ¿puede filtrar memoria si g() lanza?', `f(unique_ptr<T>(new T), g());`, 'No: los argumentos no se intercalan', 'Sí: new y g() se intercalan', 'Solo con -O3', 'Sí, siempre'],
-    ['¿Quién construye una base virtual?', null, 'La clase más derivada', 'La primera base', 'La última base', 'Cada base intermedia'],
-    ['¿Para qué sirve std::launder?', null, 'Puntero válido a un objeto recreado en ese almacenamiento', 'Borrar memoria de forma segura', 'Evitar una data race', 'Convertir entre tipos sin UB'],
-    ['Tras «new (buf) T», ¿cómo se destruye?', null, 'p->~T()', 'delete p', 'delete[] buf', 'Solo, al salir del ámbito'],
+    // --- Enlazador y binario
+    ['¿Qué significa _Z3fooi?', null, 'foo(int)', 'int foo()', 'foo con 3 ints', 'Un int global foo'],
+    ['¿Qué desactiva extern "C"?', null, 'El name mangling', 'Las excepciones', 'El enlazado estático', 'Las plantillas'],
+    ['Una función inline definida en un .h, usada en 10 .cpp', null, 'Símbolo débil: queda uno', '10 copias enlazadas', 'Error de símbolo duplicado', 'Nunca se emite'],
+    ['«static int x = 0;» global, ¿en qué sección?', null, '.bss', '.data', '.rodata', '.text'],
+    ['«int x = 5;» global, ¿en qué sección?', null, '.data', '.bss', '.rodata', '.init'],
+    ['¿Qué sección no ocupa espacio en el ejecutable en disco?', null, '.bss', '.data', '.rodata', '.text'],
+    ['¿Quién corre los constructores de globales antes de main?', null, 'Las entradas de .init_array', 'El kernel', 'El enlazador al compilar', 'main, al principio'],
+    ['Un static local se protege en gcc con…', null, '__cxa_guard_acquire', 'pthread_once siempre', 'Nada', 'Un spinlock en .bss sin más'],
+    ['¿Cómo se llama a una función de una .so por primera vez?', null, 'Por PLT, que resuelve y anota en GOT', 'Directamente al fijar la dirección', 'Por la vtable', 'Con dlopen cada vez'],
+    ['¿Coste de un try sin excepción con el ABI de gcc x86-64?', null, 'Casi cero: usa tablas', 'Un registro por bloque', 'Un setjmp', 'Guardar todos los registros'],
+    ['El desenrollado de una excepción tiene dos fases…', null, 'Buscar handler y luego limpiar', 'Limpiar y luego buscar', 'Copiar y lanzar', 'Parar hilos y limpiar'],
 
-    // --- Plantillas y tipos
-    ['En «template<class T> void f(T&&)», con int i; f(i), T es…', null, 'int&', 'int', 'int&&', 'const int&'],
-    ['En «template<class T> void f(vector<T>&&)», el parámetro es…', null, 'Referencia a rvalue', 'Referencia universal', 'Referencia a lvalue', 'Copia'],
-    ['Error de tipos dentro del CUERPO de una plantilla instanciada', null, 'Error duro: no es SFINAE', 'SFINAE: se descarta', 'Warning', 'UB'],
-    ['¿Qué falta para que compile con x dependiente?', `x.___ get<0>();`, 'template', 'typename', 'auto', 'using'],
-    ['¿Compila? B<T> tiene f()', `template<class T>
-struct D : B<T> {
-  void g() { f(); }
-};`, 'No: hace falta this->f()', 'Sí, siempre', 'Solo si T es int', 'Solo en C++20'],
-    ['Rama descartada de if constexpr FUERA de una plantilla', null, 'Se comprueba igualmente', 'Se ignora por completo', 'No se permite if constexpr', 'Da UB'],
-    ['std::decay_t<int[3]> es…', null, 'int*', 'int[3]', 'int', 'int(&)[3]'],
-    ['¿Tipo de x?', `auto x = {1};`, 'initializer_list<int>', 'int', 'int[1]', 'No compila'],
-    ['¿Tipo de x? (C++17)', `auto x{1};`, 'int', 'initializer_list<int>', 'int[1]', 'No compila'],
-    ['¿Tipo de x?', `vector<bool> v{true};
-auto x = v[0];`, 'vector<bool>::reference', 'bool', 'bool&', 'const bool&'],
-    ['¿Qué devuelve +[]{}?', null, 'Un puntero a función', 'El propio lambda', 'void', 'No compila'],
-    ['¿Cómo se encuentra una «hidden friend»?', null, 'Solo por ADL', 'Con búsqueda normal', 'Con el operador ::', 'Con using'],
-    ['Dos overloads con concepts válidos, uno subsume al otro', null, 'Gana el más restringido', 'Es ambiguo', 'Gana el primero declarado', 'Gana el menos restringido'],
-    ['Si defines «auto operator<=>(const T&) const = default;»', null, 'También se declara == por defecto', 'Hay que escribir == a mano', 'Solo funciona <', 'Se generan copia y move'],
-    ['Con un operator<=> escrito a mano (no default), ¿a == b?', null, 'No compila: no se genera ==', 'Usa <=> por dentro', 'Compara bit a bit', 'Compara miembro a miembro'],
-    ['¿Cuál debe evaluarse siempre en compilación?', null, 'consteval', 'constexpr', 'constinit', 'const'],
-    ['¿Qué garantiza constinit?', null, 'Inicialización estática, sin hacerla const', 'Que es inmutable', 'Evaluar solo en compilación', 'Que es inline'],
-    ['Inicializadores designados en C++20', `S s{.b = 1, .a = 2}; // a va antes que b`, 'No compila: importa el orden', 'Compila sin problema', 'Compila con warning', 'UB'],
-    ['Una función es coroutine si contiene…', null, 'co_await, co_yield o co_return', 'Devolver std::future', 'La palabra coroutine', 'Devolver std::generator'],
-    ['¿Qué nombre busca el compilador en el tipo de una coroutine?', null, 'promise_type', 'coroutine_handle', 'awaiter', 'task_type'],
-    ['¿Qué estándar introduce «deducing this»?', null, 'C++23', 'C++20', 'C++17', 'C++26'],
-
-    // --- Concurrencia
-    ['memory_order_relaxed garantiza…', null, 'Atomicidad y orden en esa variable', 'Orden total global', 'Sincronizar con otros hilos', 'Nada de nada'],
-    ['Un load acquire sincroniza con un store release si…', null, 'Lee el valor de ese store', 'Sucede después en el tiempo', 'Comparten núcleo', 'Están en el mismo hilo'],
-    ['¿Qué añade seq_cst sobre acquire-release?', null, 'Un orden total único', 'Atomicidad', 'Menos coste', 'Nada en x86-64 ni en ARM'],
-    ['compare_exchange_weak frente a strong', null, 'Puede fallar sin motivo', 'No es atómica', 'Bloquea el hilo', 'Solo vale con enteros'],
-    ['¿Cuántas funciones corren a la vez?', `std::async(launch::async, f);
-std::async(launch::async, g);`, 'Una: el future temporal bloquea', 'Dos, en paralelo', 'Ninguna: son diferidas', 'Depende del planificador'],
-    ['Destruir un std::thread aún joinable', null, 'std::terminate', 'Hace join', 'Hace detach', 'UB silencioso'],
-    ['Un static local en C++11 se inicializa…', null, 'Una vez y de forma thread-safe', 'Una vez por hilo', 'Sin garantías entre hilos', 'Antes de main'],
-    ['Dos atómicos independientes en la misma línea de caché', null, 'False sharing', 'Data race', 'ABA', 'Deadlock'],
-    ['std::function frente a std::move_only_function (C++23)', null, 'function exige callable copiable', 'function es solo para lambdas', 'function no permite estado', 'Son lo mismo'],
-
-    // --- Biblioteca
-    ['deque::push_back invalida…', null, 'Iteradores, no referencias', 'Referencias, no iteradores', 'Ambos', 'Ninguno'],
-    ['Un rehash de unordered_map invalida…', null, 'Iteradores, no referencias', 'Referencias, no iteradores', 'Ambos', 'Ninguno'],
-    ['std::lower_bound sobre std::list', null, 'O(log n) comparaciones, O(n) avances', 'O(log n) en todo', 'O(n) comparaciones', 'No compila'],
-    ['map<string, int, less<>> permite…', null, 'find(string_view) sin crear string', 'Ordenar al revés', 'Claves duplicadas', 'Búsqueda en O(1)'],
-    ['variant::valueless_by_exception() es true si…', null, 'Falló un cambio de alternativa', 'Está sin inicializar', 'Contiene monostate', 'Se movió desde él'],
-    ['¿Para qué sirve [[no_unique_address]]?', null, 'Que un miembro vacío no ocupe', 'Prohibir tomar su dirección', 'Alinearlo a la caché', 'Evitar el aliasing'],
-    ['Los miembros static constexpr de una clase, desde C++17…', null, 'Son implícitamente inline', 'Necesitan definición en el .cpp', 'Tienen enlace interno', 'No pueden ser ODR-used'],
-    ['Un const global de ámbito de namespace tiene enlace…', null, 'Interno', 'Externo', 'Ninguno', 'Débil'],
-    ['El destructor virtual puro…', null, 'Debe tener definición', 'No puede tener definición', 'No está permitido', 'Lo genera el compilador'],
-    ['¿Se puede sobrescribir un virtual privado de la base?', null, 'Sí', 'No', 'Solo siendo friend', 'Solo si es puro'],
-    ['Lanzar de nuevo con «throw e;» en vez de «throw;»', null, 'Copia y puede cortar el tipo', 'Es exactamente igual', 'Es UB', 'std::terminate'],
+    // --- CPU, caché y sistema
+    ['¿Qué reordenación permite x86 (TSO)?', null, 'Store seguido de load', 'Load seguido de load', 'Store seguido de store', 'Ninguna'],
+    ['Un load acquire en x86-64 se compila a…', null, 'Un mov normal', 'lock mov', 'mfence y mov', 'xchg'],
+    ['Un store seq_cst en x86-64 se compila a…', null, 'xchg o mov y mfence', 'Un mov normal', 'lfence y mov', 'cmov'],
+    ['¿Qué hace el prefijo lock?', null, 'Operación atómica y barrera total', 'Bloquea todas las CPU para siempre', 'Pide un mutex al kernel', 'Vacía la caché'],
+    ['Dos hilos escriben contadores distintos en la misma línea de caché', null, 'False sharing', 'Data race', 'ABA', 'Deadlock'],
+    ['Tamaño típico de línea de caché en x86-64', null, '64 bytes', '16 bytes', '128 KB', '4 KB'],
+    ['Latencia típica de L1 en ciclos', null, 'Unos 4', 'Unos 40', 'Unos 200', 'Menos de 1'],
+    ['Coste típico de un fallo de predicción de salto en ciclos', null, '15-20', '1-2', '200-300', '2000'],
+    ['¿Para qué sirve la TLB?', null, 'Cachear traducciones de direcciones', 'Cachear instrucciones', 'Predecir saltos', 'Reordenar escrituras'],
+    ['malloc de 1 GB en Linux sin tocarlo aún', null, 'Casi no consume RAM física', 'Reserva 1 GB de RAM', 'Falla seguro', 'Escribe ceros en 1 GB'],
+    ['¿Qué pasa la primera vez que tocas una página recién obtenida con mmap?', null, 'Fallo de página menor', 'SIGSEGV', 'Nada, ya está mapeada', 'Un fallo de TLB fatal'],
+    ['fork() y la memoria del padre', null, 'Copy-on-write', 'Se copia entera', 'Se comparte siempre', 'Se pierde en el hijo'],
+    ['¿Qué ocurre al desbordar la pila?', null, 'SIGSEGV en la página de guarda', 'Lanza una excepción C++', 'Crece sin límite', 'Devuelve nullptr'],
+    ['Ancho de un registro ymm', null, '256 bits', '128 bits', '512 bits', '64 bits'],
+    ['Con cmpxchg, un puntero que pasa de A a B y vuelve a A causa…', null, 'Problema ABA', 'False sharing', 'Una data race', 'Un fallo de TLB'],
   ];
   async function playCpp(G, seed) {
-    if (!await intro(G, '<b>5 preguntas</b> de C++ para gente que sufre a diario: trampas del lenguaje, plantillas, memoria y concurrencia. <b>30 segundos</b> cada una. Cuenta acertar y ser rápido.')) return null;
+    if (!await intro(G, '<b>5 preguntas</b> de C++ de bajo nivel: memoria, vtables, ABI, ensamblador, enlazador y CPU. Todo en <b>x86-64, Linux y g++</b>. <b>30 segundos</b> cada una. Cuenta acertar y ser rápido.')) return null;
     const r = rng(seed + 'cpp'); const qs = fromDeck(CPP, 5, 'cpp', r);
     const rounds = qs.map(([q, code, ok, ...bad]) => {
       const options = shuffle([ok, ...bad], r);
