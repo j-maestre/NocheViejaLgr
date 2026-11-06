@@ -10,6 +10,8 @@
   let MN;
   // Solo los duelos a partir de que existe la tragaperras (no cambia los antiguos)
   const SLOTS_SINCE = new Date('2026-10-27T09:00').getTime();
+  // Mesas y salas: desde que tienen tragaperras (las anteriores no cambian)
+  const TABLE_SLOTS_SINCE = 1793964984354;
   const FILLER = ['🍒', '🍋', '🔔', '⭐', '🍀', '💎', '🍇', '🎲'];
 
   // ---------------------------------------------------------- modificadores
@@ -30,8 +32,33 @@
     return OUTCOMES[0];
   }
   const eligible = (t) => t.type === 'duel' && t.ts >= SLOTS_SINCE && MN.S.settings.slotsEnabled !== false;
+  const isTable = (t) => t.type === 'payout' && t.kind === 'table';
+  const eligibleTable = (t) => isTable(t) && t.ts >= TABLE_SLOTS_SINCE && MN.S.settings.slotsEnabled !== false;
+  const eligibleAny = (t) => eligible(t) || eligibleTable(t);
+  const involved = (t, pid) => (isTable(t) ? pid in (t.payouts || {}) : t.winner === pid || t.loser === pid);
+
+  // En una mesa los modificadores se aplican a cada uno: ganancias de los ganadores, pérdidas de los demás
+  function tablePayouts(t, o) {
+    const ent = Object.entries(t.payouts || {});
+    const gain = ent.filter(([, v]) => v > 0); const lost = ent.filter(([, v]) => v < 0);
+    const out = {};
+    if (o.id === 'double') gain.forEach(([id, v]) => { out[id] = v; });
+    if (o.id === 'jackpot') gain.forEach(([id, v]) => { out[id] = v * 2; });
+    if (o.id === 'consolation') lost.forEach(([id, v]) => { const h = Math.floor(-v / 2); if (h) out[id] = h; });
+    if (o.id === 'tax') gain.forEach(([id, v]) => { out[id] = -Math.min(Math.max(1, Math.floor(v * 0.25)), v); });
+    if (o.id === 'spectators') MN.S.players.filter((p) => !(p.id in t.payouts) && p.createdAt <= t.ts).forEach((p) => { out[p.id] = 1; });
+    return Object.keys(out).length ? out : null;
+  }
+  const TABLE_TEXT = { double: 'La Banca dobla las ganancias', jackpot: 'La Banca triplica las ganancias', consolation: 'Los que perdieron recuperan la mitad', tax: 'Comisión de la Banca' };
+  function textOf(o, d) {
+    if (!isTable(d) || o.id === 'nothing') return o.text(d);
+    if (o.id === 'spectators') return 'Todos los que no jugaban reciben +1 ficha';
+    const p = payoutsFor(d, o);
+    return p ? `${TABLE_TEXT[o.id]}: ${Object.entries(p).map(([id, v]) => `${name(id)} ${v > 0 ? '+' : ''}${v}`).join(' · ')}` : `${TABLE_TEXT[o.id]}… pero no había nada que tocar`;
+  }
 
   function payoutsFor(duel, o) {
+    if (isTable(duel)) return tablePayouts(duel, o);
     switch (o.id) {
       case 'double': return { [duel.winner]: duel.amount };
       case 'jackpot': return { [duel.winner]: duel.amount * 2 };
@@ -49,7 +76,7 @@
   async function sweep() {
     const byId = {}; MN.S.txs.forEach((t) => { byId[t.id] = t; });
     const writes = [];
-    MN.S.txs.filter(eligible).forEach((d) => {
+    MN.S.txs.filter(eligibleAny).forEach((d) => {
       const o = outcomeOf(d); const payouts = payoutsFor(d, o);
       const id = 'slot_' + d.id; const cur = byId[id];
       if (!payouts) return;
@@ -119,14 +146,43 @@
     await new Promise((resolve) => { const t = setTimeout(resolve, 12000); next.onclick = () => { clearTimeout(t); resolve(); }; });
   }
 
+  // ---------------------------------------------------------- 🃏 resultado de una mesa o sala
+  async function tableStage(box, t, withSlot) {
+    const mine = MN.me(); const mineIn = mine && involved(t, mine.id);
+    const iWon = mineIn && t.winners.includes(mine.id); const tie = t.mode !== 'teams' && t.winners.length > 1;
+    const list = MN.tableRanking ? MN.tableRanking(t) : [];
+    box.innerHTML = `<div class="show-inner table-show">
+      <div class="show-title">🃏 ${MN.esc(t.game)}</div>
+      <div class="show-kicker">Bote: ${t.pot} fichas · ${list.length} jugadores</div>
+      <ol class="fr-rank" id="tb-rank"></ol>
+      <div class="show-big" id="tb-out"></div>
+      ${withSlot ? '<button type="button" class="btn primary show-close" id="tb-next" hidden>🎰 Seguir</button>' : closeBtn}</div>`;
+    sfx('drum'); await sleep(700);
+    // De último a primero, como en un podio
+    for (let k = list.length - 1; k >= 0; k--) {
+      const html = MN.tableRankingHtml(t, list).split('</li>')[k] + '</li>';
+      MN.$('#tb-rank').insertAdjacentHTML('afterbegin', html);
+      sfx(list[k].win ? 'win' : 'tick'); await sleep(list[k].win ? 700 : 380);
+    }
+    const out = MN.$('#tb-out');
+    const winners = t.mode === 'teams' ? `EL EQUIPO ${t.pick}` : t.winners.map((id) => MN.player(id).name).join(' Y ');
+    out.textContent = !mineIn ? `GANA ${winners}` : iWon ? (tie ? '¡EMPATE! OS REPARTÍS EL BOTE' : '¡HAS GANADO!') : 'HAS PERDIDO';
+    if (mineIn) out.classList.add(iWon ? 'win' : 'lose');
+    if (mineIn && !iWon) sfx('lose'); else boom({ count: 180 });
+    if (!withSlot) return;
+    const next = MN.$('#tb-next'); next.hidden = false;
+    await new Promise((resolve) => { const tm = setTimeout(resolve, 12000); next.onclick = () => { clearTimeout(tm); resolve(); }; });
+  }
+
   // ---------------------------------------------------------- 🎰 tragaperras
   async function slotShow(box, duel) {
     if (duel.sw) await swDuelStage(box, duel, true);
+    if (isTable(duel)) await tableStage(box, duel, true);
     const o = outcomeOf(duel);
     const syms = o.sym ? [o.sym, o.sym, o.sym] : (() => { const s = MN.shuffle(FILLER.slice()); return [s[0], s[1], s[2]]; })();
     const strip = (target) => Array.from({ length: 24 }, () => FILLER[Math.floor(Math.random() * FILLER.length)]).concat([target]);
     box.innerHTML = `<div class="show-inner slot-show">
-      <div class="show-kicker">${MN.esc(duel.game)} · ${MN.esc(name(duel.winner))} gana ${duel.amount}</div>
+      <div class="show-kicker">${isTable(duel) ? `Mesa de ${MN.esc(duel.game)} · bote ${duel.pot}` : `${MN.esc(duel.game)} · ${MN.esc(name(duel.winner))} gana ${duel.amount}`}</div>
       <div class="slot-title">🎰 ¿Modificador?</div>
       <div class="slot-machine"><div class="slot-lights"></div>
         ${syms.map((s, i) => `<div class="reel"><div class="reel-strip" id="reel${i}">${strip(s).map((x) => `<div class="sym">${x}</div>`).join('')}</div></div>`).join('')}
@@ -146,7 +202,7 @@
     // Por si la animación va con retraso (móvil lento), los rodillos quedan siempre en su símbolo final
     syms.forEach((_, i) => { const el = MN.$('#reel' + i); el.style.transition = 'none'; el.style.transform = 'translateY(calc(-24 * var(--sym-h)))'; });
     const res = MN.$('#slot-result');
-    res.innerHTML = `<div class="slot-out ${o.id}">${o.title}</div><div class="slot-text">${MN.esc(o.text(duel))}</div>`;
+    res.innerHTML = `<div class="slot-out ${o.id}">${o.title}</div><div class="slot-text">${MN.esc(textOf(o, duel))}</div>`;
     res.classList.add('shown');
     if (o.id === 'jackpot' || o.id === 'double') { boom({ count: o.id === 'jackpot' ? 300 : 160 }); sfx('win'); }
     else if (o.id === 'tax') sfx('lose');
@@ -457,7 +513,7 @@
   // Duelos míos cuya tragaperras aún no he visto: quedan pendientes hasta que toque "Girar"
   function pendingSlots() {
     const mine = MN.me(); if (!mine || isTV()) return [];
-    return MN.S.txs.filter((t) => eligible(t) && !t.voided && (t.winner === mine.id || t.loser === mine.id) && !slotSeen(t, mine.id)).reverse();
+    return MN.S.txs.filter((t) => eligibleAny(t) && !t.voided && involved(t, mine.id) && !slotSeen(t, mine.id)).reverse();
   }
 
   function pendingBets() {
@@ -496,7 +552,15 @@
           <div class="ch-status">Apostaste por ${MN.who(x.bet.on)}. ¿Acertaste?</div>
           <div class="ch-actions"><button type="button" class="btn primary" data-bet-play="${MN.esc(x.pay.id)}">🎰 Ver resultado</button></div></li>`;
       }).join('') + list.filter(() => shown++ < MAXV).map((d) => {
-        const mine = MN.me(); const won = d.winner === mine.id;
+        const mine = MN.me();
+        if (isTable(d)) {
+          return `<li class="challenge status-reported needs-me slot-pending">
+          <div class="ch-head">🃏 Mesa de ${MN.esc(d.game)}<span class="ch-amount">${d.pot}</span></div>
+          <div class="ch-sub">${Object.keys(d.payouts).length} jugadores · ${MN.ago(d.ts)}</div>
+          <div class="ch-status">${d.winners.includes(mine.id) ? '🏆 ¡Ganaste!' : '😵 Perdiste…'} Falta ver qué dice la tragaperras.</div>
+          <div class="ch-actions"><button type="button" class="btn primary" data-slot-play="${MN.esc(d.id)}">🎰 Ver resultado</button></div></li>`;
+        }
+        const won = d.winner === mine.id;
         return `<li class="challenge status-reported needs-me slot-pending">
           <div class="ch-head">${MN.who(d.winner)}<span class="ch-vs">VS</span>${MN.who(d.loser)}<span class="ch-amount">${d.amount}</span></div>
           <div class="ch-sub">${MN.esc(d.game)} · ${MN.ago(d.ts)}</div>
@@ -518,9 +582,9 @@
     const ids = new Set(MN.S.txs.map((t) => t.id));
     if (known) {
       // En directo: si estoy conectado cuando se resuelve mi duelo (o he apostado, o es la TV), sale sola
-      MN.S.txs.filter((t) => eligible(t) && !t.voided && !known.has(t.id) && now - t.ts < 5 * 60000).forEach((d) => {
-        const bet = mine && (MN.S.bets || []).some((b) => b.challengeId === d.challengeId && b.player === mine.id);
-        const mineDuel = mine && (d.winner === mine.id || d.loser === mine.id);
+      MN.S.txs.filter((t) => eligibleAny(t) && !t.voided && !known.has(t.id) && now - t.ts < 5 * 60000).forEach((d) => {
+        const bet = mine && !isTable(d) && (MN.S.bets || []).some((b) => b.challengeId === d.challengeId && b.player === mine.id);
+        const mineDuel = mine && involved(d, mine.id);
         if (isTV()) { if (!seen('slot:' + d.id + ':tv')) enqueue((box) => slotShow(box, d)); }
         else if (mineDuel) { if (!slotSeen(d, mine.id)) playSlot(d); }
         else if (bet && !seen(slotKey(d, mine.id))) enqueue((box) => slotShow(box, d));
@@ -528,6 +592,9 @@
       // Sin tragaperras, el resultado del cronómetro sale igual
       MN.S.txs.filter((t) => t.type === 'duel' && t.sw && !eligible(t) && !t.voided && !known.has(t.id) && now - t.ts < 5 * 60000 && mine && (t.winner === mine.id || t.loser === mine.id))
         .forEach((d) => enqueue((box) => swDuelStage(box, d, false)));
+      // Mesas sin tragaperras (desactivada): la clasificación sale igual
+      MN.S.txs.filter((t) => isTable(t) && !eligibleTable(t) && !t.voided && !known.has(t.id) && now - t.ts < 5 * 60000 && mine && involved(t, mine.id))
+        .forEach((d) => enqueue((box) => tableStage(box, d, false)));
     }
     if (known) pendingBets().filter((x) => !known.has(x.pay.id)).forEach(playBet);
     known = ids;
@@ -583,10 +650,10 @@
     duelBadge: () => pendingSlots().length + pendingBets().length,
     rules(section) {
       return section('🎰', 'Tragaperras', `
-        <p>Al terminar cada duelo gira una tragaperras con un modificador aleatorio:</p>
+        <p>Al terminar cada duelo, mesa o sala gira una tragaperras con un modificador aleatorio:</p>
         <ul>${OUTCOMES.map((o) => `<li><b>${o.sym ? o.sym.repeat(3) : '🍒🍋🔔'} ${o.title}</b> (${o.w}%): ${
           { nothing: 'no pasa nada', double: 'el ganador cobra el doble', consolation: 'el perdedor recupera la mitad de lo perdido', spectators: 'todos los demás jugadores reciben 1 ficha', tax: 'el ganador paga a la Banca el 25% de lo ganado', jackpot: 'el ganador cobra el triple' }[o.id]}.</li>`).join('')}</ul>
-        <p class="hint">Los premios los pone la Banca. Si se anula el duelo, también se anula el modificador.</p>`);
+        <p class="hint">En las mesas, el doble, el jackpot y la comisión se aplican a lo que gana cada ganador, y el consuelo a lo que pierde cada uno. Los premios los pone la Banca. Si se anula el duelo o la mesa, también se anula el modificador.</p>`);
     },
   };
 })());

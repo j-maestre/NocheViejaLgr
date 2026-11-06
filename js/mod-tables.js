@@ -29,6 +29,25 @@
   const agOver = (t, id) => agMine(t, id) || agQuit(t, id);
   const pickLabel = (t, pick) => (t.mode === 'teams' ? `equipo ${pick}` : MN.player(pick).name);
 
+  // Clasificación de una mesa terminada, a partir de su movimiento: [{ id, label, win }]
+  function rankingOf(tx) {
+    const t = tables().find((x) => x.id === tx.tableId);
+    const win = (id) => (tx.winners || []).includes(id);
+    if (t && t.flappy) return t.flappy.map((x) => ({ id: x.id, label: `${x.score} tubo${x.score === 1 ? '' : 's'}`, win: win(x.id) }));
+    if (t && t.appGame) {
+      const sc = (id) => (agMine(t, id) ? t['ag_' + id] : -Infinity);
+      return t.seats.map((s) => s.player).sort((a, b) => sc(b) - sc(a)).map((id) => ({ id, label: agMine(t, id) ? t['agl_' + id] : 'No jugó', win: win(id) }));
+    }
+    const seats = t ? t.seats : Object.keys(tx.payouts || {}).map((id) => ({ player: id }));
+    return seats.map((s) => ({ id: s.player, label: s.team ? `Equipo ${s.team}` : '', win: win(s.player) })).sort((a, b) => b.win - a.win);
+  }
+  // La clasificación pintada (historial y animación)
+  function rankingHtml(tx, list = rankingOf(tx)) {
+    const mine = MN.me();
+    return list.map((x, i) => { const d = (tx.payouts || {})[x.id] || 0; return `<li class="${mine && x.id === mine.id ? 'me' : ''}"><span>${x.win ? '🏆' : i + 1}</span>
+      <span>${MN.face(MN.player(x.id), 'mini')} ${MN.esc(MN.player(x.id).name)} <span class="muted small">${d > 0 ? '+' : ''}${d}</span></span><b>${MN.esc(x.label)}</b></li>`; }).join('');
+  }
+
   // Reparto del bote: cada uno pone su entrada (o lo que le quede) y los ganadores se reparten todo
   function payouts(t, winners) {
     const bal = MN.balances();
@@ -298,7 +317,9 @@
   return {
     init(api) {
       MN = api;
+      MN.tableRanking = rankingOf; MN.tableRankingHtml = rankingHtml;
       MN.registerTx('table', {
+        detail: (t) => `<ol class="fr-rank">${rankingHtml(t)}</ol>`,
         line(t) {
           const label = t.mode === 'teams' ? `El <b>equipo ${MN.esc(t.pick)}</b> (${t.winners.map((id) => MN.who(id)).join(', ')})`
             : t.winners.length > 1 ? `Empate: ${t.winners.map((id) => MN.who(id)).join(' y ')}` : MN.who(t.winners[0]);

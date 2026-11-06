@@ -233,6 +233,10 @@ input[type="range"] { padding: 0; accent-color: var(--gold); background: none; b
 .feed-body .who { color: var(--text); }
 .feed-sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .feed-item.voided { opacity: .45; }
+.feed-item[data-tx] { cursor: pointer; }
+.tx-sum .fr-rank { margin: 10px 0 4px; }
+.tx-sum-slot { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(245, 197, 66, .08); font-size: 14px; text-align: center; }
+.table-show .fr-rank li { animation: pop .35s ease both; }
 .feed-item.voided .feed-body > div:first-child { text-decoration: line-through; }
 
 .mini-list { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line); }

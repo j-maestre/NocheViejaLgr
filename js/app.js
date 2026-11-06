@@ -1137,12 +1137,34 @@
     const btn = admin && t.type !== 'init'
       ? (t.voided ? `<button class="mini" data-restore="${esc(t.id)}">Restaurar</button>` : `<button class="mini danger" data-void="${esc(t.id)}">Anular</button>`)
       : '';
-    return `<li class="feed-item ${t.voided ? 'voided' : ''}">
+    return `<li class="feed-item ${t.voided ? 'voided' : ''}" data-tx="${esc(t.id)}">
       <div class="feed-icon">${l.icon}</div>
       <div class="feed-body">
         <div>${l.text}${t.voided ? ' <span class="tag">ANULADO</span>' : ''}</div>
         <div class="feed-sub">${l.sub ? l.sub + ' · ' : ''}<time title="${fmtDate(t.ts)}">${ago(t.ts)}</time></div>
       </div>${btn}</li>`;
+  }
+
+  // Resumen de un movimiento del historial (al tocarlo): quién, cuánto, marcas y tragaperras
+  function txSummary(t) {
+    const l = txLine(t); const def = TX[t.kind] || TX[t.type];
+    const row = (id, icon, label, d) => `<li class="${me() && me().id === id ? 'me' : ''}"><span>${icon}</span>
+      <span>${face(player(id), 'mini')} ${esc(player(id).name)} <span class="muted small">${d > 0 ? '+' : ''}${d}</span></span><b>${esc(label || '')}</b></li>`;
+    let body = '';
+    if (t.type === 'duel') {
+      const mark = (id) => (t.sw ? `${swSecs(t.sw[id])} s` : t.ag ? t.ag[id] : '');
+      body = `<ol class="fr-rank">${row(t.winner, '🏆', mark(t.winner), t.amount)}${row(t.loser, '😵', mark(t.loser), -t.amount)}</ol>`;
+    } else if (def && def.detail) {
+      body = def.detail(t);
+    } else {
+      const ef = effects(t).sort((a, b) => b[1] - a[1]);
+      if (ef.length > 1 || t.type === 'payout') body = `<ol class="fr-rank">${ef.map(([id, d]) => row(id, d > 0 ? '⬆️' : '⬇️', '', d)).join('')}</ol>`;
+    }
+    const slot = S.txs.find((x) => x.id === 'slot_' + t.id && !x.voided);
+    const sl = slot && TX.slot ? TX.slot.line(slot) : null;
+    modal(`<div class="tx-sum"><div class="modal-icon">${l.icon}</div><p class="modal-text">${l.text}</p>
+      <p class="hint center">${l.sub ? l.sub + ' · ' : ''}${esc(fmtDate(t.ts))}${t.voided ? ' · <b>ANULADO</b>' : ''}</p>
+      ${body}${sl ? `<p class="tx-sum-slot">${sl.text}</p>` : ''}</div>`, 'Cerrar', '');
   }
 
   // ============================================================
@@ -1573,6 +1595,9 @@
         act(() => Store.updateTx(v.dataset.void, { voided: true }), 'Movimiento anulado');
       }
       if (r) act(() => Store.updateTx(r.dataset.restore, { voided: false }), 'Movimiento restaurado');
+      if (v || r) return;
+      const li = e.target.closest('[data-tx]'); const t = li && S.txs.find((x) => x.id === li.dataset.tx);
+      if (t) txSummary(t);
     });
 
     // --- Banca: acceso
